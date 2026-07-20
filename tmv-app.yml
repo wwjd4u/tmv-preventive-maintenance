@@ -1,0 +1,6 @@
+tunnel: tmv-app
+credentials-file: /home/jason_guynes/.cloudflared/7e9a1044-7d6e-4bc8-a618-b5e76f46a7d0.json
+ingress:
+  - hostname: tmvapp.local-journal.com
+    service: http://localhost:9240
+  - service: http_status:404

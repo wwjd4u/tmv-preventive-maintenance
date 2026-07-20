@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TMV Field Task</title>
+<style>
+  :root{--cudd:#812F2F;--ink:#1a1a1a;--line:#e3e3e3;--ok:#16a34a;--warn:#d97706;--due:#dc2626}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.4 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6f8;color:var(--ink);-webkit-text-size-adjust:100%}
+  header{background:var(--cudd);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px}
+  header img{height:30px}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  main{padding:14px;max-width:560px;margin:0 auto;padding-bottom:90px}
+  .meta{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  .meta b{color:var(--cudd)}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:#6b7280}
+  .badge.assigned{background:#6b7280}.badge.in_progress{background:var(--warn)}.badge.completed{background:var(--ok)}
+  .section{border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px;margin-bottom:12px}
+  .section h3{margin:0 0 4px;font-size:15px;background:#eaf2fb;padding:8px 10px;border-radius:8px}
+  .row{padding:10px 4px;border-bottom:1px solid #f0f0f0}
+  .row:last-child{border-bottom:0}
+  .row .lbl{font-weight:600;margin-bottom:6px}
+  .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .opt{flex:1;min-width:70px;text-align:center;padding:10px 6px;border:2px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;font-size:14px;user-select:none}
+  .opt.sel-yes{border-color:var(--ok);background:#f0fdf4;color:var(--ok);font-weight:700}
+  .opt.sel-no{border-color:var(--due);background:#fef2f2;color:var(--due);font-weight:700}
+  .opt.sel-pass{border-color:var(--ok);background:#f0fdf4;color:var(--ok);font-weight:700}
+  .opt.sel-fail{border-color:var(--due);background:#fef2f2;color:var(--due);font-weight:700}
+  .opt.sel-val{border-color:var(--cudd);background:#fdf2f2;color:var(--cudd);font-weight:700}
+  .row input[type=text],.row input[type=number],.row input[type=date],.row select{width:100%;padding:9px 10px;font-size:14px;border:1px solid var(--line);border-radius:8px;margin-top:4px}
+  .photos{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:8px}
+  .photo{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+  .photo img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
+  .photo input[type=text]{border:0;border-top:1px solid var(--line);border-radius:0;font-size:13px}
+  .photo .x{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer}
+  .pbtn{display:block;width:100%;padding:12px;margin:8px 0;border:2px dashed var(--cudd);border-radius:10px;background:#fff;color:var(--cudd);font-weight:600;cursor:pointer;font-size:14px}
+  .btn{position:fixed;left:0;right:0;bottom:0;background:var(--cudd);color:#fff;border:0;padding:16px;font-size:17px;font-weight:700;cursor:pointer;z-index:60}
+  .btn:disabled{opacity:.5}
+  .ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:14px;border-radius:10px;margin-bottom:14px;font-weight:600}
+  .err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:12px 14px;border-radius:10px;margin-bottom:14px}
+  .load{padding:40px;text-align:center;color:#888}
+</style>
+</head>
+<body>
+<header>
+  <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
+  <h1>TMV Field Task</h1>
+</header>
+<main id="app"><div class="load">Loading task…</div></main>
+<div class="btn" id="completeBtn" style="display:none" onclick="completeTask()">✓ Complete Task</div>
+
+<script>
+var AID = location.pathname.split('/').pop();
+var ASSIGN = null;
+var PHOTOS = []; // {file, caption, local}
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+async function load(){
+  try{
+    var r = await fetch('/api/assignments/'+AID);
+    var d = await r.json();
+    if(!r.ok) throw new Error(d.error||'Not found');
+    ASSIGN = d.assignment;
+    render();
+  }catch(e){ document.getElementById('app').innerHTML='<div class="err">Could not load task: '+esc(e.message)+'</div>'; }
+}
+function render(){
+  if(ASSIGN.status==='completed'){
+    document.getElementById('completeBtn').style.display='none';
+    document.getElementById('app').innerHTML =
+      '<div class="ok">✓ Task completed'+(ASSIGN.completedAt?(' '+new Date(ASSIGN.completedAt).toLocaleString()):'')+'</div>'
+      +metaHtml();
+    return;
+  }
+  var html = metaHtml();
+  html += ASSIGN.sections.map(function(s,si){
+    var items = s.items.map(function(it,ii){
+      return '<div class="row"><div class="lbl">'+esc(it.label)+'</div>'+ctlHtml(si,ii,it)+'</div>';
+    }).join('');
+    return '<div class="section"><h3>'+esc(s.title)+'</h3>'+items+'</div>';
+  }).join('');
+  html += '<div class="section"><h3>Photos (camera / upload)</h3>'
+    +'<label class="pbtn" for="cam">📷 Add Photo</label>'
+    +'<input id="cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="onPick(event)">'
+    +'<div class="photos" id="photoGrid"></div></div>';
+  document.getElementById('app').innerHTML = html;
+  renderPhotos();
+  document.getElementById('completeBtn').style.display='block';
+  ASSIGN.status='in_progress';
+  save();
+}
+function metaHtml(){
+  return '<div class="meta">'
+    +'<div><b>'+esc(ASSIGN.tmv)+'</b> · '+esc(ASSIGN.vanType||'')+'</div>'
+    +'<div style="color:#666;font-size:13px">'+esc(ASSIGN.location||'')+' · '+esc(ASSIGN.date)+'</div>'
+    +'<div style="color:#666;font-size:13px">Tech: '+esc(ASSIGN.technician)+'</div>'
+    +'<span class="badge '+(ASSIGN.status||'assigned')+'">'+(ASSIGN.status||'assigned').replace('_',' ')+'</span>'
+    +'</div>';
+}
+function ctlHtml(si,ii,it){
+  var cur = (ASSIGN.results&&ASSIGN.results[si]&&ASSIGN.results[si].items[ii])?ASSIGN.results[si].items[ii].value:'';
+  switch(it.type){
+    case 'yn': return '<div class="opts">'
+      +opt('yes','Yes','sel-yes',si,ii,cur)
+      +opt('no','No','sel-no',si,ii,cur)+'</div>';
+    case 'ynpf': return '<div class="opts">'
+      +opt('yes','Yes','sel-yes',si,ii,cur)
+      +opt('no','No','sel-no',si,ii,cur)
+      +opt('pass','Pass','sel-pass',si,ii,cur)
+      +opt('fail','Fail','sel-fail',si,ii,cur)+'</div>';
+    case 'ynver': return '<div class="opts">'
+      +opt('yes','Yes','sel-yes',si,ii,cur)
+      +opt('no','No','sel-no',si,ii,cur)+'</div>'
+      +'<input type="text" id="v_'+si+'_'+ii+'" placeholder="Ver #" value="'+esc(cur&&cur.indexOf(' v')===0?'':(cur||''))+'" onchange="setVal('+si+','+ii+',this.value)">';
+    case 'pf': return '<div class="opts">'
+      +opt('pass','Pass','sel-pass',si,ii,cur)
+      +opt('fail','Fail','sel-fail',si,ii,cur)+'</div>';
+    case 'num': return '<input type="number" id="v_'+si+'_'+ii+'" value="'+esc(cur||'')+'" placeholder="value" onchange="setVal('+si+','+ii+',this.value)">';
+    case 'text': return '<input type="text" id="v_'+si+'_'+ii+'" value="'+esc(cur||'')+'" placeholder="entry" onchange="setVal('+si+','+ii+',this.value)">';
+    case 'date': return '<input type="date" id="v_'+si+'_'+ii+'" value="'+esc(cur||'')+'" onchange="setVal('+si+','+ii+',this.value)">';
+    case 'choice': return '<select id="v_'+si+'_'+ii+'" onchange="setVal('+si+','+ii+',this.value)">'
+      +it.opts.map(function(o){return '<option'+(o===cur?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>';
+    default: return '<input type="text" id="v_'+si+'_'+ii+'" value="'+esc(cur||'')+'" onchange="setVal('+si+','+ii+',this.value)">';
+  }
+}
+function opt(val,label,cls,si,ii,cur){
+  var sel = (cur===val)?(' '+cls):'';
+  return '<div class="opt'+sel+'" onclick="setOpt('+si+','+ii+',\''+val+'\',\''+cls+'\')">'+label+'</div>';
+}
+function ensureResults(){
+  if(!ASSIGN.results) ASSIGN.results = ASSIGN.sections.map(function(s){return {title:s.title,items:s.items.map(function(){return {value:''};})};});
+  // make sure length matches
+  ASSIGN.results = ASSIGN.sections.map(function(s,si){
+    var old = ASSIGN.results[si]||{items:[]};
+    return {title:s.title,items:s.items.map(function(it,ii){return old.items[ii]||{value:''};})};
+  });
+}
+function setOpt(si,ii,val,cls){
+  ensureResults();
+  ASSIGN.results[si].items[ii].value=val;
+  // update button styling
+  var row = document.querySelectorAll('.section')[si].querySelectorAll('.row')[ii];
+  var opts = row.querySelectorAll('.opt');
+  var map={'yes':'sel-yes','no':'sel-no','pass':'sel-pass','fail':'sel-fail'};
+  opts.forEach(function(o){o.className='opt'+(o.textContent.toLowerCase()===val?' '+(map[val]||'sel-val'):'');});
+  save();
+}
+function setVal(si,ii,v){ ensureResults(); ASSIGN.results[si].items[ii].value=v; save(); }
+
+function onPick(e){
+  var file = e.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    PHOTOS.push({local:ev.target.result});
+    renderPhotos();
+    uploadPhoto(ev.target.result, file.name);
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+async function uploadPhoto(dataUrl,name){
+  try{
+    var r=await fetch('/api/assignments/'+AID+'/photos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:dataUrl,name:name,caption:''})});
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.error||'upload failed');
+    // replace the local-only entry with server file
+    var i = PHOTOS.findIndex(p=>!p.file);
+    if(i>=0){PHOTOS[i].file=d.photo.file;PHOTOS[i].caption=d.photo.caption;}
+    save();
+    renderPhotos();
+  }catch(e){ alert('Photo upload failed: '+e.message); }
+}
+function renderPhotos(){
+  var grid=document.getElementById('photoGrid');
+  if(!grid) return;
+  grid.innerHTML = PHOTOS.map(function(p,i){
+    return '<div class="photo"><button class="x" onclick="delPhoto('+i+')">×</button>'
+      +'<img src="'+(p.file?('/uploads/'+encodeURIComponent(p.file)):p.local)+'">'
+      +'<input type="text" placeholder="Caption" value="'+esc(p.caption||'')+'" onchange="capPhoto('+i+',this.value)"></div>';
+  }).join('');
+}
+function capPhoto(i,v){ if(PHOTOS[i]){PHOTOS[i].caption=v; save(); } }
+function delPhoto(i){
+  var p=PHOTOS[i];
+  if(p&&p.file){ fetch('/api/assets/x/photos/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo:p.file})}).catch(function(){}); }
+  PHOTOS.splice(i,1); save(); renderPhotos();
+}
+function save(){
+  ensureResults();
+  var payload={status:ASSIGN.status,results:ASSIGN.results,photos:PHOTOS.map(function(p){return {file:p.file,caption:p.caption||''};})};
+  fetch('/api/assignments/'+AID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(){});
+}
+async function completeTask(){
+  ensureResults();
+  var payload={status:'completed',results:ASSIGN.results,photos:PHOTOS.map(function(p){return {file:p.file,caption:p.caption||''};})};
+  try{
+    var r=await fetch('/api/assignments/'+AID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.error||'save failed');
+    ASSIGN=d.assignment;
+    render();
+  }catch(e){ alert('Could not complete: '+e.message); }
+}
+load();
+</script>
+</body>
+</html>

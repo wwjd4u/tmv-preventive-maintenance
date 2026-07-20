@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TMV Field Work Orders</title>
+<style>
+  :root{--cudd:#812F2F;--ink:#1a1a1a;--line:#e3e3e3;--ok:#16a34a;--warn:#d97706}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.4 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6f8;color:var(--ink)}
+  header{background:var(--cudd);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px}
+  header h1{font-size:17px;margin:0;font-weight:600}
+  main{padding:14px;max-width:560px;margin:0 auto;padding-bottom:30px}
+  .hint{color:#666;font-size:13px;margin:4px 2px 14px}
+  .card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px;margin-bottom:12px;display:block;text-decoration:none;color:inherit}
+  .card:active{background:#fafafa}
+  .card .t{font-weight:700;font-size:16px}
+  .card .sub{color:#666;font-size:13px;margin-top:3px}
+  .card .tech{color:var(--cudd);font-size:13px;margin-top:6px;font-weight:600}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:#6b7280;margin-top:8px}
+  .badge.assigned{background:#6b7280}.badge.in_progress{background:var(--warn)}.badge.completed{background:var(--ok)}
+  .empty{text-align:center;color:#888;padding:40px 10px}
+</style>
+</head>
+<body>
+<header><h1>TMV Field Work Orders</h1></header>
+<main>
+  <div class="hint">Open a work order to complete the checklist with photos. Tap a card to begin.</div>
+  <div id="list"><div class="empty">Loading…</div></div>
+</main>
+<script>
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+async function load(){
+  try{
+    var r=await fetch('/api/assignments'); var d=await r.json();
+    var list=(d.assignments||[]).filter(function(a){return a.status!=='completed';});
+    var el=document.getElementById('list');
+    if(!list.length){ el.innerHTML='<div class="empty">No open work orders. Check back later.</div>'; return; }
+    el.innerHTML=list.map(function(a){
+      return '<a class="card" href="/tech/'+encodeURIComponent(a.id)+'">'
+        +'<div class="t">'+esc(a.tmv)+'</div>'
+        +'<div class="sub">'+esc(a.vanType||'')+(a.location?(' · '+esc(a.location)):'')+' · '+esc(a.date)+'</div>'
+        +'<div class="tech">Tech: '+esc(a.technician)+'</div>'
+        +'<span class="badge '+a.status+'">'+(a.status||'assigned').replace('_',' ')+'</span>'
+        +'</a>';
+    }).join('');
+  }catch(e){ document.getElementById('list').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; }
+}
+load();
+</script>
+</body>
+</html>

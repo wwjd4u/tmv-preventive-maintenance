@@ -1,0 +1,563 @@
+{
+  "intervals": [
+    30,
+    60,
+    90,
+    120,
+    180,
+    365
+  ],
+  "locations": [
+    "Odessa",
+    "Snyder",
+    "Seminole",
+    "Kilgore",
+    "Odessa Test Shack",
+    "Woodlands Lab",
+    "UAT-Kilgore"
+  ],
+  "unitOptions": [
+    "days",
+    "weeks",
+    "months"
+  ],
+  "vanTypes": [
+    "Legacy TMV",
+    "Virtual TMV",
+    "Twinfrac TMV",
+    "Odessa Test Shack",
+    "UAT",
+    "Woodlands Lab"
+  ],
+  "tmvVanMap": {
+    "TMV57449B": [
+      "Virtual TMV"
+    ],
+    "TMV57454B": [
+      "Virtual TMV"
+    ],
+    "TMV57560B": [
+      "Twinfrac TMV"
+    ],
+    "TMV57566B": [
+      "Virtual TMV"
+    ],
+    "TMV57738B": [
+      "Twinfrac TMV"
+    ],
+    "TMV57744B": [
+      "Legacy TMV",
+      "Twinfrac TMV"
+    ],
+    "TMV57757B": [
+      "Legacy TMV"
+    ],
+    "TMV57763B": [
+      "Legacy TMV"
+    ],
+    "TMV57879B": [
+      "Virtual TMV"
+    ],
+    "TMV57903B": [
+      "Virtual TMV"
+    ],
+    "TMV57909B": [
+      "Virtual TMV"
+    ],
+    "TMV87455B": [
+      "Virtual TMV"
+    ],
+    "TMV87461B": [
+      "Legacy TMV"
+    ],
+    "TMV97776B": [
+      "Legacy TMV"
+    ],
+    "Odessa Test Shack": [
+      "Legacy TMV"
+    ],
+    "Woodlands Lab": [
+      "Virtual TMV"
+    ],
+    "Kilgore UAT": [
+      "Virtual TMV"
+    ]
+  },
+  "technicians": [
+    {
+      "name": "Mike Stettler",
+      "whatsapp": "",
+      "telegram": ""
+    },
+    {
+      "name": "Johnathon Gouge",
+      "whatsapp": "",
+      "telegram": ""
+    },
+    {
+      "name": "Jason Guynes",
+      "whatsapp": "",
+      "telegram": ""
+    },
+    {
+      "name": "Payton Calicutt",
+      "whatsapp": "",
+      "telegram": ""
+    }
+  ],
+  "checklist": [
+    {
+      "title": "Legacy TMV",
+      "appliesTo": [
+        "Legacy TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Servers cleaned, working and connected to shared drive",
+          "type": "yn"
+        },
+        {
+          "label": "Engineer",
+          "type": "yn"
+        },
+        {
+          "label": "FracLink",
+          "type": "yn"
+        },
+        {
+          "label": "DASTRAC",
+          "type": "yn"
+        },
+        {
+          "label": "MultiFrac 1",
+          "type": "yn"
+        },
+        {
+          "label": "MultiFrac 2",
+          "type": "yn"
+        },
+        {
+          "label": "Spare",
+          "type": "yn"
+        },
+        {
+          "label": "Lab",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "Virtual TMV",
+      "appliesTo": [
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Number of servers",
+          "type": "num"
+        },
+        {
+          "label": "BIOS revision #",
+          "type": "text"
+        },
+        {
+          "label": "System boots up and terminals Wake On LAN",
+          "type": "yn"
+        },
+        {
+          "label": "Anywhere USB installed",
+          "type": "yn"
+        },
+        {
+          "label": "Anywhere USB working on all stations",
+          "type": "yn"
+        },
+        {
+          "label": "Type of station terminal",
+          "type": "choice",
+          "opts": [
+            "Dell",
+            "HP",
+            "Igel"
+          ]
+        },
+        {
+          "label": "Type of terminal software",
+          "type": "text"
+        },
+        {
+          "label": "Standalone Station working",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "Twinfrac TMV",
+      "appliesTo": [
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Secondary Belly switch",
+          "type": "yn"
+        },
+        {
+          "label": "Four Hoffman switches",
+          "type": "yn"
+        },
+        {
+          "label": "Twin Engineer",
+          "type": "yn"
+        },
+        {
+          "label": "Twin FracLink",
+          "type": "yn"
+        },
+        {
+          "label": "Twin MultiFrac",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "UPS and Power Systems",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Number and type(s) of UPS units",
+          "type": "text"
+        },
+        {
+          "label": "Load Test (5 mins after generator is off)",
+          "type": "num"
+        },
+        {
+          "label": "Network card installed",
+          "type": "yn"
+        },
+        {
+          "label": "Battery type",
+          "type": "choice",
+          "opts": [
+            "Lead",
+            "Lithium"
+          ]
+        },
+        {
+          "label": "Battery install date",
+          "type": "date"
+        },
+        {
+          "label": "Generator OFF Alarm",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "Air Conditioning and Environmental Controls",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Rack AC installed",
+          "type": "yn"
+        },
+        {
+          "label": "Rack AC underneath UPS",
+          "type": "yn"
+        },
+        {
+          "label": "Rack AC drain line installed",
+          "type": "yn"
+        },
+        {
+          "label": "Rack AC exhaust duct installed",
+          "type": "yn"
+        },
+        {
+          "label": "TMV AC units working",
+          "type": "yn"
+        },
+        {
+          "label": "AC manifold for server cabinet installed",
+          "type": "yn"
+        },
+        {
+          "label": "Server cabinet filter replaced",
+          "type": "yn"
+        },
+        {
+          "label": "Mini-Split installed",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "Network and Server Components",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "TMV Cleanliness (Major Issues)",
+          "type": "text"
+        },
+        {
+          "label": "Starlink connected to internet",
+          "type": "choice",
+          "opts": [
+            "Primary",
+            "Secondary"
+          ]
+        },
+        {
+          "label": "# of installed Starlink units",
+          "type": "choice",
+          "opts": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "label": "BEC units connected to 4G network",
+          "type": "choice",
+          "opts": [
+            "Primary",
+            "Secondary"
+          ]
+        },
+        {
+          "label": "BEC units disabled",
+          "type": "yn"
+        },
+        {
+          "label": "Meraki MX unit(s) installed",
+          "type": "yn"
+        },
+        {
+          "label": "Palo Alto",
+          "type": "choice",
+          "opts": [
+            "PA-220",
+            "PA-450R"
+          ]
+        },
+        {
+          "label": "Switches",
+          "type": "choice",
+          "opts": [
+            "Dell N2048P",
+            "9200L",
+            "9300L-4 10G",
+            "9300L-8 10G"
+          ]
+        },
+        {
+          "label": "# of installed switch units",
+          "type": "num"
+        },
+        {
+          "label": "Wi-Fi is available and connected",
+          "type": "choice",
+          "opts": [
+            "Crew",
+            "Equip",
+            "Guest",
+            "Mech"
+          ]
+        },
+        {
+          "label": "Printer available over network",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "IoT Edge Mini Servers",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "# of IoT Edge Servers",
+          "type": "num"
+        },
+        {
+          "label": "IoT Edge Servers location",
+          "type": "choice",
+          "opts": [
+            "Wall",
+            "Server Cabinet"
+          ]
+        },
+        {
+          "label": "Primary MultiFrac connects to pumps",
+          "type": "ynver"
+        },
+        {
+          "label": "Secondary MultiFrac connects to pumps",
+          "type": "ynver"
+        }
+      ]
+    },
+    {
+      "title": "Monitors",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "All monitors working for all stations",
+          "type": "yn"
+        },
+        {
+          "label": "Non-standard monitor installations",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "Observability Server",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Observability Server installed",
+          "type": "yn"
+        },
+        {
+          "label": "Observability Server location",
+          "type": "text"
+        },
+        {
+          "label": "Observability Server connected and working",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "Time Machine",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Time Machine installed and connected to antenna",
+          "type": "yn"
+        },
+        {
+          "label": "Time Machine location",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "title": "Serial and DeviceMaster",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "DeviceMaster installation status",
+          "type": "yn"
+        },
+        {
+          "label": "Status of unnecessary DeviceMaster ports",
+          "type": "yn"
+        },
+        {
+          "label": "Virtual CAN Connection",
+          "type": "choice",
+          "opts": [
+            "CAN Gateway",
+            "CAN USB adapter"
+          ]
+        },
+        {
+          "label": "Status of Serial Inputs 1-4",
+          "type": "pf"
+        },
+        {
+          "label": "DAS Serial Output status",
+          "type": "yn"
+        },
+        {
+          "label": "Engineer",
+          "type": "yn"
+        },
+        {
+          "label": "Slide-out wall",
+          "type": "yn"
+        }
+      ]
+    },
+    {
+      "title": "Meraki Sensors",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Installation status of sensors",
+          "type": "choice",
+          "opts": [
+            "Top",
+            "Middle",
+            "Bottom"
+          ]
+        },
+        {
+          "label": "Rack door sensor installation",
+          "type": "choice",
+          "opts": [
+            "Front",
+            "Side",
+            "None"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "FracLink",
+      "appliesTo": [
+        "Legacy TMV",
+        "Virtual TMV",
+        "Twinfrac TMV"
+      ],
+      "items": [
+        {
+          "label": "Client Viewer installation status",
+          "type": "yn"
+        },
+        {
+          "label": "Remote Viewer installation status (Engineer)",
+          "type": "ynver"
+        }
+      ]
+    }
+  ]
+}

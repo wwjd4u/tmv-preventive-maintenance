@@ -1,0 +1,14 @@
+# Runtime data (not source)
+assignments.json
+uploads/
+server.log
+tunnel.log
+tunnel-url.txt
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+*.swp

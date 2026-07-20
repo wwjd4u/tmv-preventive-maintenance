@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMV Preventive Maintenance</title>
+<style>
+  :root{
+    --cudd:#812F2F; --cudd-dk:#5e2121; --ink:#1a1a1a; --line:#e3e3e3;
+    --ok:#16a34a; --warn:#d97706; --due:#dc2626; --none:#9ca3af; --bg:#f5f6f8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.4 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--cudd);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
+  header img{height:34px}
+  header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.3px}
+  nav{margin-left:auto;display:flex;gap:8px}
+  nav button{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer}
+  nav button.active{background:#fff;color:var(--cudd);font-weight:600}
+  main{padding:18px;max-width:1100px;margin:0 auto}
+  .view{display:none}
+  .view.active{display:block}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  select,input,textarea{font:14px inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card h3{margin:0 0 6px;font-size:15px}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff}
+  .b-ok{background:var(--ok)} .b-warn{background:var(--warn)} .b-due{background:var(--due)} .b-none{background:var(--none)}
+  .meta{color:#666;font-size:13px;margin:4px 0}
+  .err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:12px 14px;border-radius:10px;margin-bottom:14px;white-space:pre-wrap;font:13px/1.4 monospace}
+  .summary{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .pill{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 16px;text-align:center;min-width:90px}
+  .pill b{display:block;font-size:22px}
+  /* TMV detail */
+  .tmv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+  .tmv-btn{border:2px solid var(--line);background:#fff;border-radius:12px;padding:14px;cursor:pointer;text-align:left}
+  .tmv-btn:hover{border-color:var(--cudd)}
+  .tmv-btn .id{font-weight:700;font-size:15px}
+  .tmv-btn .vt{color:#666;font-size:12px;margin-top:4px}
+  .meta-bar{position:sticky;top:54px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:40;margin-bottom:16px}
+  .meta-bar label{font-size:13px;color:#555;display:flex;flex-direction:column;gap:3px}
+  .section{border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px;margin-bottom:12px}
+  .section h3{margin:0 0 4px;font-size:15px;background:#eaf2fb;padding:8px 10px;border-radius:8px;display:flex;align-items:center;justify-content:space-between}
+  .inc{font-size:13px;color:#555;font-weight:500;display:flex;align-items:center;gap:5px;margin:0 0 8px 2px;cursor:pointer}
+  .items{margin-top:10px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 4px;border-bottom:1px solid #f0f0f0}
+  .row:last-child{border-bottom:0}
+  .row .lbl{flex:1;min-width:200px}
+  .row .ctl{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .row .ctl label{font-size:13px;color:#444;display:flex;gap:4px;align-items:center}
+  .row input[type=text],.row input[type=number],.row input[type=date]{padding:5px 8px;font-size:13px}
+  .row select{padding:5px 8px;font-size:13px}
+  .btn{background:var(--cudd);color:#fff;border:0;padding:10px 18px;border-radius:9px;font-size:15px;cursor:pointer;font-weight:600}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--cudd);border:1px solid var(--cudd)}
+  .btn.back{background:#eee;color:#333;border:1px solid #ccc}
+  .ticket{margin-top:16px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:16px}
+  .ticket pre{white-space:pre-wrap;font:13px/1.5 monospace;background:#f8f8fa;padding:12px;border-radius:8px}
+  .links{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .links a{text-decoration:none;padding:10px 16px;border-radius:9px;color:#fff;font-weight:600}
+  .wa{background:#25D366} .tg{background:#229ED9}
+  .hidden{display:none}
+  footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
+  .ok-note{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:10px 14px;border-radius:10px;margin-top:14px}
+  .assign-link{margin-top:12px;font-size:14px;word-break:break-all}
+</style>
+</head>
+<body>
+<header>
+  <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
+  <h1>TMV Preventive Maintenance</h1>
+  <nav>
+    <button id="tabTmv" class="active" onclick="showView('tmv')">🚚 TMV Inspections</button>
+    <button id="tabTracker" onclick="showView('tracker')">Tracker</button>
+  </nav>
+</header>
+
+<main>
+  <div id="errSlot"></div>
+
+  <!-- TRACKER VIEW -->
+  <section id="viewTracker" class="view">
+    <div class="summary" id="summary"></div>
+    <div class="bar">
+      <select id="filter"><option value="all">All statuses</option><option value="ok">OK</option><option value="warn">Due Soon</option><option value="due">DUE</option></select>
+      <select id="filterType"><option value="all">All van types</option></select>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <!-- TMV INSPECTIONS VIEW -->
+  <section id="viewTmv" class="view active">
+    <div id="tmvPicker">
+      <h2 style="margin-top:0">Select a TMV Unit</h2>
+      <div class="tmv-grid" id="tmvGrid"></div>
+    </div>
+
+    <div id="tmvDetail" class="hidden">
+      <button class="btn back" onclick="backToTmv()">← Back to TMV list</button>
+      <div class="meta-bar">
+        <label>TMV Unit<input type="text" id="dTmv" readonly></label>
+        <label>Van Type<input type="text" id="dVan" readonly></label>
+        <label>Location<select id="dLoc"></select></label>
+        <label>Date<input type="date" id="dDate"></label>
+        <label>Technician<select id="dTech"><option value="">— choose —</option></select></label>
+      </div>
+      <div id="sections"></div>
+      <button class="btn" id="genBtn" onclick="submitInspection()" disabled>Generate Ticket &amp; Log</button>
+      <button class="btn ghost" id="assignBtn" onclick="assignToTech()" disabled style="margin-top:10px">📲 Assign to Technician</button>
+      <button class="btn ghost" id="demoBtn" onclick="loadDemo()" style="margin-top:10px">🧪 Load Demo Work Orders</button>
+      <div id="assignOut" class="hidden"></div>
+      <div id="ticketOut" class="hidden"></div>
+    </div>
+  </section>
+</main>
+
+<footer>CUDD Energy Services · Preventive Maintenance</footer>
+
+<script src="app.js?v=20260720E"></script>
+</body>
+</html>
