@@ -265,17 +265,29 @@ function doLogin(){
   document.getElementById('loginErr').textContent='';
   fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
     .then(r=>r.json()).then(d=>{
-      if(d.token){token=d.token;document.getElementById('loginOverlay').style.display='none';loadData();}
+      if(d.ok||d.token){
+        token = d.token;
+        document.cookie='admin_token='+encodeURIComponent(d.token)+';path=/;max-age=28800;SameSite=Lax';
+        try{sessionStorage.setItem('tmv_admin_token',d.token);}catch(e){}
+        document.getElementById('loginOverlay').style.display='none';
+        loadData();
+      }
       else document.getElementById('loginErr').textContent=d.error||'Invalid credentials';
     }).catch(()=>document.getElementById('loginErr').textContent='Server error');
 }
-(function(){
+// Auto-login: wait for DOM ready, then try autologin param → cookie → sessionStorage
+document.addEventListener('DOMContentLoaded', function(){
   if(location.search.includes('autologin=1')){
     var u=sessionStorage.getItem('tmv_db_user'),p=sessionStorage.getItem('tmv_db_pass');
-    if(u&&p){document.getElementById('user').value=u;document.getElementById('pass').value=p;setTimeout(doLogin,100);}
+    if(u&&p){document.getElementById('user').value=u;document.getElementById('pass').value=p;setTimeout(doLogin,100);return;}
   }
-})();
-function authHdr(){return{'Authorization':'Bearer '+token}}
+  // Try cookie set by previous login
+  const ck = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('admin_token='));
+  if(ck){token=decodeURIComponent(ck.split('=')[1]);document.getElementById('loginOverlay').style.display='none';loadData();return;}
+  // Try sessionStorage (legacy)
+  try{token=sessionStorage.getItem('tmv_admin_token');if(token){document.getElementById('loginOverlay').style.display='none';loadData();}}catch(e){}
+});
+function authHdr(){return{'Authorization':'Bearer '+token,'Content-Type':'application/json'}}
 
 /* ── Load ── */
 function loadData(){

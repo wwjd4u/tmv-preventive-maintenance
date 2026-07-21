@@ -159,7 +159,7 @@ http.createServer((req, res) => {
     return serveFile(res, path.join(__dirname, 'index.html'));
   }
 
-  // ── Serve DB viewer page (admin) ──
+  // ── Serve DB viewer page (served always — client-side JS handles login overlay) ──
   if (url.pathname === '/db' || url.pathname === '/db.html') {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
