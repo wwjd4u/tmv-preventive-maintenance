@@ -99,3 +99,25 @@ function saveConfig(c) {
 }
 
 module.exports = { db, loadAssignments, saveAssignments, purgeAssignments, loadAssets, saveAssets, loadConfig, saveConfig };
+
+// ---- individual asset CRUD ----
+function getAssetById(id) {
+  const row = db.prepare('SELECT data FROM assets WHERE id = ?').get(String(id));
+  return row ? JSON.parse(row.data) : null;
+}
+function upsertAsset(asset) {
+  db.prepare('INSERT OR REPLACE INTO assets (id, data) VALUES (?, ?)').run(String(asset.id), JSON.stringify(asset));
+}
+function deleteAssetById(id) {
+  db.prepare('DELETE FROM assets WHERE id = ?').run(String(id));
+}
+function getAllAssets() {
+  return db.prepare('SELECT data FROM assets').all().map(r => JSON.parse(r.data));
+}
+
+module.exports = {
+  loadAssignments, saveAssignments, purgeAssignments,
+  loadAssets, saveAssets,
+  getAssetById, upsertAsset, deleteAssetById, getAllAssets,
+  loadConfig, saveConfig
+};

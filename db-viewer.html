@@ -25,6 +25,7 @@
   .btn{background:var(--cudd);color:#fff;border:0;padding:10px 18px;border-radius:9px;font-size:15px;cursor:pointer;font-weight:600}
   .btn.ghost{background:#fff;color:var(--cudd);border:1px solid var(--cudd)}
   .btn.sm{padding:6px 12px;font-size:13px}
+  .btn.danger{background:var(--due)}
 
   /* Login overlay */
   #loginOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:center;justify-content:center}
@@ -39,6 +40,12 @@
   .tab.active{color:var(--cudd);border-bottom-color:var(--cudd)}
   .tab:hover{color:var(--ink)}
 
+  /* Sub-tabs for Assets */
+  .subtabs{display:flex;gap:0;border-bottom:2px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+  .subtab{padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;font-weight:500;color:#666;font-size:14px}
+  .subtab.active{color:var(--cudd);border-bottom-color:var(--cudd)}
+  .subtab:hover{color:var(--ink)}
+
   /* Table */
   .tbl-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -50,9 +57,6 @@
   .b-assigned{background:#3b82f6}
   .b-in_progress{background:#d97706}
   .b-completed{background:#16a34a}
-  .b-ok{background:var(--ok)}
-  .b-warn{background:var(--warn)}
-  .b-due{background:var(--due)}
 
   /* Detail panel */
   #detailPanel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;overflow-y:auto}
@@ -81,6 +85,27 @@
   .filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
   .search{width:260px}
   .empty{text-align:center;padding:40px;color:#999;font-size:15px}
+
+  /* CRUD cards for Assets sub-tabs */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:14px;margin-bottom:16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;position:relative}
+  .card h3{margin:0 0 8px;font-size:15px;color:var(--cudd)}
+  .card p{margin:4px 0;font-size:13px;color:#555}
+  .card .card-actions{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+  .card .card-actions button{padding:4px 8px;font-size:12px;border-radius:6px}
+  .add-bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  .add-bar input,.add-bar select{flex:1;min-width:140px}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal{background:#fff;border-radius:14px;padding:24px;min-width:380px;max-width:520px;max-height:85vh;overflow-y:auto}
+  .modal h2{margin:0 0 16px;color:var(--cudd)}
+  .form-row{margin-bottom:12px}
+  .form-row label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:4px}
+  .form-row input,.form-row select,.form-row textarea{width:100%}
+  .form-row textarea{resize:vertical;min-height:60px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+  .tag{display:inline-block;background:#f0f0f0;padding:3px 8px;border-radius:6px;font-size:12px;margin:2px}
+  .tag .rem{color:var(--due);cursor:pointer;margin-left:4px}
 
   footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
 </style>
@@ -134,22 +159,70 @@
     <div id="assignEmpty" class="empty" style="display:none">No assignments found.</div>
   </div>
 
-  <!-- ASSETS VIEW -->
+  <!-- ASSETS VIEW (5 sub-tabs) -->
   <div id="viewAssets" class="view">
-    <div class="filter-bar">
-      <input id="searchAssets" class="search" placeholder="Search assets…" oninput="renderAssets()">
-      <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+    <div class="subtabs">
+      <div class="subtab active" id="subTmv" onclick="switchSubTab('tmv')">🚚 TMV's</div>
+      <div class="subtab" id="subLoc" onclick="switchSubTab('locations')">📍 Locations</div>
+      <div class="subtab" id="subTech" onclick="switchSubTab('techs')">👷 Technicians</div>
+      <div class="subtab" id="subDist" onclick="switchSubTab('districts')">🗺️ District</div>
+      <div class="subtab" id="subTasks" onclick="switchSubTab('tasks')">📝 Tasks</div>
     </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          <th>ID</th><th>Name</th><th>Type</th><th>Location</th>
-          <th>TMV ID</th><th>Interval</th><th>Last Maint</th>
-        </tr></thead>
-        <tbody id="assetsBody"></tbody>
-      </table>
+
+    <!-- TMV's sub-tab -->
+    <div id="subViewTmv">
+      <div class="add-bar">
+        <button class="btn sm" onclick="openAssetModal()">+ Add TMV</button>
+        <input id="searchTmv" class="search" placeholder="Search TMV's…" oninput="renderTmvCards()">
+        <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+      </div>
+      <div class="card-grid" id="tmvCards"></div>
+      <div id="tmvEmpty" class="empty" style="display:none">No TMV assets found.</div>
     </div>
-    <div id="assetsEmpty" class="empty" style="display:none">No assets found.</div>
+
+    <!-- Locations sub-tab -->
+    <div id="subViewLocations" style="display:none">
+      <div class="add-bar">
+        <input id="newLoc" placeholder="New location name" onkeydown="if(event.key==='Enter')addLocation()">
+        <button class="btn sm" onclick="addLocation()">+ Add</button>
+        <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+      </div>
+      <div class="card-grid" id="locCards"></div>
+      <div id="locEmpty" class="empty" style="display:none">No locations found.</div>
+    </div>
+
+    <!-- Technicians sub-tab -->
+    <div id="subViewTechs" style="display:none">
+      <div class="add-bar">
+        <button class="btn sm" onclick="openTechModal()">+ Add Technician</button>
+        <input id="searchTech" class="search" placeholder="Search technicians…" oninput="renderTechCards()">
+        <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+      </div>
+      <div class="card-grid" id="techCards"></div>
+      <div id="techEmpty" class="empty" style="display:none">No technicians found.</div>
+    </div>
+
+    <!-- Districts sub-tab -->
+    <div id="subViewDistricts" style="display:none">
+      <div class="add-bar">
+        <input id="newDist" placeholder="District name" onkeydown="if(event.key==='Enter')addDistrict()">
+        <button class="btn sm" onclick="addDistrict()">+ Add</button>
+        <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+      </div>
+      <div class="card-grid" id="distCards"></div>
+      <div id="distEmpty" class="empty" style="display:none">No districts found.</div>
+    </div>
+
+    <!-- Tasks sub-tab -->
+    <div id="subViewTasks" style="display:none">
+      <div class="add-bar">
+        <button class="btn sm" onclick="openTaskModal()">+ Add Task Group</button>
+        <input id="searchTask" class="search" placeholder="Search tasks…" oninput="renderTaskCards()">
+        <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+      </div>
+      <div class="card-grid" id="taskCards"></div>
+      <div id="taskEmpty" class="empty" style="display:none">No task groups found.</div>
+    </div>
   </div>
 
   <!-- CONFIG VIEW -->
@@ -157,6 +230,61 @@
     <pre id="configPre" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;overflow-x:auto;font:13px/1.5 monospace;white-space:pre-wrap"></pre>
   </div>
 </main>
+
+<!-- MODAL: Add/Edit TMV -->
+<div class="modal-overlay" id="assetModal">
+  <div class="modal">
+    <h2 id="assetModalTitle">Add TMV</h2>
+    <input type="hidden" id="editAssetId">
+    <div class="form-row"><label>Name *</label><input id="aName" placeholder="e.g. TMV57449B Inspection"></div>
+    <div class="form-row"><label>TMV ID</label><input id="aTmvId" placeholder="e.g. TMV57449B"></div>
+    <div class="form-row"><label>Type</label><select id="aType"></select></div>
+    <div class="form-row"><label>Location</label><select id="aLocation"></select></div>
+    <div class="form-row"><label>Interval</label><input id="aInterval" type="number" placeholder="90"></div>
+    <div class="form-row"><label>Unit</label>
+      <select id="aUnit"><option value="days">days</option><option value="months">months</option></select>
+    </div>
+    <div class="form-row"><label>Last Maintenance (epoch ms)</label><input id="aLastMaint" type="number" placeholder="e.g. 1784419200000"></div>
+    <div class="form-row"><label>Notes</label><textarea id="aNotes"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeAssetModal()">Cancel</button>
+      <button class="btn" onclick="saveAsset()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Technician -->
+<div class="modal-overlay" id="techModal">
+  <div class="modal">
+    <h2 id="techModalTitle">Add Technician</h2>
+    <input type="hidden" id="editTechIdx">
+    <div class="form-row"><label>Name *</label><input id="tName" placeholder="e.g. Mike Stettler"></div>
+    <div class="form-row"><label>WhatsApp</label><input id="tWhatsapp" placeholder="+1234567890"></div>
+    <div class="form-row"><label>Telegram</label><input id="tTelegram" placeholder="@username"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeTechModal()">Cancel</button>
+      <button class="btn" onclick="saveTech()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Task Group -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <h2 id="taskModalTitle">Add Task Group</h2>
+    <input type="hidden" id="editTaskIdx">
+    <div class="form-row"><label>Title *</label><input id="tkTitle" placeholder="e.g. Virtual TMV"></div>
+    <div class="form-row"><label>Applies To (van types)</label><div id="tkAppliesTo" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
+    <div class="form-row"><label>Items (one per line: label|type)</label>
+      <textarea id="tkItems" rows="6" placeholder="Servers cleaned|yn&#10;Engineer|yn&#10;BIOS revision|text"></textarea>
+      <small style="color:#999">Format: label|type (yn, num, text, date, choice)</small>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeTaskModal()">Cancel</button>
+      <button class="btn" onclick="saveTask()">Save</button>
+    </div>
+  </div>
+</div>
 
 <div id="detailPanel" onclick="if(event.target===this)closeDetail()">
   <div id="detailBox">
@@ -208,7 +336,12 @@ function loadData(){
       dbData = d;
       renderStats();
       renderAssignments();
-      renderAssets();
+      renderTmvCards();
+      renderLocCards();
+      renderTechCards();
+      renderDistCards();
+      renderTaskCards();
+      populateSelects();
       document.getElementById('configPre').textContent = JSON.stringify(d.config, null, 2);
     })
     .catch(() => alert('Failed to load DB data'));
@@ -225,16 +358,37 @@ function renderStats(){
     `<div class="stat"><b>${dbData.assets.length}</b><span>Assets</span></div>`;
 }
 
+function populateSelects(){
+  const cfg = dbData.config;
+  // Populate TMV type select
+  const typeSel = document.getElementById('aType');
+  typeSel.innerHTML = (cfg.vanTypes||[]).map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  // Populate location select
+  const locSel = document.getElementById('aLocation');
+  locSel.innerHTML = (cfg.locations||[]).map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  // Populate appliesTo checkboxes in task modal
+  const atDiv = document.getElementById('tkAppliesTo');
+  atDiv.innerHTML = (cfg.vanTypes||[]).map(t =>
+    `<label style="font-size:13px;display:flex;align-items:center;gap:4px;background:#f0f0f0;padding:4px 8px;border-radius:6px">
+      <input type="checkbox" value="${esc(t)}" class="atCb"> ${esc(t)}
+    </label>`).join('');
+}
+
+// ── Sub-tab switching ──
+function switchSubTab(tab){
+  ['tmv','locations','techs','districts','tasks'].forEach(t => {
+    document.getElementById('sub'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
+    document.getElementById('subView'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = t===tab ? 'block' : 'none';
+  });
+}
+
+// ── Assignments ──
 function statusBadge(s){
   const cls = 'b-' + (s||'assigned');
   const label = (s||'assigned').replace('_',' ');
   return `<span class="badge ${cls}">${label}</span>`;
 }
-
-function ts(t){
-  if(!t) return '—';
-  return new Date(t).toLocaleString();
-}
+function ts(t){ if(!t) return '—'; return new Date(t).toLocaleString(); }
 
 function renderAssignments(){
   const filter = document.getElementById('filterStatus').value;
@@ -260,27 +414,6 @@ function renderAssignments(){
   </tr>`).join('');
 }
 
-function renderAssets(){
-  const q = document.getElementById('searchAssets').value.toLowerCase();
-  let list = dbData.assets;
-  if(q) list = list.filter(x =>
-    (x.name||'').toLowerCase().includes(q) ||
-    (x.type||'').toLowerCase().includes(q) ||
-    (x.location||'').toLowerCase().includes(q)
-  );
-  const tbody = document.getElementById('assetsBody');
-  document.getElementById('assetsEmpty').style.display = list.length?'none':'block';
-  tbody.innerHTML = list.map(a => `<tr>
-    <td>${a.id}</td>
-    <td><strong>${esc(a.name||'—')}</strong></td>
-    <td>${esc(a.type||'—')}</td>
-    <td>${esc(a.location||'—')}</td>
-    <td>${esc(a.tmvId||'—')}</td>
-    <td>${a.interval||'—'} ${a.unit||''}</td>
-    <td class="ts">${a.lastMaint ? ts(a.lastMaint) : '—'}</td>
-  </tr>`).join('');
-}
-
 function showAssignment(id){
   const a = dbData.assignments.find(x => x.id === id);
   if(!a) return;
@@ -294,8 +427,6 @@ function showAssignment(id){
     <strong>Date:</strong> ${a.date||'—'}<br>
     <strong>Created:</strong> ${ts(a.createdAt)}<br>
     <strong>Completed:</strong> ${ts(a.completedAt)}</p></div>`;
-
-  // Results (technician checklist)
   if(a.results && a.results.length){
     html += `<div class="section"><h3>Technician Results</h3><div class="checklist">`;
     a.results.forEach(sec => {
@@ -314,11 +445,7 @@ function showAssignment(id){
       });
     });
     html += `</div></div>`;
-  } else if(a.status==='completed'){
-    html += `<div class="section"><em style="color:#999">No detailed results recorded.</em></div>`;
   }
-
-  // Photos
   if(a.photos && a.photos.length){
     html += `<div class="section"><h3>Photos (${a.photos.length})</h3><div class="photo-grid">`;
     a.photos.forEach(p => {
@@ -331,12 +458,276 @@ function showAssignment(id){
     });
     html += `</div></div>`;
   }
-
   document.getElementById('detailContent').innerHTML = html;
   document.getElementById('detailPanel').style.display = 'block';
 }
 function closeDetail(){ document.getElementById('detailPanel').style.display='none'; }
 
+// ── TMV Cards (CRUD) ──
+function renderTmvCards(){
+  const q = (document.getElementById('searchTmv')?.value||'').toLowerCase();
+  let list = dbData.assets;
+  if(q) list = list.filter(x =>
+    (x.name||'').toLowerCase().includes(q) ||
+    (x.tmvId||'').toLowerCase().includes(q) ||
+    (x.location||'').toLowerCase().includes(q)
+  );
+  const grid = document.getElementById('tmvCards');
+  document.getElementById('tmvEmpty').style.display = list.length?'none':'block';
+  grid.innerHTML = list.map(a => `<div class="card">
+    <div class="card-actions">
+      <button class="btn sm ghost" onclick="editAsset('${a.id}')">Edit</button>
+      <button class="btn sm danger ghost" onclick="deleteAsset('${a.id}')">Del</button>
+    </div>
+    <h3>${esc(a.name||'—')}</h3>
+    <p><strong>TMV ID:</strong> ${esc(a.tmvId||'—')}</p>
+    <p><strong>Type:</strong> ${esc(a.type||'—')}</p>
+    <p><strong>Location:</strong> ${esc(a.location||'—')}</p>
+    <p><strong>Interval:</strong> ${a.interval||'—'} ${a.unit||''}</p>
+    <p><strong>Last Maint:</strong> ${a.lastMaint ? ts(a.lastMaint) : '—'}</p>
+  </div>`).join('');
+}
+
+function openAssetModal(assetId){
+  document.getElementById('assetModalTitle').textContent = assetId ? 'Edit TMV' : 'Add TMV';
+  document.getElementById('editAssetId').value = assetId || '';
+  document.getElementById('aName').value = '';
+  document.getElementById('aTmvId').value = '';
+  document.getElementById('aInterval').value = '';
+  document.getElementById('aUnit').value = 'days';
+  document.getElementById('aLastMaint').value = '';
+  document.getElementById('aNotes').value = '';
+  populateSelects();
+  if(assetId){
+    const a = dbData.assets.find(x => String(x.id) === String(assetId));
+    if(!a) return;
+    document.getElementById('aName').value = a.name||'';
+    document.getElementById('aTmvId').value = a.tmvId||'';
+    document.getElementById('aType').value = a.type||'';
+    document.getElementById('aLocation').value = a.location||'';
+    document.getElementById('aInterval').value = a.interval||'';
+    document.getElementById('aUnit').value = a.unit||'days';
+    document.getElementById('aLastMaint').value = a.lastMaint||'';
+    document.getElementById('aNotes').value = a.notes||'';
+  }
+  document.getElementById('assetModal').classList.add('open');
+}
+function closeAssetModal(){ document.getElementById('assetModal').classList.remove('open'); }
+
+function saveAsset(){
+  const id = document.getElementById('editAssetId').value;
+  const a = {
+    id: id ? Number(id) : Date.now(),
+    name: document.getElementById('aName').value.trim(),
+    tmvId: document.getElementById('aTmvId').value.trim(),
+    type: document.getElementById('aType').value,
+    location: document.getElementById('aLocation').value,
+    interval: Number(document.getElementById('aInterval').value) || 90,
+    unit: document.getElementById('aUnit').value,
+    lastMaint: Number(document.getElementById('aLastMaint').value) || null,
+    notes: document.getElementById('aNotes').value.trim(),
+    photos: [],
+    maintBy: '',
+    inspections: []
+  };
+  if(!a.name){ alert('Name is required'); return; }
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/assets/${id}` : '/api/assets';
+  fetch(url, { method, headers: {...authHdr(), 'Content-Type':'application/json'}, body: JSON.stringify(a) })
+    .then(r => r.json())
+    .then(d => {
+      if(d.error) alert(d.error);
+      else { closeAssetModal(); loadData(); }
+    })
+    .catch(() => alert('Save failed'));
+}
+
+function editAsset(id){ openAssetModal(id); }
+function deleteAsset(id){
+  if(!confirm('Delete this TMV asset?')) return;
+  fetch(`/api/assets/${id}`, { method:'DELETE', headers: authHdr() })
+    .then(r => r.json())
+    .then(d => { if(d.error) alert(d.error); else loadData(); })
+    .catch(() => alert('Delete failed'));
+}
+
+// ── Locations (CRUD) ──
+function renderLocCards(){
+  const locs = dbData.config.locations || [];
+  const grid = document.getElementById('locCards');
+  document.getElementById('locEmpty').style.display = locs.length?'none':'block';
+  grid.innerHTML = locs.map((l,i) => `<div class="card">
+    <div class="card-actions">
+      <button class="btn sm danger ghost" onclick="deleteLocation(${i})">Del</button>
+    </div>
+    <h3>${esc(l)}</h3>
+  </div>`).join('');
+}
+function addLocation(){
+  const val = document.getElementById('newLoc').value.trim();
+  if(!val){ alert('Enter a location name'); return; }
+  const locs = [...(dbData.config.locations||[]), val];
+  patchConfigArray('locations', locs);
+  document.getElementById('newLoc').value = '';
+}
+function deleteLocation(idx){
+  if(!confirm('Delete this location?')) return;
+  const locs = (dbData.config.locations||[]).filter((_,i) => i!==idx);
+  patchConfigArray('locations', locs);
+}
+function patchConfigArray(key, value){
+  fetch(`/api/admin/config/array/${key}`, {
+    method:'PATCH', headers:{...authHdr(),'Content-Type':'application/json'},
+    body: JSON.stringify({op:'set', value})
+  }).then(r=>r.json()).then(d=>{ if(d.error)alert(d.error); else loadData(); })
+    .catch(()=>alert('Update failed'));
+}
+
+// ── Technicians (CRUD) ──
+function renderTechCards(){
+  const q = (document.getElementById('searchTech')?.value||'').toLowerCase();
+  let list = dbData.config.technicians || [];
+  if(q) list = list.filter(x => (x.name||'').toLowerCase().includes(q));
+  const grid = document.getElementById('techCards');
+  document.getElementById('techEmpty').style.display = list.length?'none':'block';
+  grid.innerHTML = list.map((t,i) => `<div class="card">
+    <div class="card-actions">
+      <button class="btn sm ghost" onclick="editTech(${i})">Edit</button>
+      <button class="btn sm danger ghost" onclick="deleteTech(${i})">Del</button>
+    </div>
+    <h3>${esc(t.name||'—')}</h3>
+    <p><strong>WhatsApp:</strong> ${esc(t.whatsapp||'—')}</p>
+    <p><strong>Telegram:</strong> ${esc(t.telegram||'—')}</p>
+  </div>`).join('');
+}
+function openTechModal(idx){
+  document.getElementById('editTechIdx').value = idx ?? '';
+  document.getElementById('techModalTitle').textContent = (idx!==null&&idx!=='') ? 'Edit Technician' : 'Add Technician';
+  document.getElementById('tName').value = '';
+  document.getElementById('tWhatsapp').value = '';
+  document.getElementById('tTelegram').value = '';
+  if(idx!==null&&idx!==''){
+    const t = (dbData.config.technicians||[])[idx];
+    if(t){ document.getElementById('tName').value=t.name||''; document.getElementById('tWhatsapp').value=t.whatsapp||''; document.getElementById('tTelegram').value=t.telegram||''; }
+  }
+  document.getElementById('techModal').classList.add('open');
+}
+function closeTechModal(){ document.getElementById('techModal').classList.remove('open'); }
+function saveTech(){
+  const idx = document.getElementById('editTechIdx').value;
+  const t = { name:document.getElementById('tName').value.trim(), whatsapp:document.getElementById('tWhatsapp').value.trim(), telegram:document.getElementById('tTelegram').value.trim() };
+  if(!t.name){ alert('Name is required'); return; }
+  let techs = [...(dbData.config.technicians||[])];
+  if(idx) techs[idx] = t; else techs.push(t);
+  patchConfigArray('technicians', techs);
+  closeTechModal();
+}
+function editTech(i){ openTechModal(i); }
+function deleteTech(i){
+  if(!confirm('Delete this technician?')) return;
+  const techs = (dbData.config.technicians||[]).filter((_,j)=>j!==i);
+  patchConfigArray('technicians', techs);
+}
+
+// ── Districts (CRUD) ──
+function renderDistCards(){
+  const dists = dbData.config.districts || [];
+  const grid = document.getElementById('distCards');
+  document.getElementById('distEmpty').style.display = dists.length?'none':'block';
+  grid.innerHTML = dists.map((d,i) => `<div class="card">
+    <div class="card-actions">
+      <button class="btn sm ghost" onclick="editDist(${i})">Edit</button>
+      <button class="btn sm danger ghost" onclick="deleteDist(${i})">Del</button>
+    </div>
+    <h3>${esc(typeof d==='string'?d:d.name||'—')}</h3>
+    ${typeof d==='object'&&d.notes? '<p>'+esc(d.notes)+'</p>':''}
+  </div>`).join('');
+}
+function addDistrict(){
+  const val = document.getElementById('newDist').value.trim();
+  if(!val){ alert('Enter a district name'); return; }
+  const dists = [...(dbData.config.districts||[]), val];
+  patchConfigArray('districts', dists);
+  document.getElementById('newDist').value = '';
+}
+function editDist(i){
+  const d = (dbData.config.districts||[])[i];
+  const name = typeof d==='string' ? d : (d.name||'');
+  const newName = prompt('District name:', name);
+  if(newName!==null && newName.trim()){
+    const dists = [...(dbData.config.districts||[])];
+    dists[i] = newName.trim();
+    patchConfigArray('districts', dists);
+  }
+}
+function deleteDist(i){
+  if(!confirm('Delete this district?')) return;
+  const dists = (dbData.config.districts||[]).filter((_,j)=>j!==i);
+  patchConfigArray('districts', dists);
+}
+
+// ── Tasks / Checklist (CRUD) ──
+function renderTaskCards(){
+  const q = (document.getElementById('searchTask')?.value||'').toLowerCase();
+  let list = dbData.config.checklist || [];
+  if(q) list = list.filter(x => (x.title||'').toLowerCase().includes(q));
+  const grid = document.getElementById('taskCards');
+  document.getElementById('taskEmpty').style.display = list.length?'none':'block';
+  grid.innerHTML = list.map((t,i) => `<div class="card">
+    <div class="card-actions">
+      <button class="btn sm ghost" onclick="editTask(${i})">Edit</button>
+      <button class="btn sm danger ghost" onclick="deleteTask(${i})">Del</button>
+    </div>
+    <h3>${esc(t.title||'—')}</h3>
+    <p><strong>Applies To:</strong> ${(t.appliesTo||[]).map(x=>`<span class="tag">${esc(x)}</span>`).join(' ')}</p>
+    <p><strong>Items:</strong> ${(t.items||[]).length} field(s)</p>
+  </div>`).join('');
+}
+function openTaskModal(idx){
+  document.getElementById('editTaskIdx').value = idx ?? '';
+  document.getElementById('taskModalTitle').textContent = (idx!==null&&idx!=='') ? 'Edit Task Group' : 'Add Task Group';
+  document.getElementById('tkTitle').value = '';
+  document.getElementById('tkItems').value = '';
+  populateSelects();
+  // Uncheck all
+  document.querySelectorAll('.atCb').forEach(cb => cb.checked=false);
+  if(idx!==null&&idx!==''){
+    const t = (dbData.config.checklist||[])[idx];
+    if(t){
+      document.getElementById('tkTitle').value = t.title||'';
+      (t.appliesTo||[]).forEach(a => {
+        document.querySelectorAll('.atCb').forEach(cb => { if(cb.value===a) cb.checked=true; });
+      });
+      document.getElementById('tkItems').value = (t.items||[]).map(it => `${it.label}|${it.type||'yn'}`).join('\n');
+    }
+  }
+  document.getElementById('taskModal').classList.add('open');
+}
+function closeTaskModal(){ document.getElementById('taskModal').classList.remove('open'); }
+function saveTask(){
+  const idx = document.getElementById('editTaskIdx').value;
+  const title = document.getElementById('tkTitle').value.trim();
+  if(!title){ alert('Title is required'); return; }
+  const appliesTo = Array.from(document.querySelectorAll('.atCb')).filter(cb=>cb.checked).map(cb=>cb.value);
+  const itemsRaw = document.getElementById('tkItems').value.split('\n').filter(l=>l.trim());
+  const items = itemsRaw.map(l => {
+    const parts = l.split('|');
+    return { label: parts[0]?.trim()||'', type: parts[1]?.trim()||'yn' };
+  }).filter(it=>it.label);
+  let tasks = [...(dbData.config.checklist||[])];
+  const taskObj = { title, appliesTo, items };
+  if(idx) tasks[idx] = taskObj; else tasks.push(taskObj);
+  patchConfigArray('checklist', tasks);
+  closeTaskModal();
+}
+function editTask(i){ openTaskModal(i); }
+function deleteTask(i){
+  if(!confirm('Delete this task group?')) return;
+  const tasks = (dbData.config.checklist||[]).filter((_,j)=>j!==i);
+  patchConfigArray('checklist', tasks);
+}
+
+// ── Tab switching ──
 function switchTab(tab){
   ['assign','assets','config'].forEach(t => {
     document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
@@ -347,7 +738,6 @@ function switchTab(tab){
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function enc(s){ return encodeURIComponent(s||''); }
 
-// Enter key login
 document.getElementById('pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 </script>
 </body>
