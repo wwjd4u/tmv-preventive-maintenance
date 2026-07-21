@@ -105,6 +105,21 @@
   .mrow.addrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);margin-bottom:0}
   .msel{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
   .minput{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+  /* category cards */
+  .catblock{display:block;grid-column:1/-1}
+  .catcard{border:1px solid var(--line);border-radius:10px;margin-top:12px;overflow:hidden}
+  .cathead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#faf7f7;cursor:default}
+  .catname{cursor:pointer;font-weight:600;color:#3a2a2a;font-size:15px}
+  .catname .car{color:var(--cudd);width:14px;display:inline-block}
+  .catname .cnt{color:#999;font-weight:normal;font-size:13px}
+  .catbtns{display:flex;gap:8px}
+  .cattasks{padding:12px 14px;border-top:1px solid var(--line);background:#fff}
+  .taskline{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed #eee}
+  .taskline:last-child{border-bottom:none}
+  .taskline .tlabel{flex:1;font-size:14px}
+  .taskline .ttype{font-size:12px;color:#888;background:#f0f0f0;border-radius:6px;padding:2px 8px}
+  .empty{color:#999;font-size:13px;font-style:italic;padding:6px 0}
+  .addtaskrow{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -205,20 +220,15 @@
         </div>
       </section>
 
-      <!-- CATEGORIES -->
-      <section class="mblock">
+      <!-- CATEGORIES (expandable cards) -->
+      <section class="mblock catblock">
         <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>
-        <div class="mrow">
-          <select id="selCat" class="msel"></select>
-          <button class="btn sm ghost" onclick="renameCat()">Rename</button>
-          <button class="btn sm danger" onclick="deleteCat()">× Remove</button>
-        </div>
         <div class="mrow addrow">
           <input id="newCat" class="minput" placeholder="Air Conditioning">
           <button class="btn sm" onclick="addCat()">+ Add Category</button>
         </div>
+        <div id="catCards"></div>
       </section>
-
     </div>
   </div>
 
@@ -433,12 +443,8 @@ function renderAssetManager(){
   }));
   document.getElementById('cntTech').textContent = '(' + cfg.technicians.length + ')';
 
-  // --- Categories (checklist section titles) ---
-  _fill('selCat', cfg.checklist.map(function(c,i){
-    var label = typeof c==='string' ? c : (c.title||c.label||('Category '+(i+1)));
-    return {value:String(i), label:label};
-  }));
-  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';
+  // --- Categories (expandable cards) ---
+  renderCatCards();
 }
 
 /* ---- TMV Units ---- */
@@ -542,7 +548,61 @@ function deleteTech(){
   saveConfigArray('technicians', cfg.technicians);
 }
 
-/* ---- Categories (checklist sections) ---- */
+/* ---- Categories (checklist sections) — expandable cards ---- */
+function renderCatCards(){
+  var cfg = dbData.config || {};
+  cfg.checklist = cfg.checklist || [];
+  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';
+  var wrap = document.getElementById('catCards');
+  wrap.innerHTML = '';
+  cfg.checklist.forEach(function(c, ci){
+    var title = typeof c==='string' ? c : (c.title||c.label||('Category '+(ci+1)));
+    var items = (typeof c==='object' && c.items) ? c.items : [];
+    var html = '<div class="catcard">' +
+      '<div class="cathead">' +
+        '<div class="catname" onclick="toggleCat(' + ci + ')"><span class="car">' + (isCatOpen(ci)?'▾':'▸') + '</span> ' + esc(title) + ' <span class="cnt">(' + items.length + ')</span></div>' +
+        '<div class="catbtns">' +
+          '<button class="btn sm ghost" onclick="renameCat(' + ci + ')">Rename</button>' +
+          '<button class="btn sm danger" onclick="deleteCat(' + ci + ')">× Remove</button>' +
+        '</div>' +
+      '</div>';
+    if(isCatOpen(ci)){
+      html += '<div class="cattasks">';
+      if(items.length){
+        items.forEach(function(it, ii){
+          var label = typeof it==='string' ? it : (it.label||'');
+          var type  = typeof it==='object' ? (it.type||'text') : 'text';
+          html += '<div class="taskline">' +
+            '<span class="tlabel">' + esc(label) + '</span>' +
+            '<span class="ttype">' + esc(type) + '</span>' +
+            '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +
+          '</div>';
+        });
+      } else {
+        html += '<div class="empty">No tasks yet.</div>';
+      }
+      html += '<div class="addtaskrow">' +
+        '<input id="newTaskLabel_' + ci + '" class="minput" placeholder="Task description (e.g. AC filter replaced)">' +
+        '<select id="newTaskType_' + ci + '" class="msel">' +
+          '<option value="yn">Yes/No</option>' +
+          '<option value="num">Number</option>' +
+          '<option value="text">Text</option>' +
+          '<option value="date">Date</option>' +
+          '<option value="choice">Choice</option>' +
+        '</select>' +
+        '<button class="btn sm" onclick="addTask(' + ci + ')">+ Add Task</button>' +
+      '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    wrap.innerHTML += html;
+  });
+}
+
+var _openCats = {};
+function isCatOpen(ci){ return _openCats[ci] === true; }
+function toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }
+
 function addCat(){
   var cfg = dbData.config;
   var v = document.getElementById('newCat').value.trim();
@@ -552,27 +612,47 @@ function addCat(){
   document.getElementById('newCat').value = '';
   saveConfigArray('checklist', cfg.checklist);
 }
-function renameCat(){
+function renameCat(ci){
   var cfg = dbData.config;
-  var i = parseInt(document.getElementById('selCat').value, 10);
-  if(isNaN(i)) return;
-  var cur = cfg.checklist[i];
+  var cur = cfg.checklist[ci];
+  if(!cur) return;
   var curTitle = typeof cur==='string' ? cur : (cur.title||cur.label||'');
   var v = prompt('Rename category:', curTitle);
   if(v!==null && v.trim()){
-    if(typeof cur==='string') cfg.checklist[i] = {title:v.trim(), appliesTo:[], items:[]};
+    if(typeof cur==='string') cfg.checklist[ci] = {title:v.trim(), appliesTo:[], items:[]};
     else cur.title = v.trim();
     saveConfigArray('checklist', cfg.checklist);
   }
 }
-function deleteCat(){
+function deleteCat(ci){
   var cfg = dbData.config;
-  var i = parseInt(document.getElementById('selCat').value, 10);
-  if(isNaN(i)) return;
-  var cur = cfg.checklist[i];
+  var cur = cfg.checklist[ci];
   var title = typeof cur==='string' ? cur : (cur.title||cur.label||'');
-  if(!confirm('Remove category "' + title + '" and its checklist items?')) return;
-  cfg.checklist.splice(i,1);
+  if(!confirm('Remove category "' + title + '" and ALL its tasks?')) return;
+  cfg.checklist.splice(ci,1);
+  if(_openCats[ci]) delete _openCats[ci];
+  saveConfigArray('checklist', cfg.checklist);
+}
+
+/* task add/remove within a category */
+function addTask(ci){
+  var cfg = dbData.config;
+  var cat = cfg.checklist[ci];
+  if(!cat) return;
+  if(typeof cat==='string'){ cat = cfg.checklist[ci] = {title:cat, appliesTo:[], items:[]}; }
+  var label = document.getElementById('newTaskLabel_' + ci).value.trim();
+  if(!label){ alert('Task description required'); return; }
+  var type = document.getElementById('newTaskType_' + ci).value;
+  if(!cat.items) cat.items = [];
+  cat.items.push({label:label, type:type});
+  saveConfigArray('checklist', cfg.checklist);
+}
+function deleteTask(ci, ii){
+  var cfg = dbData.config;
+  var cat = cfg.checklist[ci];
+  if(!cat || typeof cat==='string') return;
+  if(!confirm('Delete task "' + ((cat.items[ii].label)||'') + '"?')) return;
+  cat.items.splice(ii, 1);
   saveConfigArray('checklist', cfg.checklist);
 }
 
