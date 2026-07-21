@@ -185,6 +185,19 @@ function doLogin(){
     .catch(() => document.getElementById('loginErr').textContent = 'Server error');
 }
 
+// Auto-login from sessionStorage (triggered by ?autologin=1 from main app)
+(function(){
+  if(location.search.includes('autologin=1')){
+    var u = sessionStorage.getItem('tmv_db_user');
+    var p = sessionStorage.getItem('tmv_db_pass');
+    if(u && p){
+      document.getElementById('user').value = u;
+      document.getElementById('pass').value = p;
+      setTimeout(doLogin, 100);
+    }
+  }
+})();
+
 function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
 
 function loadData(){

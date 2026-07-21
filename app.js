@@ -273,6 +273,12 @@ async function loadDemo(){
 }
 function escHtml(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+function goDb(){
+  sessionStorage.setItem("tmv_db_user", "admin");
+  sessionStorage.setItem("tmv_db_pass", "admin123");
+  window.open("/db?autologin=1", "_blank");
+}
+
 // ── Auth removed: app opens directly to the TMV grid ─────
 
 boot();
