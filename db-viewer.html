@@ -94,6 +94,17 @@
   .line-item button:hover{color:var(--due)}
 
   footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
+
+  /* SINGLE-PAGE ASSET MANAGER */
+  .muted{color:#888;font-size:13px;margin-left:8px}
+  .asset-manage{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;margin-top:12px}
+  .mblock{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+  .mblock h3{margin:0 0 14px;color:var(--cudd);font-size:15px;border-bottom:2px solid var(--cudd);padding-bottom:8px}
+  .mblock .cnt{color:#999;font-weight:normal;font-size:13px}
+  .mrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .mrow.addrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);margin-bottom:0}
+  .msel{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
+  .minput{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
 </style>
 </head>
 <body>
@@ -144,108 +155,84 @@
 
   <!-- ASSETS TAB -->
   <div id="viewAssets" class="view">
-    <div class="subtabs">
-      <div class="subtab active" onclick="switchSubTab('tmvs', this)">TMV's</div>
-      <div class="subtab" onclick="switchSubTab('locations', this)">Locations</div>
-      <div class="subtab" onclick="switchSubTab('techs', this)">Technicians</div>
-      <div class="subtab" onclick="switchSubTab('districts', this)">Districts</div>
-      <div class="subtab" onclick="switchSubTab('tasks', this)">Tasks</div>
+    <div class="bar">
+      <button class="btn ghost sm" onclick="loadData()">↻ Refresh</button>
+      <span class="muted">Manage all master lists on one page — dropdowns use your supplied data.</span>
     </div>
 
-    <!-- TMV's sub-view -->
-    <div id="subTmvs" class="subview active">
-      <div class="bar">
-        <button class="btn sm" onclick="toggleAddForm('tmv')">+ Add TMV</button>
-        <input id="searchTmvs" class="search" placeholder="Search TMV's..." oninput="renderTmvCards()">
-        <button class="btn ghost sm" onclick="loadData()">Refresh</button>
-      </div>
-      <div id="addTmvForm" class="add-form">
-        <h3>Add New TMV</h3>
-        <div class="form-row"><label>ID:</label><input id="newTmvId" placeholder="TMV-001"></div>
-        <div class="form-row"><label>Name:</label><input id="newTmvName" placeholder="Building A TMV"></div>
-        <div class="form-row"><label>Type:</label><input id="newTmvType" placeholder="Type A"></div>
-        <div class="form-row"><label>Location:</label><input id="newTmvLoc" placeholder="Main Floor"></div>
-        <div class="form-actions">
-          <button class="btn sm" onclick="addTmv()">Save</button>
-          <button class="btn ghost sm" onclick="toggleAddForm('tmv')">Cancel</button>
-        </div>
-      </div>
-      <div class="card-grid" id="tmvCards"></div>
-      <div id="tmvEmpty" class="empty" style="display:none">No TMV's yet. Click "+ Add TMV" to create one.</div>
-    </div>
+    <div class="asset-manage">
 
-    <!-- Locations sub-view -->
-    <div id="subLocations" class="subview">
-      <div class="bar">
-        <button class="btn sm" onclick="toggleAddForm('location')">+ Add Location</button>
-        <input id="searchLocs" class="search" placeholder="Search locations..." oninput="renderLocCards()">
-      </div>
-      <div id="addLocationForm" class="add-form">
-        <h3>Add New Location</h3>
-        <div class="form-row"><label>Name:</label><input id="newLocName" placeholder="Main Building"></div>
-        <div class="form-actions">
-          <button class="btn sm" onclick="addLocation()">Save</button>
-          <button class="btn ghost sm" onclick="toggleAddForm('location')">Cancel</button>
+      <!-- TMV UNITS -->
+      <section class="mblock">
+        <h3>TMV Units <span class="cnt" id="cntTmv"></span></h3>
+        <div class="mrow">
+          <select id="selTmv" class="msel" onchange="onSelTmv()"></select>
+          <select id="selTmvType" class="msel" title="Van type" onchange="updateTmvType()"></select>
+          <button class="btn sm danger" onclick="deleteTmv()">× Remove</button>
         </div>
-      </div>
-      <div class="card-grid" id="locCards"></div>
-      <div id="locEmpty" class="empty" style="display:none">No locations yet.</div>
-    </div>
+        <div class="mrow addrow">
+          <input id="newTmvId" class="minput" placeholder="TMV57560B">
+          <select id="newTmvType" class="msel"></select>
+          <button class="btn sm" onclick="addTmv()">+ Add TMV</button>
+        </div>
+      </section>
 
-    <!-- Technicians sub-view -->
-    <div id="subTechs" class="subview">
-      <div class="bar">
-        <button class="btn sm" onclick="toggleAddForm('tech')">+ Add Technician</button>
-        <input id="searchTechs" class="search" placeholder="Search technicians..." oninput="renderTechCards()">
-      </div>
-      <div id="addTechForm" class="add-form">
-        <h3>Add New Technician</h3>
-        <div class="form-row"><label>Name:</label><input id="newTechName" placeholder="John Smith"></div>
-        <div class="form-row"><label>WhatsApp:</label><input id="newTechWa" placeholder="+1234567890"></div>
-        <div class="form-row"><label>Telegram:</label><input id="newTechTg" placeholder="@username"></div>
-        <div class="form-actions">
-          <button class="btn sm" onclick="addTech()">Save</button>
-          <button class="btn ghost sm" onclick="toggleAddForm('tech')">Cancel</button>
+      <!-- LOCATIONS -->
+      <section class="mblock">
+        <h3>Locations <span class="cnt" id="cntLoc"></span></h3>
+        <div class="mrow">
+          <select id="selLoc" class="msel"></select>
+          <button class="btn sm ghost" onclick="renameLoc()">Rename</button>
+          <button class="btn sm danger" onclick="deleteLoc()">× Remove</button>
         </div>
-      </div>
-      <div class="card-grid" id="techCards"></div>
-      <div id="techEmpty" class="empty" style="display:none">No technicians yet.</div>
-    </div>
+        <div class="mrow addrow">
+          <input id="newLoc" class="minput" placeholder="Midland">
+          <button class="btn sm" onclick="addLoc()">+ Add Location</button>
+        </div>
+      </section>
 
-    <!-- Districts sub-view -->
-    <div id="subDistricts" class="subview">
-      <div class="bar">
-        <button class="btn sm" onclick="toggleAddForm('district')">+ Add District</button>
-        <input id="searchDists" class="search" placeholder="Search districts..." oninput="renderDistCards()">
-      </div>
-      <div id="addDistrictForm" class="add-form">
-        <h3>Add New District</h3>
-        <div class="form-row"><label>Name:</label><input id="newDistName" placeholder="North District"></div>
-        <div class="form-actions">
-          <button class="btn sm" onclick="addDistrict()">Save</button>
-          <button class="btn ghost sm" onclick="toggleAddForm('district')">Cancel</button>
+      <!-- TECHNICIANS -->
+      <section class="mblock">
+        <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
+        <div class="mrow">
+          <select id="selTech" class="msel"></select>
+          <button class="btn sm ghost" onclick="renameTech()">Rename</button>
+          <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
         </div>
-      </div>
-      <div class="card-grid" id="distCards"></div>
-      <div id="distEmpty" class="empty" style="display:none">No districts yet.</div>
-    </div>
+        <div class="mrow addrow">
+          <input id="newTech" class="minput" placeholder="Jason Guynes">
+          <button class="btn sm" onclick="addTech()">+ Add Technician</button>
+        </div>
+      </section>
 
-    <!-- Tasks sub-view -->
-    <div id="subTasks" class="subview">
-      <div class="bar">
-        <button class="btn sm" onclick="toggleAddForm('task')">+ Add Task</button>
-        <input id="searchTasks" class="search" placeholder="Search tasks..." oninput="renderTaskCards()">
-      </div>
-      <div id="addTaskForm" class="add-form">
-        <h3>Add New Task</h3>
-        <div class="form-row"><label>Label:</label><input id="newTaskLabel" placeholder="Check valve pressure"></div>
-        <div class="form-actions">
-          <button class="btn sm" onclick="addTask()">Save</button>
-          <button class="btn ghost sm" onclick="toggleAddForm('task')">Cancel</button>
+      <!-- DISTRICTS -->
+      <section class="mblock">
+        <h3>Districts <span class="cnt" id="cntDist"></span></h3>
+        <div class="mrow">
+          <select id="selDist" class="msel"></select>
+          <button class="btn sm ghost" onclick="renameDist()">Rename</button>
+          <button class="btn sm danger" onclick="deleteDist()">× Remove</button>
         </div>
-      </div>
-      <div class="card-grid" id="taskCards"></div>
-      <div id="taskEmpty" class="empty" style="display:none">No tasks yet.</div>
+        <div class="mrow addrow">
+          <input id="newDist" class="minput" placeholder="Permian Basin">
+          <button class="btn sm" onclick="addDist()">+ Add District</button>
+        </div>
+      </section>
+
+      <!-- CATEGORIES -->
+      <section class="mblock">
+        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>
+        <div class="mrow">
+          <select id="selCat" class="msel"></select>
+          <button class="btn sm ghost" onclick="renameCat()">Rename</button>
+          <button class="btn sm danger" onclick="deleteCat()">× Remove</button>
+        </div>
+        <div class="mrow addrow">
+          <input id="newCat" class="minput" placeholder="Air Conditioning">
+          <button class="btn sm" onclick="addCat()">+ Add Category</button>
+        </div>
+      </section>
+
     </div>
   </div>
 
@@ -325,7 +312,7 @@ function loadData(){
       dbData = d;
       try { renderStats(); } catch(e){ console.error('renderStats', e); }
       try { renderAssignments(); } catch(e){ console.error('renderAssignments', e); }
-      try { renderTmvCards(); } catch(e){ console.error('renderTmvCards', e); }
+      try { renderAssetManager(); } catch(e){ console.error('renderAssetManager', e); }
       try { populateConfig(); } catch(e){ console.error('populateConfig', e); }
     })
     .catch(() => alert('Failed to load DB data'));
@@ -360,46 +347,8 @@ function switchTab(tab){
   });
   document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
   document.getElementById('view'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
-  if(tab === 'assets'){ renderTmvCards(); }
+  if(tab === 'assets'){ renderAssetManager(); }
   if(tab === 'config'){ populateConfig(); }
-}
-
-function switchSubTab(name, btn){
-  ['subTmvs','subLocations','subTechs','subDistricts','subTasks'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el) el.classList.remove('active');
-  });
-  var subtabs = document.getElementById('viewAssets').querySelector('.subtabs').children;
-  for(var i=0; i<subtabs.length; i++){ subtabs[i].classList.remove('active'); }
-  var viewId = 'sub' + name.charAt(0).toUpperCase() + name.slice(1);
-  var viewEl = document.getElementById(viewId);
-  if(viewEl) viewEl.classList.add('active');
-  if(btn) btn.classList.add('active');
-  if(name==='tmvs') renderTmvCards();
-  if(name==='locations') renderLocCards();
-  if(name==='techs') renderTechCards();
-  if(name==='districts') renderDistCards();
-  if(name==='tasks') renderTaskCards();
-}
-
-/* TOGGLE ADD FORM */
-function toggleAddForm(type){
-  var formMap = {
-    'tmv': 'addTmvForm',
-    'location': 'addLocationForm',
-    'tech': 'addTechForm',
-    'district': 'addDistrictForm',
-    'task': 'addTaskForm'
-  };
-  var formId = formMap[type];
-  var form = document.getElementById(formId);
-  if(form){
-    form.classList.toggle('active');
-    if(form.classList.contains('active')){
-      var firstInput = form.querySelector('input');
-      if(firstInput) firstInput.focus();
-    }
-  }
 }
 
 /* ASSIGNMENTS */
@@ -454,275 +403,223 @@ function showAssignment(id){
 }
 function closeDetail(){ document.getElementById('detailPanel').style.display = 'none'; }
 
-/* TMV CARDS - with inline add form */
-function renderTmvCards(){
-  const grid = document.getElementById('tmvCards');
-  grid.innerHTML = '';
-  const tmvs = dbData.assets || [];
-  if(tmvs.length===0){ document.getElementById('tmvEmpty').style.display='block'; return; }
-  document.getElementById('tmvEmpty').style.display='none';
-  tmvs.forEach(function(a){
-    grid.innerHTML += '<div class="card">' +
-      '<h3>'+esc(a.name||a.id)+'</h3>' +
-      '<div class="meta">ID: '+esc(a.id||'')+'</div>' +
-      '<div class="meta">Type: '+esc(a.type||'-')+'</div>' +
-      '<div class="meta">Location: '+esc(a.location||'-')+'</div>' +
-      '<div class="card-actions">' +
-        '<button onclick="editTmv(' + JSON.stringify(a.id) + ')">Edit</button>' +
-        '<button class="danger" onclick="deleteAsset(' + JSON.stringify(a.id) + ')">X Delete</button>' +
-      '</div>' +
-    '</div>';
+/* ===== SINGLE-PAGE ASSET MANAGER (dropdown-driven) ===== */
+
+function _fill(sel, items, current){
+  var s = document.getElementById(sel);
+  if(!s) return;
+  s.innerHTML = '';
+  items.forEach(function(it){
+    var o = document.createElement('option');
+    o.value = it.value; o.textContent = it.label;
+    s.appendChild(o);
   });
+  if(current!=null) s.value = current;
+}
+
+function renderAssetManager(){
+  var cfg = dbData.config || {};
+  cfg.locations   = cfg.locations   || [];
+  cfg.technicians = cfg.technicians || [];
+  cfg.districts   = cfg.districts   || [];
+  cfg.checklist   = cfg.checklist   || [];
+  cfg.vanTypes    = cfg.vanTypes    || [];
+  cfg.tmvVanMap   = cfg.tmvVanMap   || {};
+
+  // --- TMV Units (from tmvVanMap) ---
+  var tmvIds = Object.keys(cfg.tmvVanMap);
+  _fill('selTmv', tmvIds.map(function(id){ return {value:id, label:id}; }));
+  // van-type dropdowns
+  var typeOpts = cfg.vanTypes.map(function(t){ return {value:t, label:t}; });
+  _fill('selTmvType', typeOpts);
+  _fill('newTmvType', typeOpts);
+  document.getElementById('cntTmv').textContent = '(' + tmvIds.length + ')';
+  onSelTmv();
+
+  // --- Locations ---
+  _fill('selLoc', cfg.locations.map(function(l,i){ return {value:String(i), label:l}; }));
+  document.getElementById('cntLoc').textContent = '(' + cfg.locations.length + ')';
+
+  // --- Technicians ---
+  _fill('selTech', cfg.technicians.map(function(t,i){
+    var name = typeof t==='string' ? t : (t.name||'');
+    return {value:String(i), label:name};
+  }));
+  document.getElementById('cntTech').textContent = '(' + cfg.technicians.length + ')';
+
+  // --- Districts ---
+  _fill('selDist', cfg.districts.map(function(d,i){ return {value:String(i), label:d}; }));
+  document.getElementById('cntDist').textContent = '(' + cfg.districts.length + ')';
+
+  // --- Categories (checklist section titles) ---
+  _fill('selCat', cfg.checklist.map(function(c,i){
+    var label = typeof c==='string' ? c : (c.title||c.label||('Category '+(i+1)));
+    return {value:String(i), label:label};
+  }));
+  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';
+}
+
+/* ---- TMV Units ---- */
+function onSelTmv(){
+  var cfg = dbData.config || {};
+  var id = document.getElementById('selTmv').value;
+  var map = cfg.tmvVanMap || {};
+  var cur = map[id];
+  var curType = Array.isArray(cur) ? (cur[0]||'') : (cur||'');
+  var sel = document.getElementById('selTmvType');
+  if(sel && curType) sel.value = curType;
+}
+
+function updateTmvType(){
+  var cfg = dbData.config;
+  var id = document.getElementById('selTmv').value;
+  if(!id) return;
+  var type = document.getElementById('selTmvType').value;
+  cfg.tmvVanMap[id] = [type];
+  saveConfigArray('tmvVanMap', cfg.tmvVanMap);
 }
 
 function addTmv(){
+  var cfg = dbData.config;
   var id = document.getElementById('newTmvId').value.trim();
-  var name = document.getElementById('newTmvName').value.trim();
-  if(!id || !name){ alert('ID and Name are required'); return; }
-  var type = document.getElementById('newTmvType').value.trim();
-  var location = document.getElementById('newTmvLoc').value.trim();
-  fetch('/api/assets', {
-    method:'POST',
-    headers:{...authHdr(),'Content-Type':'application/json'},
-    body:JSON.stringify({id:id, name:name, type:type, location:location})
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(){
-    document.getElementById('newTmvId').value = '';
-    document.getElementById('newTmvName').value = '';
-    document.getElementById('newTmvType').value = '';
-    document.getElementById('newTmvLoc').value = '';
-    toggleAddForm('tmv');
-    loadData();
-  })
-  .catch(function(){ alert('Add failed'); });
+  if(!id){ alert('TMV ID required (e.g. TMV57560B)'); return; }
+  if(!cfg.tmvVanMap) cfg.tmvVanMap = {};
+  if(cfg.tmvVanMap[id]){ alert(id + ' already exists'); return; }
+  var type = document.getElementById('newTmvType').value;
+  cfg.tmvVanMap[id] = type ? [type] : [];
+  document.getElementById('newTmvId').value = '';
+  saveConfigArray('tmvVanMap', cfg.tmvVanMap);
 }
 
-function editTmv(id){
-  var a = (dbData.assets||[]).find(function(x){ return x.id === id; });
-  if(!a) return;
-  var name = prompt('Name:', a.name||'');
-  if(name===null) return;
-  var type = prompt('Type:', a.type||'');
-  var loc = prompt('Location:', a.location||'');
-  fetch('/api/assets/'+id, {
-    method:'PUT',
-    headers:{...authHdr(),'Content-Type':'application/json'},
-    body:JSON.stringify({name:name.trim(), type:type||'', location:loc||''})
-  })
-  .then(function(){ loadData(); })
-  .catch(function(){ alert('Update failed'); });
-}
-
-function deleteAsset(id){
-  if(!confirm('Delete this TMV?')) return;
-  fetch('/api/assets/'+id, { method:'DELETE', headers: authHdr() })
-    .then(function(){ loadData(); })
-    .catch(function(){ alert('Delete failed'); });
-}
-
-/* LOCATION CARDS */
-function renderLocCards(){
-  const cfg = dbData.config || {};
-  const locs = cfg.locations || [];
-  const grid = document.getElementById('locCards');
-  grid.innerHTML = '';
-  if(locs.length===0){ document.getElementById('locEmpty').style.display='block'; return; }
-  document.getElementById('locEmpty').style.display='none';
-  locs.forEach(function(loc, idx){
-    grid.innerHTML += '<div class="card">' +
-      '<h3>'+esc(loc)+'</h3>' +
-      '<div class="meta">Location #'+(idx+1)+'</div>' +
-      '<div class="card-actions">' +
-        '<button onclick="editLocation('+idx+')">Edit</button>' +
-        '<button class="danger" onclick="deleteLocation('+idx+')">X Delete</button>' +
-      '</div>' +
-    '</div>';
-  });
-}
-
-function addLocation(){
-  var val = document.getElementById('newLocName').value.trim();
-  if(!val){ alert('Name is required'); return; }
+function deleteTmv(){
   var cfg = dbData.config;
+  var id = document.getElementById('selTmv').value;
+  if(!id) return;
+  if(!confirm('Remove TMV unit "' + id + '"?')) return;
+  delete cfg.tmvVanMap[id];
+  saveConfigArray('tmvVanMap', cfg.tmvVanMap);
+}
+
+/* ---- Locations ---- */
+function addLoc(){
+  var cfg = dbData.config;
+  var v = document.getElementById('newLoc').value.trim();
+  if(!v){ alert('Location name required'); return; }
   if(!cfg.locations) cfg.locations = [];
-  cfg.locations.push(val);
+  cfg.locations.push(v);
+  document.getElementById('newLoc').value = '';
   saveConfigArray('locations', cfg.locations);
-  document.getElementById('newLocName').value = '';
-  toggleAddForm('location');
 }
-
-function editLocation(idx){
+function renameLoc(){
   var cfg = dbData.config;
-  var cur = cfg.locations[idx];
-  var val = prompt('Rename location:', cur);
-  if(val!==null && val.trim()){
-    cfg.locations[idx] = val.trim();
-    saveConfigArray('locations', cfg.locations);
-  }
+  var i = parseInt(document.getElementById('selLoc').value, 10);
+  if(isNaN(i)) return;
+  var v = prompt('Rename location:', cfg.locations[i]);
+  if(v!==null && v.trim()){ cfg.locations[i] = v.trim(); saveConfigArray('locations', cfg.locations); }
 }
-
-function deleteLocation(idx){
-  if(!confirm('Delete this location?')) return;
+function deleteLoc(){
   var cfg = dbData.config;
-  cfg.locations.splice(idx, 1);
+  var i = parseInt(document.getElementById('selLoc').value, 10);
+  if(isNaN(i)) return;
+  if(!confirm('Remove location "' + cfg.locations[i] + '"?')) return;
+  cfg.locations.splice(i,1);
   saveConfigArray('locations', cfg.locations);
 }
 
-/* TECHNICIAN CARDS */
-function renderTechCards(){
-  const cfg = dbData.config || {};
-  const techs = cfg.technicians || [];
-  const grid = document.getElementById('techCards');
-  grid.innerHTML = '';
-  if(techs.length===0){ document.getElementById('techEmpty').style.display='block'; return; }
-  document.getElementById('techEmpty').style.display='none';
-  techs.forEach(function(tech, idx){
-    var name = typeof tech==='string' ? tech : (tech.name||'');
-    var wa = typeof tech==='object' ? (tech.whatsapp||'') : '';
-    var tg = typeof tech==='object' ? (tech.telegram||'') : '';
-    grid.innerHTML += '<div class="card">' +
-      '<h3>'+esc(name)+'</h3>' +
-      (wa?'<div class="meta">WhatsApp: '+esc(wa)+'</div>':'') +
-      (tg?'<div class="meta">Telegram: '+esc(tg)+'</div>':'') +
-      '<div class="card-actions">' +
-        '<button onclick="editTechnician('+idx+')">Edit</button>' +
-        '<button class="danger" onclick="deleteTechnician('+idx+')">X Delete</button>' +
-      '</div>' +
-    '</div>';
-  });
-}
-
+/* ---- Technicians ---- */
 function addTech(){
-  var name = document.getElementById('newTechName').value.trim();
-  if(!name){ alert('Name is required'); return; }
-  var wa = document.getElementById('newTechWa').value.trim();
-  var tg = document.getElementById('newTechTg').value.trim();
   var cfg = dbData.config;
+  var v = document.getElementById('newTech').value.trim();
+  if(!v){ alert('Technician name required'); return; }
   if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:name, whatsapp:wa, telegram:tg});
-  saveConfigArray('technicians', cfg.technicians);
-  document.getElementById('newTechName').value = '';
-  document.getElementById('newTechWa').value = '';
-  document.getElementById('newTechTg').value = '';
-  toggleAddForm('tech');
-}
-
-function editTechnician(idx){
-  var cfg = dbData.config;
-  var cur = cfg.technicians[idx];
-  var name = prompt('Name:', typeof cur==='string'?cur:cur.name);
-  if(!name) return;
-  var wa = prompt('WhatsApp:', typeof cur==='object'?cur.whatsapp:'');
-  var tg = prompt('Telegram:', typeof cur==='object'?cur.telegram:'');
-  cfg.technicians[idx] = {name:name.trim(),whatsapp:wa||'',telegram:tg||''};
+  cfg.technicians.push({name:v, whatsapp:'', telegram:''});
+  document.getElementById('newTech').value = '';
   saveConfigArray('technicians', cfg.technicians);
 }
-
-function deleteTechnician(idx){
-  if(!confirm('Delete this technician?')) return;
+function renameTech(){
   var cfg = dbData.config;
-  cfg.technicians.splice(idx, 1);
-  saveConfigArray('technicians', cfg.technicians);
-}
-
-/* DISTRICT CARDS */
-function renderDistCards(){
-  const cfg = dbData.config || {};
-  const dists = cfg.districts || [];
-  const grid = document.getElementById('distCards');
-  grid.innerHTML = '';
-  if(dists.length===0){ document.getElementById('distEmpty').style.display='block'; return; }
-  document.getElementById('distEmpty').style.display='none';
-  dists.forEach(function(d, i){
-    grid.innerHTML += '<div class="card">' +
-      '<h3>'+esc(d)+'</h3>' +
-      '<div class="meta">District #'+(i+1)+'</div>' +
-      '<div class="card-actions">' +
-        '<button onclick="editDistrict('+i+')">Edit</button>' +
-        '<button class="danger" onclick="deleteDistrict('+i+')">X Delete</button>' +
-      '</div>' +
-    '</div>';
-  });
-}
-
-function addDistrict(){
-  var val = document.getElementById('newDistName').value.trim();
-  if(!val){ alert('Name is required'); return; }
-  var cfg = dbData.config;
-  if(!cfg.districts) cfg.districts = [];
-  cfg.districts.push(val);
-  saveConfigArray('districts', cfg.districts);
-  document.getElementById('newDistName').value = '';
-  toggleAddForm('district');
-}
-
-function editDistrict(i){
-  var cfg = dbData.config;
-  var cur = cfg.districts[i];
-  var val = prompt('Rename district:', cur);
-  if(val!==null && val.trim()){
-    cfg.districts[i] = val.trim();
-    saveConfigArray('districts', cfg.districts);
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)) return;
+  var cur = cfg.technicians[i];
+  var curName = typeof cur==='string' ? cur : (cur.name||'');
+  var v = prompt('Rename technician:', curName);
+  if(v!==null && v.trim()){
+    if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), whatsapp:'', telegram:''};
+    else cur.name = v.trim();
+    saveConfigArray('technicians', cfg.technicians);
   }
 }
-
-function deleteDistrict(i){
-  if(!confirm('Delete this district?')) return;
+function deleteTech(){
   var cfg = dbData.config;
-  cfg.districts.splice(i, 1);
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)) return;
+  var cur = cfg.technicians[i];
+  var name = typeof cur==='string' ? cur : (cur.name||'');
+  if(!confirm('Remove technician "' + name + '"?')) return;
+  cfg.technicians.splice(i,1);
+  saveConfigArray('technicians', cfg.technicians);
+}
+
+/* ---- Districts ---- */
+function addDist(){
+  var cfg = dbData.config;
+  var v = document.getElementById('newDist').value.trim();
+  if(!v){ alert('District name required'); return; }
+  if(!cfg.districts) cfg.districts = [];
+  cfg.districts.push(v);
+  document.getElementById('newDist').value = '';
+  saveConfigArray('districts', cfg.districts);
+}
+function renameDist(){
+  var cfg = dbData.config;
+  var i = parseInt(document.getElementById('selDist').value, 10);
+  if(isNaN(i)) return;
+  var v = prompt('Rename district:', cfg.districts[i]);
+  if(v!==null && v.trim()){ cfg.districts[i] = v.trim(); saveConfigArray('districts', cfg.districts); }
+}
+function deleteDist(){
+  var cfg = dbData.config;
+  var i = parseInt(document.getElementById('selDist').value, 10);
+  if(isNaN(i)) return;
+  if(!confirm('Remove district "' + cfg.districts[i] + '"?')) return;
+  cfg.districts.splice(i,1);
   saveConfigArray('districts', cfg.districts);
 }
 
-/* TASK CARDS */
-function renderTaskCards(){
-  const cfg = dbData.config || {};
-  const tasks = cfg.checklist || [];
-  const grid = document.getElementById('taskCards');
-  grid.innerHTML = '';
-  if(tasks.length===0){ document.getElementById('taskEmpty').style.display='block'; return; }
-  document.getElementById('taskEmpty').style.display='none';
-  tasks.forEach(function(t, i){
-    var label = typeof t==='string' ? t : (t.label||t);
-    grid.innerHTML += '<div class="card">' +
-      '<h3>'+esc(label)+'</h3>' +
-      '<div class="meta">Task #'+(i+1)+'</div>' +
-      '<div class="card-actions">' +
-        '<button onclick="editTaskItem('+i+')">Edit</button>' +
-        '<button class="danger" onclick="deleteTaskItem('+i+')">X Delete</button>' +
-      '</div>' +
-    '</div>';
-  });
-}
-
-function addTask(){
-  var val = document.getElementById('newTaskLabel').value.trim();
-  if(!val){ alert('Label is required'); return; }
+/* ---- Categories (checklist sections) ---- */
+function addCat(){
   var cfg = dbData.config;
+  var v = document.getElementById('newCat').value.trim();
+  if(!v){ alert('Category name required'); return; }
   if(!cfg.checklist) cfg.checklist = [];
-  cfg.checklist.push(val);
+  cfg.checklist.push({title:v, appliesTo:[], items:[]});
+  document.getElementById('newCat').value = '';
   saveConfigArray('checklist', cfg.checklist);
-  document.getElementById('newTaskLabel').value = '';
-  toggleAddForm('task');
 }
-
-function editTaskItem(i){
+function renameCat(){
   var cfg = dbData.config;
+  var i = parseInt(document.getElementById('selCat').value, 10);
+  if(isNaN(i)) return;
   var cur = cfg.checklist[i];
-  var val = prompt('Task label:', typeof cur==='string'?cur:(cur.label||''));
-  if(val!==null && val.trim()){
-    if(typeof cur==='string') cfg.checklist[i] = val.trim();
-    else cur.label = val.trim();
+  var curTitle = typeof cur==='string' ? cur : (cur.title||cur.label||'');
+  var v = prompt('Rename category:', curTitle);
+  if(v!==null && v.trim()){
+    if(typeof cur==='string') cfg.checklist[i] = {title:v.trim(), appliesTo:[], items:[]};
+    else cur.title = v.trim();
     saveConfigArray('checklist', cfg.checklist);
   }
 }
-
-function deleteTaskItem(i){
-  if(!confirm('Delete this task?')) return;
+function deleteCat(){
   var cfg = dbData.config;
-  cfg.checklist.splice(i, 1);
+  var i = parseInt(document.getElementById('selCat').value, 10);
+  if(isNaN(i)) return;
+  var cur = cfg.checklist[i];
+  var title = typeof cur==='string' ? cur : (cur.title||cur.label||'');
+  if(!confirm('Remove category "' + title + '" and its checklist items?')) return;
+  cfg.checklist.splice(i,1);
   saveConfigArray('checklist', cfg.checklist);
 }
+
 
 /* CONFIG HELPERS */
 function saveConfigArray(key, value){
