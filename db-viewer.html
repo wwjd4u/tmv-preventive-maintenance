@@ -17,6 +17,8 @@
   nav{margin-left:auto;display:flex;gap:8px}
   nav button{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer}
   nav button.active{background:#fff;color:var(--cudd);font-weight:600}
+  .backbtn{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+  .backbtn:hover{background:rgba(255,255,255,.3)}
   main{padding:18px;max-width:1200px;margin:0 auto}
   .view{display:none}
   .view.active{display:block}
@@ -142,6 +144,7 @@
     <button id="tabAssign" class="active" onclick="switchTab('assign')">Assignments</button>
     <button id="tabAssets" onclick="switchTab('assets')">Configure</button>
     <button id="tabConfig" onclick="switchTab('config')">Categories</button>
+    <a class="backbtn" href="/" title="Back to main app">← Main App</a>
   </nav>
 </header>
 
