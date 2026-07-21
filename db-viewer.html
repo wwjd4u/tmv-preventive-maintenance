@@ -26,6 +26,7 @@
   .btn.ghost{background:#fff;color:var(--cudd);border:1px solid var(--cudd)}
   .btn.sm{padding:6px 12px;font-size:13px}
   .btn.danger{background:var(--due)}
+  .btn.xs{padding:4px 8px;font-size:12px}
 
   #loginOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:center;justify-content:center}
   #loginBox{background:#fff;border-radius:14px;padding:28px 32px;min-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.18)}
@@ -55,23 +56,6 @@
   .b-in_progress{background:#d97706}
   .b-completed{background:#16a34a}
 
-  #detailPanel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;overflow-y:auto}
-  #detailBox{background:#fff;border-radius:14px;margin:40px auto;max-width:800px;padding:24px;position:relative}
-  #detailBox h2{margin-top:0;color:var(--cudd)}
-  #detailClose{position:absolute;top:14px;right:18px;cursor:pointer;font-size:22px;color:#999}
-  .section{margin-bottom:14px}
-  .section h3{margin:0 0 8px;font-size:14px;color:#555}
-  .checklist{background:#f8f8fa;border-radius:10px;padding:12px}
-  .cl-item{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid #eee}
-  .cl-item:last-child{border-bottom:0}
-  .cl-val{font-weight:600;min-width:60px}
-  .cl-val.yes{color:var(--ok)}
-  .cl-val.no{color:var(--due)}
-  .cl-val.na{color:#999}
-  .photo-thumb{width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
-  .photo-grid{display:flex;gap:8px;flex-wrap:wrap}
-  .ts{color:#999;font-size:12px}
-
   .stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
   .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 20px;min-width:120px}
   .stat b{display:block;font-size:26px;color:var(--cudd)}
@@ -81,13 +65,33 @@
   .search{width:260px}
   .empty{text-align:center;padding:40px;color:#999;font-size:15px}
 
-  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  /* INLINE ADD FORM */
+  .add-form{background:#fff;border:2px solid var(--cudd);border-radius:12px;padding:16px;margin-bottom:14px;display:none}
+  .add-form.active{display:block}
+  .add-form h3{margin:0 0 12px;color:var(--cudd);font-size:15px}
+  .form-row{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .form-row label{min-width:100px;font-size:13px;color:#555;font-weight:500}
+  .form-row input,.form-row select{flex:1;min-width:200px}
+  .form-actions{display:flex;gap:8px;margin-top:12px}
+
+  /* CARD GRID */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;position:relative}
   .card h3{margin:0 0 8px;font-size:15px;color:var(--cudd)}
   .card .meta{font-size:13px;color:#666;margin-bottom:4px}
-  .card .actions{position:absolute;top:12px;right:12px;display:flex;gap:6px}
-  .card .actions button{background:0;border:0;cursor:pointer;font-size:16px;color:#999;padding:2px 6px;border-radius:4px}
-  .card .actions button:hover{color:var(--cudd);background:#f5f5f5}
+  .card .card-actions{display:flex;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .card .card-actions button{background:var(--bg);border:1px solid var(--line);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;flex:1}
+  .card .card-actions button:hover{background:var(--cudd);color:#fff;border-color:var(--cudd)}
+  .card .card-actions button.danger{border-color:var(--due);color:var(--due)}
+  .card .card-actions button.danger:hover{background:var(--due);color:#fff}
+
+  /* INLINE LINE ITEMS */
+  .line-items{margin-top:10px}
+  .line-item{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f5f5f5}
+  .line-item:last-child{border-bottom:0}
+  .line-item span{flex:1;font-size:13px}
+  .line-item button{background:0;border:0;cursor:pointer;font-size:14px;color:#999;padding:2px 6px}
+  .line-item button:hover{color:var(--due)}
 
   footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
 </style>
@@ -151,19 +155,38 @@
     <!-- TMV's sub-view -->
     <div id="subTmvs" class="subview active">
       <div class="bar">
-        <button class="btn sm" onclick="showAssetModal()">+ Add TMV</button>
+        <button class="btn sm" onclick="toggleAddForm('tmv')">+ Add TMV</button>
         <input id="searchTmvs" class="search" placeholder="Search TMV's..." oninput="renderTmvCards()">
         <button class="btn ghost sm" onclick="loadData()">Refresh</button>
       </div>
+      <div id="addTmvForm" class="add-form">
+        <h3>Add New TMV</h3>
+        <div class="form-row"><label>ID:</label><input id="newTmvId" placeholder="TMV-001"></div>
+        <div class="form-row"><label>Name:</label><input id="newTmvName" placeholder="Building A TMV"></div>
+        <div class="form-row"><label>Type:</label><input id="newTmvType" placeholder="Type A"></div>
+        <div class="form-row"><label>Location:</label><input id="newTmvLoc" placeholder="Main Floor"></div>
+        <div class="form-actions">
+          <button class="btn sm" onclick="addTmv()">Save</button>
+          <button class="btn ghost sm" onclick="toggleAddForm('tmv')">Cancel</button>
+        </div>
+      </div>
       <div class="card-grid" id="tmvCards"></div>
-      <div id="tmvEmpty" class="empty" style="display:none">No TMV's yet.</div>
+      <div id="tmvEmpty" class="empty" style="display:none">No TMV's yet. Click "+ Add TMV" to create one.</div>
     </div>
 
     <!-- Locations sub-view -->
     <div id="subLocations" class="subview">
       <div class="bar">
-        <button class="btn sm" onclick="showLocationModal()">+ Add Location</button>
+        <button class="btn sm" onclick="toggleAddForm('location')">+ Add Location</button>
         <input id="searchLocs" class="search" placeholder="Search locations..." oninput="renderLocCards()">
+      </div>
+      <div id="addLocationForm" class="add-form">
+        <h3>Add New Location</h3>
+        <div class="form-row"><label>Name:</label><input id="newLocName" placeholder="Main Building"></div>
+        <div class="form-actions">
+          <button class="btn sm" onclick="addLocation()">Save</button>
+          <button class="btn ghost sm" onclick="toggleAddForm('location')">Cancel</button>
+        </div>
       </div>
       <div class="card-grid" id="locCards"></div>
       <div id="locEmpty" class="empty" style="display:none">No locations yet.</div>
@@ -172,8 +195,18 @@
     <!-- Technicians sub-view -->
     <div id="subTechs" class="subview">
       <div class="bar">
-        <button class="btn sm" onclick="showTechModal()">+ Add Technician</button>
+        <button class="btn sm" onclick="toggleAddForm('tech')">+ Add Technician</button>
         <input id="searchTechs" class="search" placeholder="Search technicians..." oninput="renderTechCards()">
+      </div>
+      <div id="addTechForm" class="add-form">
+        <h3>Add New Technician</h3>
+        <div class="form-row"><label>Name:</label><input id="newTechName" placeholder="John Smith"></div>
+        <div class="form-row"><label>WhatsApp:</label><input id="newTechWa" placeholder="+1234567890"></div>
+        <div class="form-row"><label>Telegram:</label><input id="newTechTg" placeholder="@username"></div>
+        <div class="form-actions">
+          <button class="btn sm" onclick="addTech()">Save</button>
+          <button class="btn ghost sm" onclick="toggleAddForm('tech')">Cancel</button>
+        </div>
       </div>
       <div class="card-grid" id="techCards"></div>
       <div id="techEmpty" class="empty" style="display:none">No technicians yet.</div>
@@ -182,8 +215,16 @@
     <!-- Districts sub-view -->
     <div id="subDistricts" class="subview">
       <div class="bar">
-        <button class="btn sm" onclick="showDistrictModal()">+ Add District</button>
+        <button class="btn sm" onclick="toggleAddForm('district')">+ Add District</button>
         <input id="searchDists" class="search" placeholder="Search districts..." oninput="renderDistCards()">
+      </div>
+      <div id="addDistrictForm" class="add-form">
+        <h3>Add New District</h3>
+        <div class="form-row"><label>Name:</label><input id="newDistName" placeholder="North District"></div>
+        <div class="form-actions">
+          <button class="btn sm" onclick="addDistrict()">Save</button>
+          <button class="btn ghost sm" onclick="toggleAddForm('district')">Cancel</button>
+        </div>
       </div>
       <div class="card-grid" id="distCards"></div>
       <div id="distEmpty" class="empty" style="display:none">No districts yet.</div>
@@ -192,8 +233,16 @@
     <!-- Tasks sub-view -->
     <div id="subTasks" class="subview">
       <div class="bar">
-        <button class="btn sm" onclick="showTaskModal()">+ Add Task</button>
+        <button class="btn sm" onclick="toggleAddForm('task')">+ Add Task</button>
         <input id="searchTasks" class="search" placeholder="Search tasks..." oninput="renderTaskCards()">
+      </div>
+      <div id="addTaskForm" class="add-form">
+        <h3>Add New Task</h3>
+        <div class="form-row"><label>Label:</label><input id="newTaskLabel" placeholder="Check valve pressure"></div>
+        <div class="form-actions">
+          <button class="btn sm" onclick="addTask()">Save</button>
+          <button class="btn ghost sm" onclick="toggleAddForm('task')">Cancel</button>
+        </div>
       </div>
       <div class="card-grid" id="taskCards"></div>
       <div id="taskEmpty" class="empty" style="display:none">No tasks yet.</div>
@@ -316,26 +365,41 @@ function switchTab(tab){
 }
 
 function switchSubTab(name, btn){
-  // Hide all sub-views
   ['subTmvs','subLocations','subTechs','subDistricts','subTasks'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.classList.remove('active');
   });
-  // Deactivate all subtab buttons
   var subtabs = document.getElementById('viewAssets').querySelector('.subtabs').children;
   for(var i=0; i<subtabs.length; i++){ subtabs[i].classList.remove('active'); }
-  // Show selected sub-view
   var viewId = 'sub' + name.charAt(0).toUpperCase() + name.slice(1);
   var viewEl = document.getElementById(viewId);
   if(viewEl) viewEl.classList.add('active');
-  // Activate clicked button
   if(btn) btn.classList.add('active');
-  // Load data
   if(name==='tmvs') renderTmvCards();
   if(name==='locations') renderLocCards();
   if(name==='techs') renderTechCards();
   if(name==='districts') renderDistCards();
   if(name==='tasks') renderTaskCards();
+}
+
+/* TOGGLE ADD FORM */
+function toggleAddForm(type){
+  var formMap = {
+    'tmv': 'addTmvForm',
+    'location': 'addLocationForm',
+    'tech': 'addTechForm',
+    'district': 'addDistrictForm',
+    'task': 'addTaskForm'
+  };
+  var formId = formMap[type];
+  var form = document.getElementById(formId);
+  if(form){
+    form.classList.toggle('active');
+    if(form.classList.contains('active')){
+      var firstInput = form.querySelector('input');
+      if(firstInput) firstInput.focus();
+    }
+  }
 }
 
 /* ASSIGNMENTS */
@@ -390,7 +454,7 @@ function showAssignment(id){
 }
 function closeDetail(){ document.getElementById('detailPanel').style.display = 'none'; }
 
-/* TMV CARDS */
+/* TMV CARDS - with inline add form */
 function renderTmvCards(){
   const grid = document.getElementById('tmvCards');
   grid.innerHTML = '';
@@ -399,16 +463,62 @@ function renderTmvCards(){
   document.getElementById('tmvEmpty').style.display='none';
   tmvs.forEach(function(a){
     grid.innerHTML += '<div class="card">' +
-      '<div class="actions">' +
-        '<button onclick="editAsset(\''+a.id+'\')">Edit</button>' +
-        '<button class="danger" onclick="deleteAsset(\''+a.id+'\')">X</button>' +
-      '</div>' +
       '<h3>'+esc(a.name||a.id)+'</h3>' +
       '<div class="meta">ID: '+esc(a.id||'')+'</div>' +
       '<div class="meta">Type: '+esc(a.type||'-')+'</div>' +
       '<div class="meta">Location: '+esc(a.location||'-')+'</div>' +
+      '<div class="card-actions">' +
+        '<button onclick="editTmv(\''+a.id+'\')">Edit</button>' +
+        '<button class="danger" onclick="deleteAsset(\''+a.id+'\')">X Delete</button>' +
+      '</div>' +
     '</div>';
   });
+}
+
+function addTmv(){
+  var id = document.getElementById('newTmvId').value.trim();
+  var name = document.getElementById('newTmvName').value.trim();
+  if(!id || !name){ alert('ID and Name are required'); return; }
+  var type = document.getElementById('newTmvType').value.trim();
+  var location = document.getElementById('newTmvLoc').value.trim();
+  fetch('/api/assets', {
+    method:'POST',
+    headers:{...authHdr(),'Content-Type':'application/json'},
+    body:JSON.stringify({id:id, name:name, type:type, location:location})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(){
+    document.getElementById('newTmvId').value = '';
+    document.getElementById('newTmvName').value = '';
+    document.getElementById('newTmvType').value = '';
+    document.getElementById('newTmvLoc').value = '';
+    toggleAddForm('tmv');
+    loadData();
+  })
+  .catch(function(){ alert('Add failed'); });
+}
+
+function editTmv(id){
+  var a = (dbData.assets||[]).find(function(x){ return x.id === id; });
+  if(!a) return;
+  var name = prompt('Name:', a.name||'');
+  if(name===null) return;
+  var type = prompt('Type:', a.type||'');
+  var loc = prompt('Location:', a.location||'');
+  fetch('/api/assets/'+id, {
+    method:'PUT',
+    headers:{...authHdr(),'Content-Type':'application/json'},
+    body:JSON.stringify({name:name.trim(), type:type||'', location:loc||''})
+  })
+  .then(function(){ loadData(); })
+  .catch(function(){ alert('Update failed'); });
+}
+
+function deleteAsset(id){
+  if(!confirm('Delete this TMV?')) return;
+  fetch('/api/assets/'+id, { method:'DELETE', headers: authHdr() })
+    .then(function(){ loadData(); })
+    .catch(function(){ alert('Delete failed'); });
 }
 
 /* LOCATION CARDS */
@@ -421,14 +531,42 @@ function renderLocCards(){
   document.getElementById('locEmpty').style.display='none';
   locs.forEach(function(loc, idx){
     grid.innerHTML += '<div class="card">' +
-      '<div class="actions">' +
-        '<button onclick="editLocation('+idx+')">Edit</button>' +
-        '<button class="danger" onclick="deleteLocation('+idx+')">X</button>' +
-      '</div>' +
       '<h3>'+esc(loc)+'</h3>' +
       '<div class="meta">Location #'+(idx+1)+'</div>' +
+      '<div class="card-actions">' +
+        '<button onclick="editLocation('+idx+')">Edit</button>' +
+        '<button class="danger" onclick="deleteLocation('+idx+')">X Delete</button>' +
+      '</div>' +
     '</div>';
   });
+}
+
+function addLocation(){
+  var val = document.getElementById('newLocName').value.trim();
+  if(!val){ alert('Name is required'); return; }
+  var cfg = dbData.config;
+  if(!cfg.locations) cfg.locations = [];
+  cfg.locations.push(val);
+  saveConfigArray('locations', cfg.locations);
+  document.getElementById('newLocName').value = '';
+  toggleAddForm('location');
+}
+
+function editLocation(idx){
+  var cfg = dbData.config;
+  var cur = cfg.locations[idx];
+  var val = prompt('Rename location:', cur);
+  if(val!==null && val.trim()){
+    cfg.locations[idx] = val.trim();
+    saveConfigArray('locations', cfg.locations);
+  }
+}
+
+function deleteLocation(idx){
+  if(!confirm('Delete this location?')) return;
+  var cfg = dbData.config;
+  cfg.locations.splice(idx, 1);
+  saveConfigArray('locations', cfg.locations);
 }
 
 /* TECHNICIAN CARDS */
@@ -444,15 +582,48 @@ function renderTechCards(){
     var wa = typeof tech==='object' ? (tech.whatsapp||'') : '';
     var tg = typeof tech==='object' ? (tech.telegram||'') : '';
     grid.innerHTML += '<div class="card">' +
-      '<div class="actions">' +
-        '<button onclick="editTechnician('+idx+')">Edit</button>' +
-        '<button class="danger" onclick="deleteTechnician('+idx+')">X</button>' +
-      '</div>' +
       '<h3>'+esc(name)+'</h3>' +
       (wa?'<div class="meta">WhatsApp: '+esc(wa)+'</div>':'') +
       (tg?'<div class="meta">Telegram: '+esc(tg)+'</div>':'') +
+      '<div class="card-actions">' +
+        '<button onclick="editTechnician('+idx+')">Edit</button>' +
+        '<button class="danger" onclick="deleteTechnician('+idx+')">X Delete</button>' +
+      '</div>' +
     '</div>';
   });
+}
+
+function addTech(){
+  var name = document.getElementById('newTechName').value.trim();
+  if(!name){ alert('Name is required'); return; }
+  var wa = document.getElementById('newTechWa').value.trim();
+  var tg = document.getElementById('newTechTg').value.trim();
+  var cfg = dbData.config;
+  if(!cfg.technicians) cfg.technicians = [];
+  cfg.technicians.push({name:name, whatsapp:wa, telegram:tg});
+  saveConfigArray('technicians', cfg.technicians);
+  document.getElementById('newTechName').value = '';
+  document.getElementById('newTechWa').value = '';
+  document.getElementById('newTechTg').value = '';
+  toggleAddForm('tech');
+}
+
+function editTechnician(idx){
+  var cfg = dbData.config;
+  var cur = cfg.technicians[idx];
+  var name = prompt('Name:', typeof cur==='string'?cur:cur.name);
+  if(!name) return;
+  var wa = prompt('WhatsApp:', typeof cur==='object'?cur.whatsapp:'');
+  var tg = prompt('Telegram:', typeof cur==='object'?cur.telegram:'');
+  cfg.technicians[idx] = {name:name.trim(),whatsapp:wa||'',telegram:tg||''};
+  saveConfigArray('technicians', cfg.technicians);
+}
+
+function deleteTechnician(idx){
+  if(!confirm('Delete this technician?')) return;
+  var cfg = dbData.config;
+  cfg.technicians.splice(idx, 1);
+  saveConfigArray('technicians', cfg.technicians);
 }
 
 /* DISTRICT CARDS */
@@ -465,14 +636,42 @@ function renderDistCards(){
   document.getElementById('distEmpty').style.display='none';
   dists.forEach(function(d, i){
     grid.innerHTML += '<div class="card">' +
-      '<div class="actions">' +
-        '<button onclick="editDistrict('+i+')">Edit</button>' +
-        '<button class="danger" onclick="deleteDistrict('+i+')">X</button>' +
-      '</div>' +
       '<h3>'+esc(d)+'</h3>' +
       '<div class="meta">District #'+(i+1)+'</div>' +
+      '<div class="card-actions">' +
+        '<button onclick="editDistrict('+i+')">Edit</button>' +
+        '<button class="danger" onclick="deleteDistrict('+i+')">X Delete</button>' +
+      '</div>' +
     '</div>';
   });
+}
+
+function addDistrict(){
+  var val = document.getElementById('newDistName').value.trim();
+  if(!val){ alert('Name is required'); return; }
+  var cfg = dbData.config;
+  if(!cfg.districts) cfg.districts = [];
+  cfg.districts.push(val);
+  saveConfigArray('districts', cfg.districts);
+  document.getElementById('newDistName').value = '';
+  toggleAddForm('district');
+}
+
+function editDistrict(i){
+  var cfg = dbData.config;
+  var cur = cfg.districts[i];
+  var val = prompt('Rename district:', cur);
+  if(val!==null && val.trim()){
+    cfg.districts[i] = val.trim();
+    saveConfigArray('districts', cfg.districts);
+  }
+}
+
+function deleteDistrict(i){
+  if(!confirm('Delete this district?')) return;
+  var cfg = dbData.config;
+  cfg.districts.splice(i, 1);
+  saveConfigArray('districts', cfg.districts);
 }
 
 /* TASK CARDS */
@@ -486,140 +685,48 @@ function renderTaskCards(){
   tasks.forEach(function(t, i){
     var label = typeof t==='string' ? t : (t.label||t);
     grid.innerHTML += '<div class="card">' +
-      '<div class="actions">' +
-        '<button onclick="editTaskItem('+i+')">Edit</button>' +
-        '<button class="danger" onclick="deleteTaskItem('+i+')">X</button>' +
-      '</div>' +
       '<h3>'+esc(label)+'</h3>' +
       '<div class="meta">Task #'+(i+1)+'</div>' +
+      '<div class="card-actions">' +
+        '<button onclick="editTaskItem('+i+')">Edit</button>' +
+        '<button class="danger" onclick="deleteTaskItem('+i+')">X Delete</button>' +
+      '</div>' +
     '</div>';
   });
 }
 
-/* ASSET MODALS - placeholder implementations */
-function showAssetModal(){
-  const id = prompt("TMV ID (e.g. TMV-001):");
-  if(!id) return;
-  const name = prompt("TMV Name:");
-  if(!name) return;
-  const type = prompt("Van Type (e.g. Type A):");
-  const location = prompt("Location:");
-  fetch("/api/assets", { method:"POST", headers:{...authHdr(),"Content-Type":"application/json"}, body:JSON.stringify({id:id.trim(),name:name.trim(),type:type||"",location:location||""}) })
-    .then(function(){ loadData(); })
-    .catch(function(){ alert("Add failed"); });
-}
-function editAsset(id){ alert('Edit asset ' + id + ' - TODO: implement modal'); }
-function deleteAsset(id){
-  if(!confirm('Delete this asset?')) return;
-  fetch('/api/assets/'+id, { method:'DELETE', headers: authHdr() })
-    .then(function(r){ return r.json(); })
-    .then(function(){ loadData(); })
-    .catch(function(){ alert('Delete failed'); });
-}
-
-function showLocationModal(){
-  const val = prompt("Location name:");
-  if(!val || !val.trim()) return;
-  const cfg = dbData.config;
-  if(!cfg.locations) cfg.locations = [];
-  cfg.locations.push(val.trim());
-  saveConfigArray("locations", cfg.locations);
-}
-function editLocation(idx){
-  const cfg = dbData.config;
-  const cur = cfg.locations[idx];
-  const val = prompt('Rename location:', cur);
-  if(val!==null && val.trim()){
-    cfg.locations[idx] = val.trim();
-    saveConfigArray('locations', cfg.locations);
-  }
-}
-function deleteLocation(idx){
-  if(!confirm('Delete this location?')) return;
-  const cfg = dbData.config;
-  cfg.locations.splice(idx, 1);
-  saveConfigArray('locations', cfg.locations);
-}
-
-function showTechModal(){
-  const name = prompt("Technician name:");
-  if(!name || !name.trim()) return;
-  const wa = prompt("WhatsApp (optional):");
-  const tg = prompt("Telegram (optional):");
-  const cfg = dbData.config;
-  if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:name.trim(),whatsapp:wa||"",telegram:tg||""});
-  saveConfigArray("technicians", cfg.technicians);
-}
-function editTechnician(idx){
-  const cfg = dbData.config;
-  const cur = cfg.technicians[idx];
-  const name = prompt('Name:', typeof cur==='string'?cur:cur.name);
-  if(!name) return;
-  const wa = prompt('WhatsApp:', typeof cur==='object'?cur.whatsapp:'');
-  const tg = prompt('Telegram:', typeof cur==='object'?cur.telegram:'');
-  cfg.technicians[idx] = {name:name.trim(),whatsapp:wa||'',telegram:tg||''};
-  saveConfigArray('technicians', cfg.technicians);
-}
-function deleteTechnician(idx){
-  if(!confirm('Delete this technician?')) return;
-  const cfg = dbData.config;
-  cfg.technicians.splice(idx, 1);
-  saveConfigArray('technicians', cfg.technicians);
-}
-
-function showDistrictModal(){
-  const val = prompt("District name:");
-  if(!val || !val.trim()) return;
-  const cfg = dbData.config;
-  if(!cfg.districts) cfg.districts = [];
-  cfg.districts.push(val.trim());
-  saveConfigArray("districts", cfg.districts);
-}
-function editDistrict(i){
-  const cfg = dbData.config;
-  const cur = cfg.districts[i];
-  const val = prompt('Rename district:', cur);
-  if(val!==null && val.trim()){
-    cfg.districts[i] = val.trim();
-    saveConfigArray('districts', cfg.districts);
-  }
-}
-function deleteDistrict(i){
-  if(!confirm('Delete this district?')) return;
-  const cfg = dbData.config;
-  cfg.districts.splice(i, 1);
-  saveConfigArray('districts', cfg.districts);
-}
-
-function showTaskModal(){
-  const val = prompt("Task label:");
-  if(!val || !val.trim()) return;
-  const cfg = dbData.config;
+function addTask(){
+  var val = document.getElementById('newTaskLabel').value.trim();
+  if(!val){ alert('Label is required'); return; }
+  var cfg = dbData.config;
   if(!cfg.checklist) cfg.checklist = [];
-  cfg.checklist.push(val.trim());
-  saveConfigArray("checklist", cfg.checklist);
+  cfg.checklist.push(val);
+  saveConfigArray('checklist', cfg.checklist);
+  document.getElementById('newTaskLabel').value = '';
+  toggleAddForm('task');
 }
+
 function editTaskItem(i){
-  const cfg = dbData.config;
-  const cur = cfg.checklist[i];
-  const val = prompt('Task label:', typeof cur==='string'?cur:(cur.label||''));
+  var cfg = dbData.config;
+  var cur = cfg.checklist[i];
+  var val = prompt('Task label:', typeof cur==='string'?cur:(cur.label||''));
   if(val!==null && val.trim()){
     if(typeof cur==='string') cfg.checklist[i] = val.trim();
     else cur.label = val.trim();
     saveConfigArray('checklist', cfg.checklist);
   }
 }
+
 function deleteTaskItem(i){
   if(!confirm('Delete this task?')) return;
-  const cfg = dbData.config;
+  var cfg = dbData.config;
   cfg.checklist.splice(i, 1);
   saveConfigArray('checklist', cfg.checklist);
 }
 
 /* CONFIG HELPERS */
 function saveConfigArray(key, value){
-  const cfg = dbData.config;
+  var cfg = dbData.config;
   cfg[key] = value;
   fetch('/api/admin/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
     .then(function(){ loadData(); })
@@ -632,6 +739,7 @@ function populateConfig(){
   document.getElementById('cfgLocations').value = (cfg.locations||[]).join('\n');
   document.getElementById('cfgUnits').value = (cfg.unitOptions||[]).join('\n');
 }
+
 function saveConfig(){
   const cfg = {
     intervals: document.getElementById('cfgIntervals').value.split(',').map(Number).filter(function(n){return n>0}),
@@ -642,6 +750,7 @@ function saveConfig(){
     .then(function(){ document.getElementById('cfgStatus').textContent='Saved!'; setTimeout(function(){document.getElementById('cfgStatus').textContent='';},2000); loadData(); })
     .catch(function(){ alert('Save failed'); });
 }
+
 function purgeData(){
   if(!confirm('This will DELETE ALL assignment records. Are you sure?')) return;
   fetch('/api/admin/purge', { method:'POST', headers: authHdr() })
