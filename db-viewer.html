@@ -323,10 +323,10 @@ function loadData(){
     .then(d => {
       if(d.error){ alert(d.error); return; }
       dbData = d;
-      renderStats();
-      renderAssignments();
-      renderTmvCards();
-      populateConfig();
+      try { renderStats(); } catch(e){ console.error('renderStats', e); }
+      try { renderAssignments(); } catch(e){ console.error('renderAssignments', e); }
+      try { renderTmvCards(); } catch(e){ console.error('renderTmvCards', e); }
+      try { populateConfig(); } catch(e){ console.error('populateConfig', e); }
     })
     .catch(() => alert('Failed to load DB data'));
 }
@@ -424,7 +424,7 @@ function renderAssignments(){
       '<td>'+esc(a.location||'-')+'</td>' +
       '<td>'+(a.date||'-')+'</td>' +
       '<td class="ts">'+ts(a.completedAt)+'</td>' +
-      '<td><button class="btn sm ghost" onclick="showAssignment(\''+a.id+'\')">View</button></td>';
+      '<td><button class="btn sm ghost" onclick="showAssignment(' + JSON.stringify(a.id) + ')">View</button></td>';
     tbody.appendChild(tr);
   });
 }
@@ -468,8 +468,8 @@ function renderTmvCards(){
       '<div class="meta">Type: '+esc(a.type||'-')+'</div>' +
       '<div class="meta">Location: '+esc(a.location||'-')+'</div>' +
       '<div class="card-actions">' +
-        '<button onclick="editTmv(\''+a.id+'\')">Edit</button>' +
-        '<button class="danger" onclick="deleteAsset(\''+a.id+'\')">X Delete</button>' +
+        '<button onclick="editTmv(' + JSON.stringify(a.id) + ')">Edit</button>' +
+        '<button class="danger" onclick="deleteAsset(' + JSON.stringify(a.id) + ')">X Delete</button>' +
       '</div>' +
     '</div>';
   });
