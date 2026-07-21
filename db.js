@@ -98,7 +98,17 @@ function saveConfig(c) {
   db.prepare('INSERT OR REPLACE INTO config (key, data) VALUES (?, ?)').run('app', JSON.stringify(c));
 }
 
-module.exports = { db, loadAssignments, saveAssignments, purgeAssignments, loadAssets, saveAssets, loadConfig, saveConfig };
+// ---- full DB dump for admin viewer ----
+function getAdminDump() {
+  const assignments = db.prepare('SELECT id, status, technician, completedAt, data FROM assignments ORDER BY completedAt DESC, rowid DESC').all();
+  const assets = db.prepare('SELECT id, data FROM assets').all();
+  const configRow = db.prepare('SELECT data FROM config WHERE key = ?').get('app');
+  return {
+    assignments: assignments.map(r => ({ ...JSON.parse(r.data), _id: r.id, _status: r.status, _technician: r.technician, _completedAt: r.completedAt })),
+    assets: assets.map(r => JSON.parse(r.data)),
+    config: configRow ? JSON.parse(configRow.data) : {}
+  };
+}
 
 // ---- individual asset CRUD ----
 function getAssetById(id) {
@@ -118,6 +128,8 @@ function getAllAssets() {
 module.exports = {
   loadAssignments, saveAssignments, purgeAssignments,
   loadAssets, saveAssets,
+  getAdminDump,
+  DB_PATH,
   getAssetById, upsertAsset, deleteAssetById, getAllAssets,
   loadConfig, saveConfig
 };

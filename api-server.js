@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const { DB_PATH } = db;
 
 const PORT = 9240;
 const DATA_FILE = path.join(__dirname, 'assets.json');
@@ -303,15 +304,8 @@ http.createServer((req, res) => {
   // ── GET /api/admin/db — full DB dump for admin viewer (admin only) ──
   if (url.pathname === '/api/admin/db' && req.method === 'GET') {
     if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
-    const assignments = db.prepare('SELECT id, status, technician, completedAt, data FROM assignments ORDER BY completedAt DESC, rowid DESC').all();
-    const assets = db.prepare('SELECT id, data FROM assets').all();
-    const configRow = db.prepare('SELECT data FROM config WHERE key = ?').get('app');
-    return sendJson(res, 200, {
-      assignments: assignments.map(r => ({ ...JSON.parse(r.data), _id: r.id, _status: r.status, _technician: r.technician, _completedAt: r.completedAt })),
-      assets: assets.map(r => JSON.parse(r.data)),
-      config: configRow ? JSON.parse(configRow.data) : {},
-      dbFile: DB_PATH
-    });
+    const dump = db.getAdminDump();
+    return sendJson(res, 200, { ...dump, dbFile: DB_PATH });
   }
 
   // ── GET /api/admin/purge — wipe all temp records before production ──
@@ -321,31 +315,22 @@ http.createServer((req, res) => {
     return sendJson(res, 200, { ok: true, message: 'All assignment records purged.' });
   }
 
-  // ── PUT /api/config — update settings (admin only) ─────
+  // ── PUT /api/config — full config save (admin only) ─────
+  // Persists the entire config object so the admin viewer can manage
+  // intervals, locations, unitOptions, technicians, districts, checklist, etc.
   if (url.pathname === '/api/config' && req.method === 'PUT') {
     if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
-        const updates = JSON.parse(body);
-        const config = loadConfig();
-        if (updates.intervals) {
-          // Sort and validate intervals
-          config.intervals = updates.intervals.map(Number).filter(n => n > 0 && !isNaN(n)).sort((a,b) => a - b);
-        }
-        if (updates.locations) {
-          config.locations = updates.locations.filter(l => l.trim());
-        }
-        if (updates.unitOptions) {
-          config.unitOptions = updates.unitOptions.filter(u => u.trim());
-        }
-        saveConfig(config);
-        sendJson(res, 200, { ok: true, config: {
-          intervals: config.intervals,
-          locations: config.locations,
-          unitOptions: config.unitOptions
-        }});
+        const incoming = JSON.parse(body);
+        const config = loadConfig() || {};
+        // Merge: keep any existing keys not present in the incoming payload,
+        // then overwrite with whatever the client sent (full-save model).
+        const merged = { ...config, ...incoming };
+        saveConfig(merged);
+        sendJson(res, 200, { ok: true, config: merged });
       } catch(e) { sendJson(res, 400, { error: e.message }); }
     });
     return;

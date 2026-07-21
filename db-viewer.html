@@ -728,7 +728,7 @@ function deleteTaskItem(i){
 function saveConfigArray(key, value){
   var cfg = dbData.config;
   cfg[key] = value;
-  fetch('/api/admin/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
+  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
     .then(function(){ loadData(); })
     .catch(function(){ alert('Update failed'); });
 }
@@ -746,7 +746,7 @@ function saveConfig(){
     locations: document.getElementById('cfgLocations').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),
     unitOptions: document.getElementById('cfgUnits').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),
   };
-  fetch('/api/admin/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
+  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
     .then(function(){ document.getElementById('cfgStatus').textContent='Saved!'; setTimeout(function(){document.getElementById('cfgStatus').textContent='';},2000); loadData(); })
     .catch(function(){ alert('Save failed'); });
 }
