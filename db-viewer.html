@@ -205,20 +205,6 @@
         </div>
       </section>
 
-      <!-- DISTRICTS -->
-      <section class="mblock">
-        <h3>Districts <span class="cnt" id="cntDist"></span></h3>
-        <div class="mrow">
-          <select id="selDist" class="msel"></select>
-          <button class="btn sm ghost" onclick="renameDist()">Rename</button>
-          <button class="btn sm danger" onclick="deleteDist()">× Remove</button>
-        </div>
-        <div class="mrow addrow">
-          <input id="newDist" class="minput" placeholder="Permian Basin">
-          <button class="btn sm" onclick="addDist()">+ Add District</button>
-        </div>
-      </section>
-
       <!-- CATEGORIES -->
       <section class="mblock">
         <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>
@@ -447,10 +433,6 @@ function renderAssetManager(){
   }));
   document.getElementById('cntTech').textContent = '(' + cfg.technicians.length + ')';
 
-  // --- Districts ---
-  _fill('selDist', cfg.districts.map(function(d,i){ return {value:String(i), label:d}; }));
-  document.getElementById('cntDist').textContent = '(' + cfg.districts.length + ')';
-
   // --- Categories (checklist section titles) ---
   _fill('selCat', cfg.checklist.map(function(c,i){
     var label = typeof c==='string' ? c : (c.title||c.label||('Category '+(i+1)));
@@ -558,32 +540,6 @@ function deleteTech(){
   if(!confirm('Remove technician "' + name + '"?')) return;
   cfg.technicians.splice(i,1);
   saveConfigArray('technicians', cfg.technicians);
-}
-
-/* ---- Districts ---- */
-function addDist(){
-  var cfg = dbData.config;
-  var v = document.getElementById('newDist').value.trim();
-  if(!v){ alert('District name required'); return; }
-  if(!cfg.districts) cfg.districts = [];
-  cfg.districts.push(v);
-  document.getElementById('newDist').value = '';
-  saveConfigArray('districts', cfg.districts);
-}
-function renameDist(){
-  var cfg = dbData.config;
-  var i = parseInt(document.getElementById('selDist').value, 10);
-  if(isNaN(i)) return;
-  var v = prompt('Rename district:', cfg.districts[i]);
-  if(v!==null && v.trim()){ cfg.districts[i] = v.trim(); saveConfigArray('districts', cfg.districts); }
-}
-function deleteDist(){
-  var cfg = dbData.config;
-  var i = parseInt(document.getElementById('selDist').value, 10);
-  if(isNaN(i)) return;
-  if(!confirm('Remove district "' + cfg.districts[i] + '"?')) return;
-  cfg.districts.splice(i,1);
-  saveConfigArray('districts', cfg.districts);
 }
 
 /* ---- Categories (checklist sections) ---- */
