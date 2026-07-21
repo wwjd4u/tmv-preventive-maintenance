@@ -11,6 +11,17 @@
   }
   *{box-sizing:border-box}
   body{margin:0;font:15px/1.4 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  /* subtle blended site photo background */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-2;
+    background:#f5f6f8 url('/site-bg.png') center/cover no-repeat fixed;
+    filter:grayscale(.55) blur(1.5px) brightness(1.04);
+    opacity:.18;
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:-1;
+    background:linear-gradient(180deg, rgba(245,246,248,.82), rgba(245,246,248,.92));
+  }
   header{background:var(--cudd);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
   header img{height:34px}
   header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.3px}
