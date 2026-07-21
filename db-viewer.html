@@ -20,81 +20,49 @@
   main{padding:18px;max-width:1200px;margin:0 auto}
   .view{display:none}
   .view.active{display:block}
-  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
   select,input,textarea{font:14px inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
   .btn{background:var(--cudd);color:#fff;border:0;padding:10px 18px;border-radius:9px;font-size:15px;cursor:pointer;font-weight:600}
   .btn.ghost{background:#fff;color:var(--cudd);border:1px solid var(--cudd)}
   .btn.sm{padding:6px 12px;font-size:13px}
   .btn.danger{background:var(--due)}
+  .btn.muted{background:#e5e7eb;color:#374151}
 
-  /* Login overlay */
   #loginOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:center;justify-content:center}
   #loginBox{background:#fff;border-radius:14px;padding:28px 32px;min-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.18)}
   #loginBox h2{margin:0 0 18px;color:var(--cudd)}
   #loginBox input{width:100%;margin-bottom:10px}
   #loginErr{color:#dc2626;font-size:13px;margin-bottom:8px;min-height:18px}
 
-  /* Tabs */
   .tabs{display:flex;gap:0;border-bottom:2px solid var(--line);margin-bottom:16px}
   .tab{padding:10px 18px;cursor:pointer;border-bottom:2px solid transparent;font-weight:500;color:#666}
   .tab.active{color:var(--cudd);border-bottom-color:var(--cudd)}
-  .tab:hover{color:var(--ink)}
-
-  /* Sub-tabs for Assets */
   .subtabs{display:flex;gap:0;border-bottom:2px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
   .subtab{padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;font-weight:500;color:#666;font-size:14px}
   .subtab.active{color:var(--cudd);border-bottom-color:var(--cudd)}
-  .subtab:hover{color:var(--ink)}
 
-  /* Table */
-  .tbl-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th{background:#f8f8fa;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
-  td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
-  tr:last-child td{border-bottom:0}
-  tr:hover td{background:#fafbfc}
-  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff}
-  .b-assigned{background:#3b82f6}
-  .b-in_progress{background:#d97706}
-  .b-completed{background:#16a34a}
-
-  /* Detail panel */
-  #detailPanel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;overflow-y:auto}
-  #detailBox{background:#fff;border-radius:14px;margin:40px auto;max-width:800px;padding:24px;position:relative}
-  #detailBox h2{margin-top:0;color:var(--cudd)}
-  #detailClose{position:absolute;top:14px;right:18px;cursor:pointer;font-size:22px;color:#999}
-  .section{margin-bottom:14px}
-  .section h3{margin:0 0 8px;font-size:14px;color:#555}
-  .checklist{background:#f8f8fa;border-radius:10px;padding:12px}
-  .cl-item{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid #eee}
-  .cl-item:last-child{border-bottom:0}
-  .cl-val{font-weight:600;min-width:60px}
-  .cl-val.yes{color:var(--ok)}
-  .cl-val.no{color:var(--due)}
-  .cl-val.na{color:#999}
-  .photo-thumb{width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
-  .photo-grid{display:flex;gap:8px;flex-wrap:wrap}
-  .ts{color:#999;font-size:12px}
-
-  /* Stats */
-  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
-  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 20px;min-width:120px}
-  .stat b{display:block;font-size:26px;color:var(--cudd)}
-  .stat span{font-size:13px;color:#666}
-
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
   .filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
   .search{width:260px}
   .empty{text-align:center;padding:40px;color:#999;font-size:15px}
 
-  /* CRUD cards for Assets sub-tabs */
-  .card-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:14px;margin-bottom:16px}
-  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;position:relative}
-  .card h3{margin:0 0 8px;font-size:15px;color:var(--cudd)}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;position:relative}
+  .card h3{margin:0 0 10px;font-size:15px;color:var(--cudd)}
   .card p{margin:4px 0;font-size:13px;color:#555}
   .card .card-actions{position:absolute;top:10px;right:10px;display:flex;gap:6px}
-  .card .card-actions button{padding:4px 8px;font-size:12px;border-radius:6px}
-  .add-bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
-  .add-bar input,.add-bar select{flex:1;min-width:140px}
+
+  .item-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+  .item-row:last-child{border-bottom:0}
+  .item-label{flex:1;font-weight:500}
+  .item-type{color:#888;font-size:12px;background:#f0f0f0;padding:2px 6px;border-radius:4px}
+  .item-remove{color:var(--due);cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
+  .add-item-bar{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .add-item-bar input{flex:1;min-width:120px;padding:6px 8px;font-size:13px}
+  .add-item-bar select{padding:6px 8px;font-size:13px}
+
+  .tag{display:inline-block;background:#f0f0f0;padding:3px 8px;border-radius:6px;font-size:12px;margin:2px}
+  .tag .rem{color:var(--due);cursor:pointer;margin-left:4px}
+
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center}
   .modal-overlay.open{display:flex}
   .modal{background:#fff;border-radius:14px;padding:24px;min-width:380px;max-width:520px;max-height:85vh;overflow-y:auto}
@@ -104,9 +72,16 @@
   .form-row input,.form-row select,.form-row textarea{width:100%}
   .form-row textarea{resize:vertical;min-height:60px}
   .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
-  .tag{display:inline-block;background:#f0f0f0;padding:3px 8px;border-radius:6px;font-size:12px;margin:2px}
-  .tag .rem{color:var(--due);cursor:pointer;margin-left:4px}
 
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 20px;min-width:120px}
+  .stat b{display:block;font-size:26px;color:var(--cudd)}
+  .stat span{font-size:13px;color:#666}
+
+  .tbl-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#f8f8fa;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
   footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
 </style>
 </head>
@@ -148,30 +123,26 @@
       <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
     </div>
     <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          <th>Status</th><th>TMV</th><th>Van Type</th><th>Technician</th>
-          <th>Location</th><th>Date</th><th>Completed</th><th></th>
-        </tr></thead>
+      <table><thead><tr><th>Status</th><th>TMV</th><th>Van Type</th><th>Technician</th><th>Location</th><th>Date</th><th>Completed</th><th></th></tr></thead>
         <tbody id="assignBody"></tbody>
       </table>
     </div>
     <div id="assignEmpty" class="empty" style="display:none">No assignments found.</div>
   </div>
 
-  <!-- ASSETS VIEW (5 sub-tabs) -->
+  <!-- ASSETS VIEW -->
   <div id="viewAssets" class="view">
     <div class="subtabs">
       <div class="subtab active" id="subTmv" onclick="switchSubTab('tmv')">🚚 TMV's</div>
-      <div class="subtab" id="subLoc" onclick="switchSubTab('locations')">📍 Locations</div>
-      <div class="subtab" id="subTech" onclick="switchSubTab('techs')">👷 Technicians</div>
-      <div class="subtab" id="subDist" onclick="switchSubTab('districts')">🗺️ District</div>
+      <div class="subtab" id="subLocations" onclick="switchSubTab('locations')">📍 Locations</div>
+      <div class="subtab" id="subTechs" onclick="switchSubTab('techs')">👷 Technicians</div>
+      <div class="subtab" id="subDistricts" onclick="switchSubTab('districts')">🗺️ District</div>
       <div class="subtab" id="subTasks" onclick="switchSubTab('tasks')">📝 Tasks</div>
     </div>
 
-    <!-- TMV's sub-tab -->
+    <!-- TMV's -->
     <div id="subViewTmv">
-      <div class="add-bar">
+      <div class="bar">
         <button class="btn sm" onclick="openAssetModal()">+ Add TMV</button>
         <input id="searchTmv" class="search" placeholder="Search TMV's…" oninput="renderTmvCards()">
         <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
@@ -180,9 +151,9 @@
       <div id="tmvEmpty" class="empty" style="display:none">No TMV assets found.</div>
     </div>
 
-    <!-- Locations sub-tab -->
+    <!-- Locations -->
     <div id="subViewLocations" style="display:none">
-      <div class="add-bar">
+      <div class="bar">
         <input id="newLoc" placeholder="New location name" onkeydown="if(event.key==='Enter')addLocation()">
         <button class="btn sm" onclick="addLocation()">+ Add</button>
         <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
@@ -191,9 +162,9 @@
       <div id="locEmpty" class="empty" style="display:none">No locations found.</div>
     </div>
 
-    <!-- Technicians sub-tab -->
+    <!-- Technicians -->
     <div id="subViewTechs" style="display:none">
-      <div class="add-bar">
+      <div class="bar">
         <button class="btn sm" onclick="openTechModal()">+ Add Technician</button>
         <input id="searchTech" class="search" placeholder="Search technicians…" oninput="renderTechCards()">
         <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
@@ -202,9 +173,9 @@
       <div id="techEmpty" class="empty" style="display:none">No technicians found.</div>
     </div>
 
-    <!-- Districts sub-tab -->
+    <!-- Districts -->
     <div id="subViewDistricts" style="display:none">
-      <div class="add-bar">
+      <div class="bar">
         <input id="newDist" placeholder="District name" onkeydown="if(event.key==='Enter')addDistrict()">
         <button class="btn sm" onclick="addDistrict()">+ Add</button>
         <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
@@ -213,9 +184,9 @@
       <div id="distEmpty" class="empty" style="display:none">No districts found.</div>
     </div>
 
-    <!-- Tasks sub-tab -->
+    <!-- Tasks -->
     <div id="subViewTasks" style="display:none">
-      <div class="add-bar">
+      <div class="bar">
         <button class="btn sm" onclick="openTaskModal()">+ Add Task Group</button>
         <input id="searchTask" class="search" placeholder="Search tasks…" oninput="renderTaskCards()">
         <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
@@ -240,11 +211,7 @@
     <div class="form-row"><label>TMV ID</label><input id="aTmvId" placeholder="e.g. TMV57449B"></div>
     <div class="form-row"><label>Type</label><select id="aType"></select></div>
     <div class="form-row"><label>Location</label><select id="aLocation"></select></div>
-    <div class="form-row"><label>Interval</label><input id="aInterval" type="number" placeholder="90"></div>
-    <div class="form-row"><label>Unit</label>
-      <select id="aUnit"><option value="days">days</option><option value="months">months</option></select>
-    </div>
-    <div class="form-row"><label>Last Maintenance (epoch ms)</label><input id="aLastMaint" type="number" placeholder="e.g. 1784419200000"></div>
+    <div class="form-row"><label>Interval (days)</label><input id="aInterval" type="number" placeholder="90"></div>
     <div class="form-row"><label>Notes</label><textarea id="aNotes"></textarea></div>
     <div class="modal-actions">
       <button class="btn ghost" onclick="closeAssetModal()">Cancel</button>
@@ -259,7 +226,7 @@
     <h2 id="techModalTitle">Add Technician</h2>
     <input type="hidden" id="editTechIdx">
     <div class="form-row"><label>Name *</label><input id="tName" placeholder="e.g. Mike Stettler"></div>
-    <div class="form-row"><label>WhatsApp</label><input id="tWhatsapp" placeholder="+1234567890"></div>
+    <div class="form-row"><label>WhatsApp</label><input id="tWhatsapp" placeholder="+123****7890"></div>
     <div class="form-row"><label>Telegram</label><input id="tTelegram" placeholder="@username"></div>
     <div class="modal-actions">
       <button class="btn ghost" onclick="closeTechModal()">Cancel</button>
@@ -274,7 +241,7 @@
     <h2 id="taskModalTitle">Add Task Group</h2>
     <input type="hidden" id="editTaskIdx">
     <div class="form-row"><label>Title *</label><input id="tkTitle" placeholder="e.g. Virtual TMV"></div>
-    <div class="form-row"><label>Applies To (van types)</label><div id="tkAppliesTo" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
+    <div class="form-row"><label>Applies To</label><div id="tkAppliesTo" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
     <div class="form-row"><label>Items (one per line: label|type)</label>
       <textarea id="tkItems" rows="6" placeholder="Servers cleaned|yn&#10;Engineer|yn&#10;BIOS revision|text"></textarea>
       <small style="color:#999">Format: label|type (yn, num, text, date, choice)</small>
@@ -286,459 +253,371 @@
   </div>
 </div>
 
-<div id="detailPanel" onclick="if(event.target===this)closeDetail()">
-  <div id="detailBox">
-    <span id="detailClose" onclick="closeDetail()">&times;</span>
-    <h2 id="detailTitle"></h2>
-    <div id="detailContent"></div>
-  </div>
-</div>
-
 <footer>CUDD Energy Services · DB Viewer &nbsp;|&nbsp; <a href="/" style="color:var(--cudd)">← Back to Main App</a></footer>
 
 <script>
 let token = null;
 let dbData = { assignments:[], assets:[], config:{} };
 
+/* ── Auth ── */
 function doLogin(){
-  const u = document.getElementById('user').value;
-  const p = document.getElementById('pass').value;
-  document.getElementById('loginErr').textContent = '';
-  fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
-    .then(r => r.json())
-    .then(d => {
-      if(d.token){ token = d.token; document.getElementById('loginOverlay').style.display='none'; loadData(); }
-      else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
-    })
-    .catch(() => document.getElementById('loginErr').textContent = 'Server error');
+  const u=document.getElementById('user').value, p=document.getElementById('pass').value;
+  document.getElementById('loginErr').textContent='';
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+    .then(r=>r.json()).then(d=>{
+      if(d.token){token=d.token;document.getElementById('loginOverlay').style.display='none';loadData();}
+      else document.getElementById('loginErr').textContent=d.error||'Invalid credentials';
+    }).catch(()=>document.getElementById('loginErr').textContent='Server error');
 }
-
-// Auto-login from sessionStorage (triggered by ?autologin=1 from main app)
 (function(){
   if(location.search.includes('autologin=1')){
-    var u = sessionStorage.getItem('tmv_db_user');
-    var p = sessionStorage.getItem('tmv_db_pass');
-    if(u && p){
-      document.getElementById('user').value = u;
-      document.getElementById('pass').value = p;
-      setTimeout(doLogin, 100);
-    }
+    var u=sessionStorage.getItem('tmv_db_user'),p=sessionStorage.getItem('tmv_db_pass');
+    if(u&&p){document.getElementById('user').value=u;document.getElementById('pass').value=p;setTimeout(doLogin,100);}
   }
 })();
+function authHdr(){return{'Authorization':'Bearer '+token}}
 
-function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
-
+/* ── Load ── */
 function loadData(){
-  fetch('/api/admin/db', { headers: authHdr() })
-    .then(r => r.json())
-    .then(d => {
-      if(d.error){ alert(d.error); return; }
-      dbData = d;
-      renderStats();
-      renderAssignments();
-      renderTmvCards();
-      renderLocCards();
-      renderTechCards();
-      renderDistCards();
-      renderTaskCards();
-      populateSelects();
-      document.getElementById('configPre').textContent = JSON.stringify(d.config, null, 2);
-    })
-    .catch(() => alert('Failed to load DB data'));
+  fetch('/api/admin/db',{headers:authHdr()}).then(r=>r.json()).then(d=>{
+    if(d.error){alert(d.error);return;}
+    dbData=d;
+    renderStats();renderAssignments();
+    renderTmvCards();renderLocCards();renderTechCards();renderDistCards();renderTaskCards();
+    populateSelects();
+    document.getElementById('configPre').textContent=JSON.stringify(d.config,null,2);
+  }).catch(()=>alert('Failed to load DB data'));
 }
 
+/* ── Stats ── */
 function renderStats(){
-  const a = dbData.assignments;
-  const byStatus = s => a.filter(x => x.status === s).length;
-  document.getElementById('stats').innerHTML =
-    `<div class="stat"><b>${a.length}</b><span>Total Assignments</span></div>` +
-    `<div class="stat"><b>${byStatus('assigned')}</b><span>Assigned</span></div>` +
-    `<div class="stat"><b>${byStatus('in_progress')}</b><span>In Progress</span></div>` +
-    `<div class="stat"><b>${byStatus('completed')}</b><span>Completed</span></div>` +
+  const a=dbData.assignments,bs=s=>a.filter(x=>x.status===s).length;
+  document.getElementById('stats').innerHTML=
+    `<div class="stat"><b>${a.length}</b><span>Total Assignments</span></div>`+
+    `<div class="stat"><b>${bs('assigned')}</b><span>Assigned</span></div>`+
+    `<div class="stat"><b>${bs('in_progress')}</b><span>In Progress</span></div>`+
+    `<div class="stat"><b>${bs('completed')}</b><span>Completed</span></div>`+
     `<div class="stat"><b>${dbData.assets.length}</b><span>Assets</span></div>`;
 }
 
+/* ── Selects ── */
 function populateSelects(){
-  const cfg = dbData.config;
-  // Populate TMV type select
-  const typeSel = document.getElementById('aType');
-  typeSel.innerHTML = (cfg.vanTypes||[]).map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
-  // Populate location select
-  const locSel = document.getElementById('aLocation');
-  locSel.innerHTML = (cfg.locations||[]).map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
-  // Populate appliesTo checkboxes in task modal
-  const atDiv = document.getElementById('tkAppliesTo');
-  atDiv.innerHTML = (cfg.vanTypes||[]).map(t =>
-    `<label style="font-size:13px;display:flex;align-items:center;gap:4px;background:#f0f0f0;padding:4px 8px;border-radius:6px">
-      <input type="checkbox" value="${esc(t)}" class="atCb"> ${esc(t)}
-    </label>`).join('');
+  const cfg=dbData.config;
+  document.getElementById('aType').innerHTML=(cfg.vanTypes||[]).map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  document.getElementById('aLocation').innerHTML=(cfg.locations||[]).map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  document.getElementById('tkAppliesTo').innerHTML=(cfg.vanTypes||[]).map(t=>
+    `<label style="font-size:13px;display:flex;align-items:center;gap:4px;background:#f0f0f0;padding:4px 8px;border-radius:6px"><input type="checkbox" value="${esc(t)}" class="atCb"> ${esc(t)}</label>`).join('');
 }
 
-// ── Sub-tab switching ──
+/* ── Tabs ── */
+function switchTab(tab){
+  ['assign','assets','config'].forEach(t=>{
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active',t===tab);
+    document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active',t===tab);
+  });
+}
 function switchSubTab(tab){
-  ['tmv','locations','techs','districts','tasks'].forEach(t => {
-    document.getElementById('sub'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
-    document.getElementById('subView'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = t===tab ? 'block' : 'none';
+  const names=['tmv','locations','techs','districts','tasks'];
+  names.forEach(t=>{
+    document.getElementById('sub'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active',t===tab);
+    document.getElementById('subView'+t.charAt(0).toUpperCase()+t.slice(1)).style.display=t===tab?'block':'none';
   });
 }
 
-// ── Assignments ──
-function statusBadge(s){
-  const cls = 'b-' + (s||'assigned');
-  const label = (s||'assigned').replace('_',' ');
-  return `<span class="badge ${cls}">${label}</span>`;
-}
-function ts(t){ if(!t) return '—'; return new Date(t).toLocaleString(); }
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function ts(t){if(!t)return'—';return new Date(t).toLocaleString();}
 
-function renderAssignments(){
-  const filter = document.getElementById('filterStatus').value;
-  const q = document.getElementById('searchAssign').value.toLowerCase();
-  let list = dbData.assignments;
-  if(filter!=='all') list = list.filter(x => x.status === filter);
-  if(q) list = list.filter(x =>
-    (x.tmv||'').toLowerCase().includes(q) ||
-    (x.technician||'').toLowerCase().includes(q) ||
-    (x.location||'').toLowerCase().includes(q)
-  );
-  const tbody = document.getElementById('assignBody');
-  document.getElementById('assignEmpty').style.display = list.length?'none':'block';
-  tbody.innerHTML = list.map(a => `<tr>
-    <td>${statusBadge(a.status)}</td>
-    <td><strong>${esc(a.tmv||'—')}</strong></td>
-    <td>${esc(a.vanType||'—')}</td>
-    <td>${esc(a.technician||'—')}</td>
-    <td>${esc(a.location||'—')}</td>
-    <td>${a.date||'—'}</td>
-    <td class="ts">${ts(a.completedAt)}</td>
-    <td><button class="btn sm ghost" onclick="showAssignment('${a.id}')">View</button></td>
-  </tr>`).join('');
-}
-
-function showAssignment(id){
-  const a = dbData.assignments.find(x => x.id === id);
-  if(!a) return;
-  document.getElementById('detailTitle').textContent = `${a.tmv || 'Assignment'} — ${a.technician || 'Unassigned'}`;
-  let html = '';
-  html += `<div class="section"><h3>Details</h3>
-    <p><strong>ID:</strong> ${a.id}<br>
-    <strong>Status:</strong> ${statusBadge(a.status)}<br>
-    <strong>Van Type:</strong> ${esc(a.vanType||'—')}<br>
-    <strong>Location:</strong> ${esc(a.location||'—')}<br>
-    <strong>Date:</strong> ${a.date||'—'}<br>
-    <strong>Created:</strong> ${ts(a.createdAt)}<br>
-    <strong>Completed:</strong> ${ts(a.completedAt)}</p></div>`;
-  if(a.results && a.results.length){
-    html += `<div class="section"><h3>Technician Results</h3><div class="checklist">`;
-    a.results.forEach(sec => {
-      html += `<div style="margin-bottom:10px"><strong>${esc(sec.title||'Section')}</strong></div>`;
-      (sec.items||[]).forEach(item => {
-        const v = item.value;
-        let vLabel = '—', vCls = 'na';
-        if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
-        else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
-        else if(v){ vLabel=esc(String(v)); vCls=''; }
-        html += `<div class="cl-item">
-          <span class="cl-val ${vCls}">${vLabel}</span>
-          <span>${esc(item.label||'')}</span>
-          ${item.notes? '<br><span style="color:#666;font-size:12px">Note: '+esc(item.notes)+'</span>':''}
-        </div>`;
-      });
-    });
-    html += `</div></div>`;
-  }
-  if(a.photos && a.photos.length){
-    html += `<div class="section"><h3>Photos (${a.photos.length})</h3><div class="photo-grid">`;
-    a.photos.forEach(p => {
-      const f = typeof p==='string' ? p : p.file;
-      const cap = typeof p==='string' ? '' : (p.caption||'');
-      html += `<div style="text-align:center">
-        <img class="photo-thumb" src="/uploads/${enc(f)}" alt="${enc(cap)}" onclick="window.open('/uploads/${enc(f)}','_blank')">
-        ${cap? '<div style="font-size:11px;color:#666;margin-top:4px">'+esc(cap)+'</div>':''}
-      </div>`;
-    });
-    html += `</div></div>`;
-  }
-  document.getElementById('detailContent').innerHTML = html;
-  document.getElementById('detailPanel').style.display = 'block';
-}
-function closeDetail(){ document.getElementById('detailPanel').style.display='none'; }
-
-// ── TMV Cards (CRUD) ──
-function renderTmvCards(){
-  const q = (document.getElementById('searchTmv')?.value||'').toLowerCase();
-  let list = dbData.assets;
-  if(q) list = list.filter(x =>
-    (x.name||'').toLowerCase().includes(q) ||
-    (x.tmvId||'').toLowerCase().includes(q) ||
-    (x.location||'').toLowerCase().includes(q)
-  );
-  const grid = document.getElementById('tmvCards');
-  document.getElementById('tmvEmpty').style.display = list.length?'none':'block';
-  grid.innerHTML = list.map(a => `<div class="card">
-    <div class="card-actions">
-      <button class="btn sm ghost" onclick="editAsset('${a.id}')">Edit</button>
-      <button class="btn sm danger ghost" onclick="deleteAsset('${a.id}')">Del</button>
-    </div>
-    <h3>${esc(a.name||'—')}</h3>
-    <p><strong>TMV ID:</strong> ${esc(a.tmvId||'—')}</p>
-    <p><strong>Type:</strong> ${esc(a.type||'—')}</p>
-    <p><strong>Location:</strong> ${esc(a.location||'—')}</p>
-    <p><strong>Interval:</strong> ${a.interval||'—'} ${a.unit||''}</p>
-    <p><strong>Last Maint:</strong> ${a.lastMaint ? ts(a.lastMaint) : '—'}</p>
-  </div>`).join('');
-}
-
-function openAssetModal(assetId){
-  document.getElementById('assetModalTitle').textContent = assetId ? 'Edit TMV' : 'Add TMV';
-  document.getElementById('editAssetId').value = assetId || '';
-  document.getElementById('aName').value = '';
-  document.getElementById('aTmvId').value = '';
-  document.getElementById('aInterval').value = '';
-  document.getElementById('aUnit').value = 'days';
-  document.getElementById('aLastMaint').value = '';
-  document.getElementById('aNotes').value = '';
-  populateSelects();
-  if(assetId){
-    const a = dbData.assets.find(x => String(x.id) === String(assetId));
-    if(!a) return;
-    document.getElementById('aName').value = a.name||'';
-    document.getElementById('aTmvId').value = a.tmvId||'';
-    document.getElementById('aType').value = a.type||'';
-    document.getElementById('aLocation').value = a.location||'';
-    document.getElementById('aInterval').value = a.interval||'';
-    document.getElementById('aUnit').value = a.unit||'days';
-    document.getElementById('aLastMaint').value = a.lastMaint||'';
-    document.getElementById('aNotes').value = a.notes||'';
-  }
-  document.getElementById('assetModal').classList.add('open');
-}
-function closeAssetModal(){ document.getElementById('assetModal').classList.remove('open'); }
-
-function saveAsset(){
-  const id = document.getElementById('editAssetId').value;
-  const a = {
-    id: id ? Number(id) : Date.now(),
-    name: document.getElementById('aName').value.trim(),
-    tmvId: document.getElementById('aTmvId').value.trim(),
-    type: document.getElementById('aType').value,
-    location: document.getElementById('aLocation').value,
-    interval: Number(document.getElementById('aInterval').value) || 90,
-    unit: document.getElementById('aUnit').value,
-    lastMaint: Number(document.getElementById('aLastMaint').value) || null,
-    notes: document.getElementById('aNotes').value.trim(),
-    photos: [],
-    maintBy: '',
-    inspections: []
-  };
-  if(!a.name){ alert('Name is required'); return; }
-  const method = id ? 'PUT' : 'POST';
-  const url = id ? `/api/assets/${id}` : '/api/assets';
-  fetch(url, { method, headers: {...authHdr(), 'Content-Type':'application/json'}, body: JSON.stringify(a) })
-    .then(r => r.json())
-    .then(d => {
-      if(d.error) alert(d.error);
-      else { closeAssetModal(); loadData(); }
-    })
-    .catch(() => alert('Save failed'));
-}
-
-function editAsset(id){ openAssetModal(id); }
-function deleteAsset(id){
-  if(!confirm('Delete this TMV asset?')) return;
-  fetch(`/api/assets/${id}`, { method:'DELETE', headers: authHdr() })
-    .then(r => r.json())
-    .then(d => { if(d.error) alert(d.error); else loadData(); })
-    .catch(() => alert('Delete failed'));
-}
-
-// ── Locations (CRUD) ──
-function renderLocCards(){
-  const locs = dbData.config.locations || [];
-  const grid = document.getElementById('locCards');
-  document.getElementById('locEmpty').style.display = locs.length?'none':'block';
-  grid.innerHTML = locs.map((l,i) => `<div class="card">
-    <div class="card-actions">
-      <button class="btn sm danger ghost" onclick="deleteLocation(${i})">Del</button>
-    </div>
-    <h3>${esc(l)}</h3>
-  </div>`).join('');
-}
-function addLocation(){
-  const val = document.getElementById('newLoc').value.trim();
-  if(!val){ alert('Enter a location name'); return; }
-  const locs = [...(dbData.config.locations||[]), val];
-  patchConfigArray('locations', locs);
-  document.getElementById('newLoc').value = '';
-}
-function deleteLocation(idx){
-  if(!confirm('Delete this location?')) return;
-  const locs = (dbData.config.locations||[]).filter((_,i) => i!==idx);
-  patchConfigArray('locations', locs);
-}
+/* ── Config array helper — uses PATCH to match API ── */
 function patchConfigArray(key, value){
-  fetch(`/api/admin/config/array/${key}`, {
-    method:'PATCH', headers:{...authHdr(),'Content-Type':'application/json'},
-    body: JSON.stringify({op:'set', value})
-  }).then(r=>r.json()).then(d=>{ if(d.error)alert(d.error); else loadData(); })
+  fetch(`/api/admin/config/array/${key}`,{
+    method:'PATCH',
+    headers:{...authHdr(),'Content-Type':'application/json'},
+    body:JSON.stringify({op:'set',value})
+  }).then(r=>r.json()).then(d=>{if(d.error)alert(d.error);else loadData();})
     .catch(()=>alert('Update failed'));
 }
 
-// ── Technicians (CRUD) ──
+/* ════════════════════════════════════════════
+   ASSIGNMENTS
+   ════════════════════════════════════════════ */
+function renderAssignments(){
+  const f=document.getElementById('filterStatus').value,q=(document.getElementById('searchAssign').value||'').toLowerCase();
+  let list=dbData.assignments;
+  if(f!=='all')list=list.filter(x=>x.status===f);
+  if(q)list=list.filter(x=>(x.tmv||'').toLowerCase().includes(q)||(x.technician||'').toLowerCase().includes(q)||(x.location||'').toLowerCase().includes(q));
+  document.getElementById('assignEmpty').style.display=list.length?'none':'block';
+  document.getElementById('assignBody').innerHTML=list.map(a=>`
+    <tr>
+      <td><span style="background:${a.status==='completed'?'#16a34a':a.status==='in_progress'?'#d97706':'#3b82f6';color:#fff;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600">${(a.status||'assigned').replace('_',' ')}</span></td>
+      <td><strong>${esc(a.tmv||'—')}</strong></td><td>${esc(a.vanType||'—')}</td>
+      <td>${esc(a.technician||'—')}</td><td>${esc(a.location||'—')}</td><td>${a.date||'—'}</td>
+      <td>${ts(a.completedAt)}</td><td><button class="btn sm ghost">View</button></td>
+    </tr>`).join('');
+}
+
+/* ════════════════════════════════════════════
+   TMV's
+   ════════════════════════════════════════════ */
+function renderTmvCards(){
+  const q=(document.getElementById('searchTmv')?.value||'').toLowerCase();
+  let list=dbData.assets;
+  if(q)list=list.filter(x=>(x.name||'').toLowerCase().includes(q)||(x.tmvId||'').toLowerCase().includes(q)||(x.location||'').toLowerCase().includes(q));
+  document.getElementById('tmvEmpty').style.display=list.length?'none':'block';
+  document.getElementById('tmvCards').innerHTML=list.map(a=>`
+    <div class="card">
+      <div class="card-actions">
+        <button class="btn sm ghost" onclick="editAsset('${a.id}')">Edit</button>
+        <button class="btn sm danger ghost" onclick="deleteAsset('${a.id}')">×</button>
+      </div>
+      <h3>${esc(a.name||'—')}</h3>
+      <p><strong>TMV ID:</strong> ${esc(a.tmvId||'—')}</p>
+      <p><strong>Type:</strong> ${esc(a.type||'—')}</p>
+      <p><strong>Location:</strong> ${esc(a.location||'—')}</p>
+      <p><strong>Interval:</strong> ${a.interval||'—'} ${a.unit||'days'}</p>
+    </div>`).join('');
+}
+function openAssetModal(assetId){
+  document.getElementById('assetModalTitle').textContent=assetId?'Edit TMV':'Add TMV';
+  document.getElementById('editAssetId').value=assetId||'';
+  document.getElementById('aName').value='';document.getElementById('aTmvId').value='';
+  document.getElementById('aInterval').value='';document.getElementById('aNotes').value='';
+  populateSelects();
+  if(assetId){
+    const a=dbData.assets.find(x=>String(x.id)===String(assetId));
+    if(!a)return;
+    document.getElementById('aName').value=a.name||'';document.getElementById('aTmvId').value=a.tmvId||'';
+    document.getElementById('aType').value=a.type||'';document.getElementById('aLocation').value=a.location||'';
+    document.getElementById('aInterval').value=a.interval||'';document.getElementById('aNotes').value=a.notes||'';
+  }
+  document.getElementById('assetModal').classList.add('open');
+}
+function closeAssetModal(){document.getElementById('assetModal').classList.remove('open');}
+function saveAsset(){
+  const id=document.getElementById('editAssetId').value;
+  const a={id:id?Number(id):Date.now(),name:document.getElementById('aName').value.trim(),
+    tmvId:document.getElementById('aTmvId').value.trim(),type:document.getElementById('aType').value,
+    location:document.getElementById('aLocation').value,interval:Number(document.getElementById('aInterval').value)||90,
+    unit:'days',lastMaint:null,notes:document.getElementById('aNotes').value.trim(),photos:[],maintBy:'',inspections:[]};
+  if(!a.name){alert('Name is required');return;}
+  const m=id?'PUT':'POST',url=id?`/api/assets/${id}`:'/api/assets';
+  fetch(url,{method:m,headers:{...authHdr(),'Content-Type':'application/json'},body:JSON.stringify(a)})
+    .then(r=>r.json()).then(d=>{if(d.error)alert(d.error);else{closeAssetModal();loadData();}}).catch(()=>alert('Save failed'));
+}
+function deleteAsset(id){
+  if(!confirm('Delete this TMV asset?'))return;
+  fetch(`/api/assets/${id}`,{method:'DELETE',headers:authHdr()}).then(r=>r.json()).then(d=>{if(d.error)alert(d.error);else loadData();}).catch(()=>alert('Delete failed'));
+}
+
+/* ════════════════════════════════════════════
+   Locations — inline +/× on each card
+   ════════════════════════════════════════════ */
+function renderLocCards(){
+  const locs=dbData.config.locations||[];
+  document.getElementById('locEmpty').style.display=locs.length?'none':'block';
+  document.getElementById('locCards').innerHTML=locs.map((l,i)=>`
+    <div class="card">
+      <div class="card-actions">
+        <button class="btn sm danger ghost" onclick="deleteLocation(${i})">×</button>
+      </div>
+      <h3>${esc(l)}</h3>
+      <div class="add-item-bar" style="margin-top:10px">
+        <input type="text" id="locRename_${i}" value="${esc(l)}" style="flex:1;padding:6px 8px;font-size:13px" onkeydown="if(event.key==='Enter')renameLocation(${i})">
+        <button class="btn sm muted" onclick="renameLocation(${i})">Rename</button>
+      </div>
+    </div>`).join('');
+}
+function addLocation(){
+  const val=document.getElementById('newLoc').value.trim();
+  if(!val){alert('Enter a location name');return;}
+  patchConfigArray('locations',[...(dbData.config.locations||[]),val]);
+  document.getElementById('newLoc').value='';
+}
+function renameLocation(idx){
+  const input=document.getElementById(`locRename_${idx}`);
+  const val=input.value.trim();
+  if(!val){alert('Name cannot be empty');return;}
+  const locs=[...(dbData.config.locations||[])];locs[idx]=val;
+  patchConfigArray('locations',locs);
+}
+function deleteLocation(idx){
+  if(!confirm('Delete this location?'))return;
+  patchConfigArray('locations',(dbData.config.locations||[]).filter((_,i)=>i!==idx));
+}
+
+/* ════════════════════════════════════════════
+   Technicians — inline +/× on each card
+   ════════════════════════════════════════════ */
 function renderTechCards(){
-  const q = (document.getElementById('searchTech')?.value||'').toLowerCase();
-  let list = dbData.config.technicians || [];
-  if(q) list = list.filter(x => (x.name||'').toLowerCase().includes(q));
-  const grid = document.getElementById('techCards');
-  document.getElementById('techEmpty').style.display = list.length?'none':'block';
-  grid.innerHTML = list.map((t,i) => `<div class="card">
-    <div class="card-actions">
-      <button class="btn sm ghost" onclick="editTech(${i})">Edit</button>
-      <button class="btn sm danger ghost" onclick="deleteTech(${i})">Del</button>
-    </div>
-    <h3>${esc(t.name||'—')}</h3>
-    <p><strong>WhatsApp:</strong> ${esc(t.whatsapp||'—')}</p>
-    <p><strong>Telegram:</strong> ${esc(t.telegram||'—')}</p>
-  </div>`).join('');
+  const q=(document.getElementById('searchTech')?.value||'').toLowerCase();
+  let list=dbData.config.technicians||[];
+  if(q)list=list.filter(x=>(x.name||'').toLowerCase().includes(q));
+  document.getElementById('techEmpty').style.display=list.length?'none':'block';
+  document.getElementById('techCards').innerHTML=list.map((t,i)=>`
+    <div class="card">
+      <div class="card-actions">
+        <button class="btn sm ghost" onclick="editTech(${i})">Edit</button>
+        <button class="btn sm danger ghost" onclick="deleteTech(${i})">×</button>
+      </div>
+      <h3>${esc(t.name||'—')}</h3>
+      <div class="item-row"><span class="item-label">WhatsApp</span><input type="text" value="${esc(t.whatsapp||'')}" style="flex:1;padding:4px 6px;font-size:13px;border:1px solid #e3e3e3;border-radius:6px" onchange="updateTechField(${i},'whatsapp',this.value)"></div>
+      <div class="item-row"><span class="item-label">Telegram</span><input type="text" value="${esc(t.telegram||'')}" style="flex:1;padding:4px 6px;font-size:13px;border:1px solid #e3e3e3;border-radius:6px" onchange="updateTechField(${i},'telegram',this.value)"></div>
+    </div>`).join('');
+}
+function updateTechField(idx,field,val){
+  let techs=[...(dbData.config.technicians||[])];
+  if(!techs[idx])return;
+  techs[idx][field]=val.trim();
+  patchConfigArray('technicians',techs);
 }
 function openTechModal(idx){
-  document.getElementById('editTechIdx').value = idx ?? '';
-  document.getElementById('techModalTitle').textContent = (idx!==null&&idx!=='') ? 'Edit Technician' : 'Add Technician';
-  document.getElementById('tName').value = '';
-  document.getElementById('tWhatsapp').value = '';
-  document.getElementById('tTelegram').value = '';
+  document.getElementById('editTechIdx').value=idx??'';
+  document.getElementById('techModalTitle').textContent=(idx!==null&&idx!=='')?'Edit Technician':'Add Technician';
+  document.getElementById('tName').value='';document.getElementById('tWhatsapp').value='';document.getElementById('tTelegram').value='';
   if(idx!==null&&idx!==''){
-    const t = (dbData.config.technicians||[])[idx];
-    if(t){ document.getElementById('tName').value=t.name||''; document.getElementById('tWhatsapp').value=t.whatsapp||''; document.getElementById('tTelegram').value=t.telegram||''; }
+    const t=(dbData.config.technicians||[])[idx];
+    if(t){document.getElementById('tName').value=t.name||'';document.getElementById('tWhatsapp').value=t.whatsapp||'';document.getElementById('tTelegram').value=t.telegram||'';}
   }
   document.getElementById('techModal').classList.add('open');
 }
-function closeTechModal(){ document.getElementById('techModal').classList.remove('open'); }
+function closeTechModal(){document.getElementById('techModal').classList.remove('open');}
 function saveTech(){
-  const idx = document.getElementById('editTechIdx').value;
-  const t = { name:document.getElementById('tName').value.trim(), whatsapp:document.getElementById('tWhatsapp').value.trim(), telegram:document.getElementById('tTelegram').value.trim() };
-  if(!t.name){ alert('Name is required'); return; }
-  let techs = [...(dbData.config.technicians||[])];
-  if(idx) techs[idx] = t; else techs.push(t);
-  patchConfigArray('technicians', techs);
-  closeTechModal();
+  const idx=document.getElementById('editTechIdx').value;
+  const t={name:document.getElementById('tName').value.trim(),whatsapp:document.getElementById('tWhatsapp').value.trim(),telegram:document.getElementById('tTelegram').value.trim()};
+  if(!t.name){alert('Name is required');return;}
+  let techs=[...(dbData.config.technicians||[])];
+  if(idx)techs[idx]=t;else techs.push(t);
+  patchConfigArray('technicians',techs);closeTechModal();
 }
-function editTech(i){ openTechModal(i); }
 function deleteTech(i){
-  if(!confirm('Delete this technician?')) return;
-  const techs = (dbData.config.technicians||[]).filter((_,j)=>j!==i);
-  patchConfigArray('technicians', techs);
+  if(!confirm('Delete this technician?'))return;
+  patchConfigArray('technicians',(dbData.config.technicians||[]).filter((_,j)=>j!==i));
 }
 
-// ── Districts (CRUD) ──
+/* ════════════════════════════════════════════
+   Districts — inline +/× on each card
+   ════════════════════════════════════════════ */
 function renderDistCards(){
-  const dists = dbData.config.districts || [];
-  const grid = document.getElementById('distCards');
-  document.getElementById('distEmpty').style.display = dists.length?'none':'block';
-  grid.innerHTML = dists.map((d,i) => `<div class="card">
-    <div class="card-actions">
-      <button class="btn sm ghost" onclick="editDist(${i})">Edit</button>
-      <button class="btn sm danger ghost" onclick="deleteDist(${i})">Del</button>
-    </div>
-    <h3>${esc(typeof d==='string'?d:d.name||'—')}</h3>
-    ${typeof d==='object'&&d.notes? '<p>'+esc(d.notes)+'</p>':''}
-  </div>`).join('');
+  const dists=dbData.config.districts||[];
+  document.getElementById('distEmpty').style.display=dists.length?'none':'block';
+  document.getElementById('distCards').innerHTML=dists.map((d,i)=>`
+    <div class="card">
+      <div class="card-actions">
+        <button class="btn sm ghost" onclick="editDist(${i})">Rename</button>
+        <button class="btn sm danger ghost" onclick="deleteDist(${i})">×</button>
+      </div>
+      <h3>${esc(typeof d==='string'?d:d.name||'—')}</h3>
+      <div class="add-item-bar" style="margin-top:8px">
+        <input type="text" id="distRename_${i}" value="${esc(typeof d==='string'?d:d.name||'')}" style="flex:1;padding:6px 8px;font-size:13px" onkeydown="if(event.key==='Enter')renameDistrict(${i})">
+        <button class="btn sm muted" onclick="renameDistrict(${i})">Rename</button>
+      </div>
+    </div>`).join('');
 }
 function addDistrict(){
-  const val = document.getElementById('newDist').value.trim();
-  if(!val){ alert('Enter a district name'); return; }
-  const dists = [...(dbData.config.districts||[]), val];
-  patchConfigArray('districts', dists);
-  document.getElementById('newDist').value = '';
+  const val=document.getElementById('newDist').value.trim();
+  if(!val){alert('Enter a district name');return;}
+  patchConfigArray('districts',[...(dbData.config.districts||[]),val]);
+  document.getElementById('newDist').value='';
 }
-function editDist(i){
-  const d = (dbData.config.districts||[])[i];
-  const name = typeof d==='string' ? d : (d.name||'');
-  const newName = prompt('District name:', name);
-  if(newName!==null && newName.trim()){
-    const dists = [...(dbData.config.districts||[])];
-    dists[i] = newName.trim();
-    patchConfigArray('districts', dists);
-  }
+function renameDistrict(i){
+  const val=document.getElementById(`distRename_${i}`).value.trim();
+  if(!val){alert('Name cannot be empty');return;}
+  const dists=[...(dbData.config.districts||[])];dists[i]=val;
+  patchConfigArray('districts',dists);
 }
+function editDist(i){renameDistrict(i);}
 function deleteDist(i){
-  if(!confirm('Delete this district?')) return;
-  const dists = (dbData.config.districts||[]).filter((_,j)=>j!==i);
-  patchConfigArray('districts', dists);
+  if(!confirm('Delete this district?'))return;
+  patchConfigArray('districts',(dbData.config.districts||[]).filter((_,j)=>j!==i));
 }
 
-// ── Tasks / Checklist (CRUD) ──
+/* ════════════════════════════════════════════
+   Tasks — cards show items inline with +/× controls
+   ════════════════════════════════════════════ */
 function renderTaskCards(){
-  const q = (document.getElementById('searchTask')?.value||'').toLowerCase();
-  let list = dbData.config.checklist || [];
-  if(q) list = list.filter(x => (x.title||'').toLowerCase().includes(q));
-  const grid = document.getElementById('taskCards');
-  document.getElementById('taskEmpty').style.display = list.length?'none':'block';
-  grid.innerHTML = list.map((t,i) => `<div class="card">
-    <div class="card-actions">
-      <button class="btn sm ghost" onclick="editTask(${i})">Edit</button>
-      <button class="btn sm danger ghost" onclick="deleteTask(${i})">Del</button>
-    </div>
-    <h3>${esc(t.title||'—')}</h3>
-    <p><strong>Applies To:</strong> ${(t.appliesTo||[]).map(x=>`<span class="tag">${esc(x)}</span>`).join(' ')}</p>
-    <p><strong>Items:</strong> ${(t.items||[]).length} field(s)</p>
-  </div>`).join('');
+  const q=(document.getElementById('searchTask')?.value||'').toLowerCase();
+  let list=dbData.config.checklist||[];
+  if(q)list=list.filter(x=>(x.title||'').toLowerCase().includes(q));
+  document.getElementById('taskEmpty').style.display=list.length?'none':'block';
+  document.getElementById('taskCards').innerHTML=list.map((t,i)=>{
+    const items=t.items||[];
+    const itemsHtml=items.length?items.map((it,ii)=>`
+      <div class="item-row">
+        <span class="item-label">${esc(it.label||'—')}</span>
+        <span class="item-type">${esc(it.type||'yn')}</span>
+        <span class="item-remove" title="Remove item" onclick="removeTaskItem(${i},${ii})">×</span>
+      </div>`).join('')
+      :`<div style="color:#999;font-size:13px;padding:6px 0">No items yet</div>`;
+    return `
+    <div class="card">
+      <div class="card-actions">
+        <button class="btn sm ghost" onclick="openTaskModal(${i})">Edit</button>
+        <button class="btn sm danger ghost" onclick="deleteTask(${i})">×</button>
+      </div>
+      <h3>${esc(t.title||'—')}</h3>
+      <p style="margin:4px 0"><strong>Applies To:</strong> ${(t.appliesTo||[]).map(x=>`<span class="tag">${esc(x)}</span>`).join(' ')||'—'}</p>
+      <div style="margin-top:8px">
+        <strong style="font-size:13px;color:#555">Items (${items.length})</strong>
+        <div style="margin-top:4px">${itemsHtml}</div>
+        <div class="add-item-bar">
+          <input type="text" id="newItemLabel_${i}" placeholder="New item label…" onkeydown="if(event.key==='Enter')addTaskItem(${i})">
+          <select id="newItemType_${i}">
+            <option value="yn">Yes/No</option><option value="num">Number</option><option value="text">Text</option><option value="date">Date</option><option value="choice">Choice</option>
+          </select>
+          <button class="btn sm muted" onclick="addTaskItem(${i})">+ Add Line</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function addTaskItem(taskIdx){
+  const label=document.getElementById(`newItemLabel_${taskIdx}`).value.trim();
+  if(!label){alert('Enter a label for the new item');return;}
+  const type=document.getElementById(`newItemType_${taskIdx}`).value;
+  let tasks=[...(dbData.config.checklist||[])];
+  if(!tasks[taskIdx].items)tasks[taskIdx].items=[];
+  tasks[taskIdx].items.push({label,type});
+  patchConfigArray('checklist',tasks);
+  document.getElementById(`newItemLabel_${taskIdx}`).value='';
+}
+function removeTaskItem(taskIdx,itemIdx){
+  if(!confirm('Remove this item from the task group?'))return;
+  let tasks=[...(dbData.config.checklist||[])];
+  tasks[taskIdx].items=tasks[taskIdx].items.filter((_,j)=>j!==itemIdx);
+  patchConfigArray('checklist',tasks);
 }
 function openTaskModal(idx){
-  document.getElementById('editTaskIdx').value = idx ?? '';
-  document.getElementById('taskModalTitle').textContent = (idx!==null&&idx!=='') ? 'Edit Task Group' : 'Add Task Group';
-  document.getElementById('tkTitle').value = '';
-  document.getElementById('tkItems').value = '';
-  populateSelects();
-  // Uncheck all
-  document.querySelectorAll('.atCb').forEach(cb => cb.checked=false);
+  document.getElementById('editTaskIdx').value=idx??'';
+  document.getElementById('taskModalTitle').textContent=(idx!==null&&idx!=='')?'Edit Task Group':'Add Task Group';
+  document.getElementById('tkTitle').value='';document.getElementById('tkItems').value='';
+  populateSelects();document.querySelectorAll('.atCb').forEach(cb=>cb.checked=false);
   if(idx!==null&&idx!==''){
-    const t = (dbData.config.checklist||[])[idx];
+    const t=(dbData.config.checklist||[])[idx];
     if(t){
-      document.getElementById('tkTitle').value = t.title||'';
-      (t.appliesTo||[]).forEach(a => {
-        document.querySelectorAll('.atCb').forEach(cb => { if(cb.value===a) cb.checked=true; });
-      });
-      document.getElementById('tkItems').value = (t.items||[]).map(it => `${it.label}|${it.type||'yn'}`).join('\n');
+      document.getElementById('tkTitle').value=t.title||'';
+      (t.appliesTo||[]).forEach(a=>{document.querySelectorAll('.atCb').forEach(cb=>{if(cb.value===a)cb.checked=true;});});
+      document.getElementById('tkItems').value=(t.items||[]).map(it=>`${it.label}|${it.type||'yn'}`).join('\n');
     }
   }
   document.getElementById('taskModal').classList.add('open');
 }
-function closeTaskModal(){ document.getElementById('taskModal').classList.remove('open'); }
+function closeTaskModal(){document.getElementById('taskModal').classList.remove('open');}
 function saveTask(){
-  const idx = document.getElementById('editTaskIdx').value;
-  const title = document.getElementById('tkTitle').value.trim();
-  if(!title){ alert('Title is required'); return; }
-  const appliesTo = Array.from(document.querySelectorAll('.atCb')).filter(cb=>cb.checked).map(cb=>cb.value);
-  const itemsRaw = document.getElementById('tkItems').value.split('\n').filter(l=>l.trim());
-  const items = itemsRaw.map(l => {
-    const parts = l.split('|');
-    return { label: parts[0]?.trim()||'', type: parts[1]?.trim()||'yn' };
-  }).filter(it=>it.label);
-  let tasks = [...(dbData.config.checklist||[])];
-  const taskObj = { title, appliesTo, items };
-  if(idx) tasks[idx] = taskObj; else tasks.push(taskObj);
-  patchConfigArray('checklist', tasks);
-  closeTaskModal();
+  const idx=document.getElementById('editTaskIdx').value;
+  const title=document.getElementById('tkTitle').value.trim();
+  if(!title){alert('Title is required');return;}
+  const appliesTo=Array.from(document.querySelectorAll('.atCb')).filter(cb=>cb.checked).map(cb=>cb.value);
+  const items=(document.getElementById('tkItems').value.split('\n').filter(l=>l.trim())).map(l=>{const p=l.split('|');return{label:p[0]?.trim()||'',type:p[1]?.trim()||'yn'};}).filter(it=>it.label);
+  let tasks=[...(dbData.config.checklist||[])];
+  const taskObj={title,appliesTo,items};
+  if(idx)tasks[idx]=taskObj;else tasks.push(taskObj);
+  patchConfigArray('checklist',tasks);closeTaskModal();
 }
-function editTask(i){ openTaskModal(i); }
 function deleteTask(i){
-  if(!confirm('Delete this task group?')) return;
-  const tasks = (dbData.config.checklist||[]).filter((_,j)=>j!==i);
-  patchConfigArray('checklist', tasks);
+  if(!confirm('Delete this task group?'))return;
+  patchConfigArray('checklist',(dbData.config.checklist||[]).filter((_,j)=>j!==i));
 }
 
-// ── Tab switching ──
-function switchTab(tab){
-  ['assign','assets','config'].forEach(t => {
-    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
-    document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
-  });
-}
-
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function enc(s){ return encodeURIComponent(s||''); }
-
-document.getElementById('pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 </script>
 </body>
 </html>
