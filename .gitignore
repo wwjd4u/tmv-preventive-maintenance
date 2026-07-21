@@ -4,6 +4,12 @@ uploads/
 server.log
 tunnel.log
 tunnel-url.txt
+tmv.db
+tmv.db-shm
+tmv.db-wal
+server.pid
+watchdog.lock
+watchdog.log
 
 # Node
 node_modules/

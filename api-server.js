@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const db = require('./db');
 
 const PORT = 9240;
 const DATA_FILE = path.join(__dirname, 'assets.json');
@@ -12,6 +13,15 @@ const ASSIGNMENTS_FILE = path.join(__dirname, 'assignments.json');
 // ── Ensure directories exist ──────────────────────────────
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
+// ── Never let a single bad request kill the whole server ──
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.message);
+});
+
+// ── Admin credentials (username / password) ──────────────
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'admin123';
+
 // ── Default config ─────────────────────────────────────────
 const DEFAULT_CONFIG = {
   intervals: [30, 60, 90, 120, 180, 365],
@@ -20,28 +30,19 @@ const DEFAULT_CONFIG = {
 };
 
 function loadConfig() {
-  try {
-    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-  } catch(e) {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf8');
-    return { ...DEFAULT_CONFIG };
-  }
+  return db.loadConfig();
 }
 
 function saveConfig(c) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2), 'utf8');
+  db.saveConfig(c);
 }
 
 // ── Assignments (admin → technician handoff) ───────────────
 function loadAssignments() {
-  try {
-    return JSON.parse(fs.readFileSync(ASSIGNMENTS_FILE, 'utf8'));
-  } catch(e) {
-    return [];
-  }
+  return db.loadAssignments();
 }
 function saveAssignments(list) {
-  fs.writeFileSync(ASSIGNMENTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+  db.saveAssignments(list);
 }
 
 // ── MIME types ────────────────────────────────────────────
@@ -106,20 +107,14 @@ const DEFAULT_ASSETS = [
 
 function loadAssets() {
   try {
-    const assets = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return assets.map(a => ({
-      ...a,
-      tmvId: a.tmvId || '',
-      unit: a.unit || 'days',
-      photos: a.photos || []
-    }));
+    return db.loadAssets();
   } catch(e) {
     return [...DEFAULT_ASSETS];
   }
 }
 
 function saveAssets(a) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(a, null, 2), 'utf8');
+  db.saveAssets(a);
 }
 
 function sendJson(res, s, d) {
@@ -133,6 +128,15 @@ function serveFile(res, p, contentType) {
     res.writeHead(200, { 'Content-Type': contentType || 'text/html' });
     res.end(d);
   });
+}
+
+// ── Admin auth ────────────────────────────────────────────
+// Token is base64("<user>:<pass>"); sent in `Authorization: Bearer <token>`.
+function adminToken() {
+  return Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');
+}
+function isAdmin(token) {
+  return token === adminToken();
 }
 
 http.createServer((req, res) => {
@@ -265,11 +269,36 @@ http.createServer((req, res) => {
     return;
   }
 
+  // ── POST /api/login — authenticate admin, return bearer token ──
+  if (url.pathname === '/api/login' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        if (d.username === ADMIN_USER && d.password === ADMIN_PASS) {
+          return sendJson(res, 200, { ok: true, token: adminToken() });
+        }
+        return sendJson(res, 401, { error: 'Invalid credentials' });
+      } catch (e) {
+        sendJson(res, 400, { error: 'Invalid request: ' + e.message });
+      }
+    });
+    return;
+  }
+
   // ── Admin-only endpoints below ───────────────────────────
   // Check for Authorization header
   const authHeader = req.headers['authorization'] || '';
   const reqToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const isAdminReq = isAdmin(reqToken);
+
+  // ── POST /api/admin/purge — wipe all temp records before production ──
+  if (url.pathname === '/api/admin/purge' && req.method === 'POST') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    db.purgeAssignments();
+    return sendJson(res, 200, { ok: true, message: 'All assignment records purged.' });
+  }
 
   // ── PUT /api/config — update settings (admin only) ─────
   if (url.pathname === '/api/config' && req.method === 'PUT') {
@@ -603,4 +632,5 @@ http.createServer((req, res) => {
 }).listen(PORT, '0.0.0.0', () => {
   console.log(`🏭 TMV Master App running at http://0.0.0.0:${PORT} (all interfaces)`);
   console.log(`   Windows access: http://localhost:${PORT}`);
+  console.log(`   Admin login: POST /api/login  (user: ${ADMIN_USER} / pass: ${ADMIN_PASS})`);
 });
