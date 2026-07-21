@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Viewer — TMV Admin</title>
+<style>
+  :root{
+    --cudd:#812F2F; --cudd-dk:#5e2121; --ink:#1a1a1a; --line:#e3e3e3;
+    --ok:#16a34a; --warn:#d97706; --due:#dc2626; --none:#9ca3af; --bg:#f5f6f8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.4 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--cudd);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
+  header img{height:34px}
+  header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.3px}
+  nav{margin-left:auto;display:flex;gap:8px}
+  nav button{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer}
+  nav button.active{background:#fff;color:var(--cudd);font-weight:600}
+  main{padding:18px;max-width:1200px;margin:0 auto}
+  .view{display:none}
+  .view.active{display:block}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  select,input,textarea{font:14px inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .btn{background:var(--cudd);color:#fff;border:0;padding:10px 18px;border-radius:9px;font-size:15px;cursor:pointer;font-weight:600}
+  .btn.ghost{background:#fff;color:var(--cudd);border:1px solid var(--cudd)}
+  .btn.sm{padding:6px 12px;font-size:13px}
+
+  /* Login overlay */
+  #loginOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:center;justify-content:center}
+  #loginBox{background:#fff;border-radius:14px;padding:28px 32px;min-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+  #loginBox h2{margin:0 0 18px;color:var(--cudd)}
+  #loginBox input{width:100%;margin-bottom:10px}
+  #loginErr{color:#dc2626;font-size:13px;margin-bottom:8px;min-height:18px}
+
+  /* Tabs */
+  .tabs{display:flex;gap:0;border-bottom:2px solid var(--line);margin-bottom:16px}
+  .tab{padding:10px 18px;cursor:pointer;border-bottom:2px solid transparent;font-weight:500;color:#666}
+  .tab.active{color:var(--cudd);border-bottom-color:var(--cudd)}
+  .tab:hover{color:var(--ink)}
+
+  /* Table */
+  .tbl-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#f8f8fa;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  tr:hover td{background:#fafbfc}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff}
+  .b-assigned{background:#3b82f6}
+  .b-in_progress{background:#d97706}
+  .b-completed{background:#16a34a}
+  .b-ok{background:var(--ok)}
+  .b-warn{background:var(--warn)}
+  .b-due{background:var(--due)}
+
+  /* Detail panel */
+  #detailPanel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;overflow-y:auto}
+  #detailBox{background:#fff;border-radius:14px;margin:40px auto;max-width:800px;padding:24px;position:relative}
+  #detailBox h2{margin-top:0;color:var(--cudd)}
+  #detailClose{position:absolute;top:14px;right:18px;cursor:pointer;font-size:22px;color:#999}
+  .section{margin-bottom:14px}
+  .section h3{margin:0 0 8px;font-size:14px;color:#555}
+  .checklist{background:#f8f8fa;border-radius:10px;padding:12px}
+  .cl-item{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid #eee}
+  .cl-item:last-child{border-bottom:0}
+  .cl-val{font-weight:600;min-width:60px}
+  .cl-val.yes{color:var(--ok)}
+  .cl-val.no{color:var(--due)}
+  .cl-val.na{color:#999}
+  .photo-thumb{width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+  .photo-grid{display:flex;gap:8px;flex-wrap:wrap}
+  .ts{color:#999;font-size:12px}
+
+  /* Stats */
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 20px;min-width:120px}
+  .stat b{display:block;font-size:26px;color:var(--cudd)}
+  .stat span{font-size:13px;color:#666}
+
+  .filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .search{width:260px}
+  .empty{text-align:center;padding:40px;color:#999;font-size:15px}
+
+  footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
+</style>
+</head>
+<body>
+
+<div id="loginOverlay">
+  <div id="loginBox">
+    <h2>🔒 Admin Login</h2>
+    <input id="user" type="text" placeholder="Username" value="admin">
+    <input id="pass" type="password" placeholder="Password" value="admin123">
+    <div id="loginErr"></div>
+    <button class="btn" onclick="doLogin()" style="width:100%">Log In</button>
+  </div>
+</div>
+
+<header>
+  <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
+  <h1>TMV DB Viewer</h1>
+  <nav>
+    <button id="tabAssign" class="active" onclick="switchTab('assign')">📋 Assignments</button>
+    <button id="tabAssets" onclick="switchTab('assets')">🚚 Assets</button>
+    <button id="tabConfig" onclick="switchTab('config')">⚙️ Config</button>
+  </nav>
+</header>
+
+<main>
+  <div class="stats" id="stats"></div>
+
+  <!-- ASSIGNMENTS VIEW -->
+  <div id="viewAssign" class="view active">
+    <div class="filter-bar">
+      <select id="filterStatus" onchange="renderAssignments()">
+        <option value="all">All statuses</option>
+        <option value="assigned">Assigned</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Completed</option>
+      </select>
+      <input id="searchAssign" class="search" placeholder="Search TMV, technician…" oninput="renderAssignments()">
+      <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Status</th><th>TMV</th><th>Van Type</th><th>Technician</th>
+          <th>Location</th><th>Date</th><th>Completed</th><th></th>
+        </tr></thead>
+        <tbody id="assignBody"></tbody>
+      </table>
+    </div>
+    <div id="assignEmpty" class="empty" style="display:none">No assignments found.</div>
+  </div>
+
+  <!-- ASSETS VIEW -->
+  <div id="viewAssets" class="view">
+    <div class="filter-bar">
+      <input id="searchAssets" class="search" placeholder="Search assets…" oninput="renderAssets()">
+      <button class="btn ghost sm" onclick="loadData()">🔄 Refresh</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Name</th><th>Type</th><th>Location</th>
+          <th>TMV ID</th><th>Interval</th><th>Last Maint</th>
+        </tr></thead>
+        <tbody id="assetsBody"></tbody>
+      </table>
+    </div>
+    <div id="assetsEmpty" class="empty" style="display:none">No assets found.</div>
+  </div>
+
+  <!-- CONFIG VIEW -->
+  <div id="viewConfig" class="view">
+    <pre id="configPre" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;overflow-x:auto;font:13px/1.5 monospace;white-space:pre-wrap"></pre>
+  </div>
+</main>
+
+<div id="detailPanel" onclick="if(event.target===this)closeDetail()">
+  <div id="detailBox">
+    <span id="detailClose" onclick="closeDetail()">&times;</span>
+    <h2 id="detailTitle"></h2>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<footer>CUDD Energy Services · DB Viewer &nbsp;|&nbsp; <a href="/" style="color:var(--cudd)">← Back to Main App</a></footer>
+
+<script>
+let token = null;
+let dbData = { assignments:[], assets:[], config:{} };
+
+function doLogin(){
+  const u = document.getElementById('user').value;
+  const p = document.getElementById('pass').value;
+  document.getElementById('loginErr').textContent = '';
+  fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
+    .then(r => r.json())
+    .then(d => {
+      if(d.token){ token = d.token; document.getElementById('loginOverlay').style.display='none'; loadData(); }
+      else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
+    })
+    .catch(() => document.getElementById('loginErr').textContent = 'Server error');
+}
+
+function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
+
+function loadData(){
+  fetch('/api/admin/db', { headers: authHdr() })
+    .then(r => r.json())
+    .then(d => {
+      if(d.error){ alert(d.error); return; }
+      dbData = d;
+      renderStats();
+      renderAssignments();
+      renderAssets();
+      document.getElementById('configPre').textContent = JSON.stringify(d.config, null, 2);
+    })
+    .catch(() => alert('Failed to load DB data'));
+}
+
+function renderStats(){
+  const a = dbData.assignments;
+  const byStatus = s => a.filter(x => x.status === s).length;
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><b>${a.length}</b><span>Total Assignments</span></div>` +
+    `<div class="stat"><b>${byStatus('assigned')}</b><span>Assigned</span></div>` +
+    `<div class="stat"><b>${byStatus('in_progress')}</b><span>In Progress</span></div>` +
+    `<div class="stat"><b>${byStatus('completed')}</b><span>Completed</span></div>` +
+    `<div class="stat"><b>${dbData.assets.length}</b><span>Assets</span></div>`;
+}
+
+function statusBadge(s){
+  const cls = 'b-' + (s||'assigned');
+  const label = (s||'assigned').replace('_',' ');
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function ts(t){
+  if(!t) return '—';
+  return new Date(t).toLocaleString();
+}
+
+function renderAssignments(){
+  const filter = document.getElementById('filterStatus').value;
+  const q = document.getElementById('searchAssign').value.toLowerCase();
+  let list = dbData.assignments;
+  if(filter!=='all') list = list.filter(x => x.status === filter);
+  if(q) list = list.filter(x =>
+    (x.tmv||'').toLowerCase().includes(q) ||
+    (x.technician||'').toLowerCase().includes(q) ||
+    (x.location||'').toLowerCase().includes(q)
+  );
+  const tbody = document.getElementById('assignBody');
+  document.getElementById('assignEmpty').style.display = list.length?'none':'block';
+  tbody.innerHTML = list.map(a => `<tr>
+    <td>${statusBadge(a.status)}</td>
+    <td><strong>${esc(a.tmv||'—')}</strong></td>
+    <td>${esc(a.vanType||'—')}</td>
+    <td>${esc(a.technician||'—')}</td>
+    <td>${esc(a.location||'—')}</td>
+    <td>${a.date||'—'}</td>
+    <td class="ts">${ts(a.completedAt)}</td>
+    <td><button class="btn sm ghost" onclick="showAssignment('${a.id}')">View</button></td>
+  </tr>`).join('');
+}
+
+function renderAssets(){
+  const q = document.getElementById('searchAssets').value.toLowerCase();
+  let list = dbData.assets;
+  if(q) list = list.filter(x =>
+    (x.name||'').toLowerCase().includes(q) ||
+    (x.type||'').toLowerCase().includes(q) ||
+    (x.location||'').toLowerCase().includes(q)
+  );
+  const tbody = document.getElementById('assetsBody');
+  document.getElementById('assetsEmpty').style.display = list.length?'none':'block';
+  tbody.innerHTML = list.map(a => `<tr>
+    <td>${a.id}</td>
+    <td><strong>${esc(a.name||'—')}</strong></td>
+    <td>${esc(a.type||'—')}</td>
+    <td>${esc(a.location||'—')}</td>
+    <td>${esc(a.tmvId||'—')}</td>
+    <td>${a.interval||'—'} ${a.unit||''}</td>
+    <td class="ts">${a.lastMaint ? ts(a.lastMaint) : '—'}</td>
+  </tr>`).join('');
+}
+
+function showAssignment(id){
+  const a = dbData.assignments.find(x => x.id === id);
+  if(!a) return;
+  document.getElementById('detailTitle').textContent = `${a.tmv || 'Assignment'} — ${a.technician || 'Unassigned'}`;
+  let html = '';
+  html += `<div class="section"><h3>Details</h3>
+    <p><strong>ID:</strong> ${a.id}<br>
+    <strong>Status:</strong> ${statusBadge(a.status)}<br>
+    <strong>Van Type:</strong> ${esc(a.vanType||'—')}<br>
+    <strong>Location:</strong> ${esc(a.location||'—')}<br>
+    <strong>Date:</strong> ${a.date||'—'}<br>
+    <strong>Created:</strong> ${ts(a.createdAt)}<br>
+    <strong>Completed:</strong> ${ts(a.completedAt)}</p></div>`;
+
+  // Results (technician checklist)
+  if(a.results && a.results.length){
+    html += `<div class="section"><h3>Technician Results</h3><div class="checklist">`;
+    a.results.forEach(sec => {
+      html += `<div style="margin-bottom:10px"><strong>${esc(sec.title||'Section')}</strong></div>`;
+      (sec.items||[]).forEach(item => {
+        const v = item.value;
+        let vLabel = '—', vCls = 'na';
+        if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
+        else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
+        else if(v){ vLabel=esc(String(v)); vCls=''; }
+        html += `<div class="cl-item">
+          <span class="cl-val ${vCls}">${vLabel}</span>
+          <span>${esc(item.label||'')}</span>
+          ${item.notes? '<br><span style="color:#666;font-size:12px">Note: '+esc(item.notes)+'</span>':''}
+        </div>`;
+      });
+    });
+    html += `</div></div>`;
+  } else if(a.status==='completed'){
+    html += `<div class="section"><em style="color:#999">No detailed results recorded.</em></div>`;
+  }
+
+  // Photos
+  if(a.photos && a.photos.length){
+    html += `<div class="section"><h3>Photos (${a.photos.length})</h3><div class="photo-grid">`;
+    a.photos.forEach(p => {
+      const f = typeof p==='string' ? p : p.file;
+      const cap = typeof p==='string' ? '' : (p.caption||'');
+      html += `<div style="text-align:center">
+        <img class="photo-thumb" src="/uploads/${enc(f)}" alt="${enc(cap)}" onclick="window.open('/uploads/${enc(f)}','_blank')">
+        ${cap? '<div style="font-size:11px;color:#666;margin-top:4px">'+esc(cap)+'</div>':''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  document.getElementById('detailContent').innerHTML = html;
+  document.getElementById('detailPanel').style.display = 'block';
+}
+function closeDetail(){ document.getElementById('detailPanel').style.display='none'; }
+
+function switchTab(tab){
+  ['assign','assets','config'].forEach(t => {
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
+    document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
+  });
+}
+
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function enc(s){ return encodeURIComponent(s||''); }
+
+// Enter key login
+document.getElementById('pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>

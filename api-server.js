@@ -159,6 +159,13 @@ http.createServer((req, res) => {
     return serveFile(res, path.join(__dirname, 'index.html'));
   }
 
+  // ── Serve DB viewer page (admin) ──
+  if (url.pathname === '/db' || url.pathname === '/db.html') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    return serveFile(res, path.join(__dirname, 'db-viewer.html'));
+  }
+
   // ── Serve technician mobile page (admin → tech handoff) ──
   const techMatch = url.pathname.match(/^\/tech\/([\w-]+)$/);
   if (techMatch) {
@@ -293,7 +300,21 @@ http.createServer((req, res) => {
   const reqToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const isAdminReq = isAdmin(reqToken);
 
-  // ── POST /api/admin/purge — wipe all temp records before production ──
+  // ── GET /api/admin/db — full DB dump for admin viewer (admin only) ──
+  if (url.pathname === '/api/admin/db' && req.method === 'GET') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    const assignments = db.prepare('SELECT id, status, technician, completedAt, data FROM assignments ORDER BY completedAt DESC, rowid DESC').all();
+    const assets = db.prepare('SELECT id, data FROM assets').all();
+    const configRow = db.prepare('SELECT data FROM config WHERE key = ?').get('app');
+    return sendJson(res, 200, {
+      assignments: assignments.map(r => ({ ...JSON.parse(r.data), _id: r.id, _status: r.status, _technician: r.technician, _completedAt: r.completedAt })),
+      assets: assets.map(r => JSON.parse(r.data)),
+      config: configRow ? JSON.parse(configRow.data) : {},
+      dbFile: DB_PATH
+    });
+  }
+
+  // ── GET /api/admin/purge — wipe all temp records before production ──
   if (url.pathname === '/api/admin/purge' && req.method === 'POST') {
     if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
     db.purgeAssignments();
