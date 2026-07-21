@@ -118,6 +118,7 @@
   .taskline:last-child{border-bottom:none}
   .taskline .tlabel{flex:1;font-size:14px}
   .taskline .ttype{font-size:12px;color:#888;background:#f0f0f0;border-radius:6px;padding:2px 8px}
+  .taskline .ttype-sel{font-size:13px;color:#3a2a2a;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff;cursor:pointer}
   .empty{color:#999;font-size:13px;font-style:italic;padding:6px 0}
   .addtaskrow{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
 </style>
@@ -139,8 +140,8 @@
   <h1>TMV Preventive Maintenance Admin</h1>
   <nav>
     <button id="tabAssign" class="active" onclick="switchTab('assign')">Assignments</button>
-    <button id="tabAssets" onclick="switchTab('assets')">Assets</button>
-    <button id="tabConfig" onclick="switchTab('config')">Config</button>
+    <button id="tabAssets" onclick="switchTab('assets')">Configure</button>
+    <button id="tabConfig" onclick="switchTab('config')">Categories</button>
   </nav>
 </header>
 
@@ -549,6 +550,19 @@ function deleteTech(){
 }
 
 /* ---- Categories (checklist sections) — expandable cards ---- */
+var TASK_TYPES = [
+  {value:'yn',     label:'Yes/No'},
+  {value:'num',    label:'Number'},
+  {value:'text',   label:'Text'},
+  {value:'date',   label:'Date'},
+  {value:'choice', label:'Choice'},
+  {value:'ynver',  label:'Yes/No + Verify'}
+];
+function taskTypeOptions(current){
+  return TASK_TYPES.map(function(t){
+    return '<option value="' + t.value + '"' + (t.value===current?' selected':'') + '>' + t.label + '</option>';
+  }).join('');
+}
 function renderCatCards(){
   var cfg = dbData.config || {};
   cfg.checklist = cfg.checklist || [];
@@ -574,7 +588,9 @@ function renderCatCards(){
           var type  = typeof it==='object' ? (it.type||'text') : 'text';
           html += '<div class="taskline">' +
             '<span class="tlabel">' + esc(label) + '</span>' +
-            '<span class="ttype">' + esc(type) + '</span>' +
+            '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +
+              taskTypeOptions(type) +
+            '</select>' +
             '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +
           '</div>';
         });
@@ -653,6 +669,14 @@ function deleteTask(ci, ii){
   if(!cat || typeof cat==='string') return;
   if(!confirm('Delete task "' + ((cat.items[ii].label)||'') + '"?')) return;
   cat.items.splice(ii, 1);
+  saveConfigArray('checklist', cfg.checklist);
+}
+function changeTaskType(ci, ii, val){
+  var cfg = dbData.config;
+  var cat = cfg.checklist[ci];
+  if(!cat || typeof cat==='string') return;
+  if(!cat.items[ii]) return;
+  cat.items[ii].type = val;
   saveConfigArray('checklist', cfg.checklist);
 }
 
