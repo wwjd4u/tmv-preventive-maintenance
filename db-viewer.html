@@ -497,7 +497,17 @@ function renderTaskCards(){
 }
 
 /* ASSET MODALS - placeholder implementations */
-function showAssetModal(){ alert('Add TMV - TODO: implement modal'); }
+function showAssetModal(){
+  const id = prompt("TMV ID (e.g. TMV-001):");
+  if(!id) return;
+  const name = prompt("TMV Name:");
+  if(!name) return;
+  const type = prompt("Van Type (e.g. Type A):");
+  const location = prompt("Location:");
+  fetch("/api/assets", { method:"POST", headers:{...authHdr(),"Content-Type":"application/json"}, body:JSON.stringify({id:id.trim(),name:name.trim(),type:type||"",location:location||""}) })
+    .then(function(){ loadData(); })
+    .catch(function(){ alert("Add failed"); });
+}
 function editAsset(id){ alert('Edit asset ' + id + ' - TODO: implement modal'); }
 function deleteAsset(id){
   if(!confirm('Delete this asset?')) return;
@@ -507,7 +517,14 @@ function deleteAsset(id){
     .catch(function(){ alert('Delete failed'); });
 }
 
-function showLocationModal(){ alert('Add Location - TODO: implement modal'); }
+function showLocationModal(){
+  const val = prompt("Location name:");
+  if(!val || !val.trim()) return;
+  const cfg = dbData.config;
+  if(!cfg.locations) cfg.locations = [];
+  cfg.locations.push(val.trim());
+  saveConfigArray("locations", cfg.locations);
+}
 function editLocation(idx){
   const cfg = dbData.config;
   const cur = cfg.locations[idx];
@@ -524,7 +541,16 @@ function deleteLocation(idx){
   saveConfigArray('locations', cfg.locations);
 }
 
-function showTechModal(){ alert('Add Technician - TODO: implement modal'); }
+function showTechModal(){
+  const name = prompt("Technician name:");
+  if(!name || !name.trim()) return;
+  const wa = prompt("WhatsApp (optional):");
+  const tg = prompt("Telegram (optional):");
+  const cfg = dbData.config;
+  if(!cfg.technicians) cfg.technicians = [];
+  cfg.technicians.push({name:name.trim(),whatsapp:wa||"",telegram:tg||""});
+  saveConfigArray("technicians", cfg.technicians);
+}
 function editTechnician(idx){
   const cfg = dbData.config;
   const cur = cfg.technicians[idx];
@@ -542,7 +568,14 @@ function deleteTechnician(idx){
   saveConfigArray('technicians', cfg.technicians);
 }
 
-function showDistrictModal(){ alert('Add District - TODO: implement modal'); }
+function showDistrictModal(){
+  const val = prompt("District name:");
+  if(!val || !val.trim()) return;
+  const cfg = dbData.config;
+  if(!cfg.districts) cfg.districts = [];
+  cfg.districts.push(val.trim());
+  saveConfigArray("districts", cfg.districts);
+}
 function editDistrict(i){
   const cfg = dbData.config;
   const cur = cfg.districts[i];
@@ -559,7 +592,14 @@ function deleteDistrict(i){
   saveConfigArray('districts', cfg.districts);
 }
 
-function showTaskModal(){ alert('Add Task - TODO: implement modal'); }
+function showTaskModal(){
+  const val = prompt("Task label:");
+  if(!val || !val.trim()) return;
+  const cfg = dbData.config;
+  if(!cfg.checklist) cfg.checklist = [];
+  cfg.checklist.push(val.trim());
+  saveConfigArray("checklist", cfg.checklist);
+}
 function editTaskItem(i){
   const cfg = dbData.config;
   const cur = cfg.checklist[i];
