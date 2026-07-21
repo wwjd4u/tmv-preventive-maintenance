@@ -159,7 +159,7 @@ http.createServer((req, res) => {
     return serveFile(res, path.join(__dirname, 'index.html'));
   }
 
-  // ── Serve DB viewer page (served always — client-side JS handles login overlay) ──
+  // ── Serve DB viewer page (admin) ──
   if (url.pathname === '/db' || url.pathname === '/db.html') {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
@@ -303,86 +303,15 @@ http.createServer((req, res) => {
   // ── GET /api/admin/db — full DB dump for admin viewer (admin only) ──
   if (url.pathname === '/api/admin/db' && req.method === 'GET') {
     if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
-    try {
-      const assignments = db.loadAssignments();
-      const assets = db.getAllAssets();
-      const config = db.loadConfig();
-      return sendJson(res, 200, { assignments, assets, config, dbFile: 'tmv.db' });
-    } catch(e) {
-      return sendJson(res, 500, { error: e.message });
-    }
-  }
-
-  // ── GET /api/assets — list all assets (public) ──
-  if (url.pathname === '/api/assets' && req.method === 'GET') {
-    const assets = db.getAllAssets();
-    return sendJson(res, 200, { assets });
-  }
-
-  // ── ASSETS CRUD (admin only) ──
-  if (url.pathname === '/api/assets' && req.method === 'POST') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const a = JSON.parse(body);
-        if (!a.id || !a.name) return sendJson(res, 400, { error: 'id and name required' });
-        db.upsertAsset(a);
-        sendJson(res, 201, { ok: true, asset: a });
-      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    const assignments = db.prepare('SELECT id, status, technician, completedAt, data FROM assignments ORDER BY completedAt DESC, rowid DESC').all();
+    const assets = db.prepare('SELECT id, data FROM assets').all();
+    const configRow = db.prepare('SELECT data FROM config WHERE key = ?').get('app');
+    return sendJson(res, 200, {
+      assignments: assignments.map(r => ({ ...JSON.parse(r.data), _id: r.id, _status: r.status, _technician: r.technician, _completedAt: r.completedAt })),
+      assets: assets.map(r => JSON.parse(r.data)),
+      config: configRow ? JSON.parse(configRow.data) : {},
+      dbFile: DB_PATH
     });
-    return;
-  }
-  const putAssetMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
-  if (putAssetMatch && req.method === 'PUT') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
-    const assetId = putAssetMatch[1];
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const a = JSON.parse(body);
-        db.upsertAsset(a);
-        sendJson(res, 200, { ok: true });
-      } catch(e) { sendJson(res, 400, { error: e.message }); }
-    });
-    return;
-  }
-  const delAssetMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
-  if (delAssetMatch && req.method === 'DELETE') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
-    const assetId = delAssetMatch[1];
-    db.deleteAssetById(assetId);
-    sendJson(res, 200, { ok: true });
-    return;
-  }
-
-  // ── CONFIG array CRUD (admin only) ──
-  if (url.pathname.startsWith('/api/admin/config/array/') && req.method === 'PATCH') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
-    const key = decodeURIComponent(url.pathname.split('/').pop());
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const op = JSON.parse(body);
-        const config = loadConfig();
-        if (!Array.isArray(config[key])) config[key] = [];
-        if (op.op === 'add') {
-          config[key].push(op.value);
-        } else if (op.op === 'remove') {
-          config[key].splice(op.index, 1);
-        } else if (op.op === 'update') {
-          config[key][op.index] = op.value;
-        } else if (op.op === 'set') {
-          config[key] = op.value;
-        }
-        saveConfig(config);
-        sendJson(res, 200, { ok: true, [key]: config[key] });
-      } catch(e) { sendJson(res, 400, { error: e.message }); }
-    });
-    return;
   }
 
   // ── GET /api/admin/purge — wipe all temp records before production ──
@@ -420,6 +349,69 @@ http.createServer((req, res) => {
       } catch(e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
+  }
+
+  // ── GET /api/assets — list all assets (public) ──────────
+  if (url.pathname === '/api/assets' && req.method === 'GET')
+    return sendJson(res, 200, { assets: loadAssets() });
+
+  // ── POST /api/assets — add new asset (admin only) ───────
+  if (url.pathname === '/api/assets' && req.method === 'POST') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to add assets' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const a = JSON.parse(body);
+        const assets = loadAssets();
+        a.id = Date.now();
+        a.tmvId = a.tmvId || '';
+        a.unit = a.unit || 'days';
+        a.photos = a.photos || [];
+        a.lastMaint = a.lastMaint !== undefined ? a.lastMaint : null;
+        assets.push(a);
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: a });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/assets/:id — update asset (public for now) ──
+  const putMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (putMatch && req.method === 'PUT') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const updates = JSON.parse(body);
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(putMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Not found' });
+        assets[idx] = { ...assets[idx], ...updates };
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: assets[idx] });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── DELETE /api/assets/:id — delete asset (admin only) ──
+  const delMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (delMatch && req.method === 'DELETE') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assets' });
+    const id = parseInt(delMatch[1]);
+    const assets = loadAssets();
+    const target = assets.find(a => a.id === id);
+    // Clean up associated photos
+    if (target && target.photos) {
+      target.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p);
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      });
+    }
+    saveAssets(assets.filter(a => a.id !== id));
+    return sendJson(res, 200, { ok: true });
   }
 
   // ── POST /api/assets/:id/maintain — log maintenance (public) ─
