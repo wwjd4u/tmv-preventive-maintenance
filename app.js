@@ -13,6 +13,7 @@ function escAttr(s){return escapeHtml(s).replace(/"/g,'&quot;');}
 
 var configData = {};
 var assets = [];
+var assignments = [];
 var selectedTmv = null;
 var selectedVan = null;
 
@@ -20,10 +21,19 @@ async function boot(){
   try{
     await loadConfig();
     await loadAssets();
+    await loadAssignments();
     buildTracker();
+    buildTechFilter();
     buildTmvGrid();
     buildTechSelect();
   }catch(e){ showErr('boot failed: '+((e&&(e.stack||e.message))||e)); }
+}
+
+async function loadAssignments(){
+  var r = await fetch('/api/assignments');
+  if(!r.ok) throw new Error('/api/assignments HTTP '+r.status);
+  var d = await r.json();
+  assignments = d.assignments || [];
 }
 
 async function loadConfig(){
@@ -31,7 +41,7 @@ async function loadConfig(){
   if(!r.ok) throw new Error('/api/config HTTP '+r.status);
   configData = await r.json();
   var ft = document.getElementById('filterType');
-  (configData.vanTypes||[]).forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v; ft.appendChild(o); });
+  if(ft) (configData.vanTypes||[]).forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v; ft.appendChild(o); });
   var dl = document.getElementById('dLoc');
   (configData.locations||[]).forEach(function(l){ var o=document.createElement('option'); o.value=l; o.textContent=l; dl.appendChild(o); });
 }
@@ -53,28 +63,96 @@ function statusOf(a){ if(a.lastMaint==null) return 'none'; var d=daysLeft(a); re
 var SL={ok:'OK',warn:'Due Soon',due:'DUE',none:'Never Done'};
 var SC={ok:'b-ok',warn:'b-warn',due:'b-due',none:'b-none'};
 
-function buildTracker(){
-  var f=document.getElementById('filter').value, tf=document.getElementById('filterType').value;
-  var c={ok:0,warn:0,due:0}, html='';
-  assets.forEach(function(a){
-    if(a.lastMaint==null) return; // hide never-done vans
-    var st=statusOf(a); c[st]++;
-    if(tf!=='all'&&a.type!==tf) return;
-    var d=daysLeft(a), dl=d===Infinity?'—':(d+'d left');
-    html+='<div class="card"><h3>'+escapeHtml(a.name||'Untitled')+'</h3>'
-      +'<span class="badge '+SC[st]+'">'+SL[st]+'</span>'
-      +'<div class="meta">'+(a.type||'')+' · '+(a.location||'')+'</div>'
-      +'<div class="meta">'+dl+' · IV '+(a.interval||30)+' '+(a.unit||'days')+'</div>'
-      +(a.tmvId?'<div class="meta">'+escapeHtml(a.tmvId)+'</div>':'')
-      +'</div>';
-  });
-  document.getElementById('cards').innerHTML = html || '<p style="color:#888">No assets match.</p>';
-  document.getElementById('summary').innerHTML =
-    '<div class="pill"><b>'+c.ok+'</b>OK</div>'
-    +'<div class="pill"><b style="color:#d97706">'+c.warn+'</b>Due Soon</div>'
-    +'<div class="pill"><b style="color:#dc2626">'+c.due+'</b>DUE</div>';
+// ── Tracker = assignments board (clickable) ──────────────────
+var SL2={assigned:'Assigned',in_progress:'In Progress',completed:'Completed',rejected:'Rejected'};
+function buildTechFilter(){
+  var sel=document.getElementById('filterTech');
+  var names=[];
+  assignments.forEach(function(a){ if(a.technician&&a.technician.name&&names.indexOf(a.technician.name)<0) names.push(a.technician.name); });
+  names.sort().forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
 }
-['filter','filterType'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', buildTracker); });
+function contactBar(tech){
+  if(!tech) return '';
+  var phone=tech.phone||'';
+  var wa=tech.whatsapp||'';
+  var tg=tech.telegram||'';
+  var em=tech.email||'';
+  var waDigits=(wa||phone).replace(/\D/g,'');
+  var bars='<div class="contact-bar">';
+  if(phone) bars+='<a class="cb-call" href="tel:'+escAttr(phone)+'">📞 Call</a>';
+  if(em) bars+='<a class="cb-email" href="mailto:'+escAttr(em)+'">✉️ Email</a>';
+  if(waDigits) bars+='<a class="cb-wa" target="_blank" href="https://wa.me/'+escAttr(waDigits)+'">💬 WhatsApp</a>';
+  if(tg) bars+='<a class="cb-tg" target="_blank" href="https://t.me/'+escAttr(tg.replace(/^@/,''))+'">✈️ Telegram</a>';
+  bars+='</div>';
+  return bars;
+}
+function photoGrid(photos){
+  if(!photos||!photos.length) return '';
+  return '<div class="photos">'+photos.map(function(p){
+    var src=p.file?('/uploads/'+encodeURIComponent(p.file)):p.local;
+    return '<div class="photo"><img src="'+escAttr(src)+'" alt="" loading="lazy"></div>';
+  }).join('')+'</div>';
+}
+function resultsHtml(a){
+  if(!a.results||!a.results.length) {
+    return a.status==='completed' ? '<div class="results-sec"><b>No results recorded.</b></div>' : '';
+  }
+  var h='<div class="results-sec"><b>Results</b>';
+  a.results.forEach(function(s){
+    h+='<div style="margin-top:6px"><u>'+escapeHtml(s.title)+'</u></div>';
+    (s.items||[]).forEach(function(it){
+      h+='<div class="row" style="border:0;padding:2px 0"><span class="lbl" style="font-size:13px">'+escapeHtml(it.label)+'</span><span class="ctl">'+escapeHtml(it.value==null?'':it.value)+'</span></div>';
+    });
+  });
+  h+='</div>';
+  return h;
+}
+function trackerCard(a){
+  var t=a.technician||{};
+  var cnt=0; (a.sections||[]).forEach(function(s){ cnt+=(s.items||[]).length; });
+  var detId='det_'+a.id;
+  var techLine = t.name ? ('<div class="tech">👷 '+escapeHtml(t.name)+'</div>') : '';
+  var sub = [a.vanType, a.location, a.date].filter(Boolean).map(escapeHtml).join(' · ');
+  // Build full detail (hidden until expand): contact + results + photos
+  var detail =
+    contactBar(t)
+    + resultsHtml(a)
+    + photoGrid(a.photos);
+  return '<div class="assign-card" onclick="toggleAssign(\''+escAttr(a.id)+'\')">'
+    + '<div class="top"><h3>'+escapeHtml(a.tmv||'Untitled')+'</h3>'
+    + '<span class="st st-'+(a.status||'assigned')+'">'+(SL2[a.status]||a.status)+'</span></div>'
+    + (sub?'<div class="sub">'+sub+'</div>':'')
+    + techLine
+    + '<div class="cnt">'+cnt+' items · '+a.sections.length+' sections</div>'
+    + '<div class="assign-detail hidden" id="'+detId+'">'+detail+'</div>'
+    + '</div>';
+}
+function buildTracker(){
+  var f=document.getElementById('filter').value;
+  var ft=document.getElementById('filterTech').value;
+  var q=(document.getElementById('filterText').value||'').toLowerCase();
+  var counts={assigned:0,in_progress:0,completed:0,rejected:0}, html='';
+  assignments.forEach(function(a){
+    if(counts[a.status]!=null) counts[a.status]++;
+    if(f!=='all'&&a.status!==f) return;
+    if(ft!=='all'&&!(a.technician&&a.technician.name===ft)) return;
+    var hay=((a.tmv||'')+' '+(a.technician&&a.technician.name||'')+' '+(a.vanType||'')+' '+(a.location||'')).toLowerCase();
+    if(q&&hay.indexOf(q)<0) return;
+    html+=trackerCard(a);
+  });
+  document.getElementById('cards').innerHTML = html || '<p style="color:#888">No assignments match.</p>';
+  document.getElementById('summary').innerHTML =
+    '<div class="pill"><b>'+counts.assigned+'</b>Assigned</div>'
+    +'<div class="pill"><b style="color:#d97706">'+counts.in_progress+'</b>In Progress</div>'
+    +'<div class="pill"><b style="color:#16a34a">'+counts.completed+'</b>Completed</div>'
+    +'<div class="pill"><b style="color:#dc2626">'+counts.rejected+'</b>Rejected</div>';
+}
+function toggleAssign(id){
+  var el=document.getElementById('det_'+id);
+  if(el) el.classList.toggle('hidden');
+}
+['filter','filterTech'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', buildTracker); });
+var _ft=document.getElementById('filterText'); if(_ft) _ft.addEventListener('input', buildTracker);
 
 function showView(v){
   document.getElementById('viewTracker').classList.toggle('active', v==='tracker');
@@ -117,14 +195,17 @@ function backToTmv(){
 
 function buildSections(k){
   var vts=(configData.tmvVanMap||{})[k]||[];
-  var all=(configData.checklist||[]).filter(function(s){ return s.appliesTo.some(function(v){return vts.indexOf(v)>=0;}); });
+  var all=(configData.checklist||[]).filter(function(s){
+    if(typeof s==='string') return true;
+    if(s.include===false) return false; // admin disabled this section
+    return s.appliesTo.some(function(v){return vts.indexOf(v)>=0;});
+  });
   var wrap=document.getElementById('sections');
   wrap.innerHTML=all.map(function(s,si){
     var items=s.items.map(function(it,ii){
       return '<div class="row"><div class="lbl">'+escapeHtml(it.label)+'</div><div class="ctl" data-s="'+si+'" data-i="'+ii+'">'+renderCtl(it)+'</div></div>';
     }).join('');
     return '<div class="section" data-s="'+si+'"><h3>'+escapeHtml(s.title)+'</h3>'
-      +'<label class="inc"><input type="checkbox" class="incChk" data-s="'+si+'" checked> include</label>'
       +'<div class="items">'+items+'</div></div>';
   }).join('');
 }
@@ -149,8 +230,6 @@ function collectSections(){
   var secs=Array.prototype.slice.call(wrap.querySelectorAll('.section'));
   var out=[];
   secs.forEach(function(sec, si){
-    var chk=sec.querySelector('.incChk');
-    if(chk && !chk.checked) return; // skip unchecked sections
     var title=sec.querySelector('h3').textContent;
     var itemDefs=((configData.checklist||[]).find(function(s){return s.title===title;})||{}).items||[];
     var rows=Array.prototype.slice.call(sec.querySelectorAll('.row'));
@@ -221,6 +300,7 @@ async function submitInspection(){
       +'<div class="links">'
       +(d.hasWhatsapp?'<a class="wa" href="'+d.waLink+'" target="_blank">Send via WhatsApp</a>':'')
       +(d.hasTelegram?'<a class="tg" href="'+d.tgLink+'" target="_blank">Send via Telegram</a>':'')
+      +(d.hasEmail?'<a class="em" href="'+d.mailto+'" target="_blank">Send via Email</a>':'')
       +'<button class="btn ghost" onclick="copyTicket()">Copy</button></div>'
       +'<div class="ok-note">✓ Inspection logged for '+escapeHtml(selectedTmv)+' ('+escapeHtml(loc)+', '+escapeHtml(date)+')</div></div>';
     window.__lastTicket=d.ticket;
@@ -235,11 +315,12 @@ async function assignToTech(){
   var loc=document.getElementById('dLoc').value;
   var date=document.getElementById('dDate').value;
   var sections=collectSections();
+  var tech=(configData.technicians||[]).filter(function(t){return t.name===techName;})[0]||{name:techName};
   var btn=document.getElementById('assignBtn');
   btn.disabled=true; btn.textContent='Working…';
   try{
     var r=await fetch('/api/assignments',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:techName, sections:sections})});
+      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:tech, sections:sections})});
     var d=await r.json();
     if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
     var link='http://'+location.host+'/tech/'+d.assignment.id;

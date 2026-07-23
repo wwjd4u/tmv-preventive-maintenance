@@ -140,6 +140,23 @@ function isAdmin(token) {
   return token === adminToken();
 }
 
+// ── Password hashing (scrypt + per-user salt, constant-time compare) ──
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const d = crypto.scryptSync(pw, salt, 64).toString('hex');
+  return `scrypt$${salt}$${d}`;
+}
+function verifyPassword(pw, stored) {
+  if (typeof stored !== 'string' || !stored.startsWith('scrypt$')) return false;
+  const parts = stored.split('$');
+  if (parts.length !== 3) return false;
+  const salt = parts[1], expected = parts[2];
+  const d = crypto.scryptSync(pw, salt, 64).toString('hex');
+  const a = Buffer.from(d), b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 http.createServer((req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
 
@@ -260,14 +277,25 @@ http.createServer((req, res) => {
           ? 'https://t.me/share/url?url=' + encodeURIComponent('CUDD PM Ticket') +
             '&text=' + encodeURIComponent(ticket)
           : '';
+        // Email deep-link.
+        const email = (tech.email || '').trim();
+        const mailto = email
+          ? 'mailto:' + email + '?subject=' + encodeURIComponent('CUDD PM Ticket — ' + tmv) +
+            '&body=' + encodeURIComponent(ticket)
+          : '';
 
         sendJson(res, 200, {
           ok: true,
           ticket,
           waLink,
           tgLink,
+          mailto,
+          waDigits,
+          tgHandle,
+          email,
           hasWhatsapp: !!waDigits,
           hasTelegram: !!tgHandle,
+          hasEmail: !!email,
           technician: tech.name
         });
       } catch (e) {
@@ -286,6 +314,12 @@ http.createServer((req, res) => {
         const d = JSON.parse(body);
         if (d.username === ADMIN_USER && d.password === ADMIN_PASS) {
           return sendJson(res, 200, { ok: true, token: adminToken() });
+        }
+        // Manager login: a saved manager with a matching password gets full admin token.
+        const cfgMgr = (loadConfig() || {}).managers || [];
+        const mgr = cfgMgr.find(m => (m.username || m.name) === d.username);
+        if (mgr && verifyPassword(d.password || '', mgr.password)) {
+          return sendJson(res, 200, { ok: true, token: adminToken(), manager: mgr.name || mgr.username });
         }
         return sendJson(res, 401, { error: 'Invalid credentials' });
       } catch (e) {
@@ -332,6 +366,38 @@ http.createServer((req, res) => {
         saveConfig(merged);
         sendJson(res, 200, { ok: true, config: merged });
       } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/managers — save managers with hashed passwords (admin only) ──
+  if (url.pathname === '/api/managers' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).managers || [];
+        const current = (loadConfig() || {}).managers || [];
+        const savedByName = {};
+        current.forEach(m => { savedByName[m.username || m.name] = m; });
+        const out = incoming.map(m => {
+          const name = m.name || m.username || '';
+          const username = m.username || m.name || '';
+          const existing = savedByName[username];
+          // Hash the password only if a new plaintext password was supplied;
+          // otherwise preserve the already-hashed value already stored.
+          let password = existing ? existing.password : '';
+          if (m.password && !m.password.startsWith('scrypt$')) {
+            password = hashPassword(m.password);
+          }
+          return { name, username, password };
+        });
+        const config = loadConfig() || {};
+        const merged = { ...config, managers: out };
+        saveConfig(merged);
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
   }
@@ -521,6 +587,16 @@ http.createServer((req, res) => {
         const d = JSON.parse(body);
         if (!d.tmv) return sendJson(res, 400, { error: 'TMV unit required' });
         if (!d.technician) return sendJson(res, 400, { error: 'Technician required' });
+        // Normalize technician: accept either a plain name string or a full object.
+        let techIn = d.technician;
+        if (typeof techIn === 'string') techIn = { name: techIn };
+        techIn = {
+          name: techIn.name || 'Unassigned',
+          email: techIn.email || '',
+          phone: techIn.phone || '',
+          whatsapp: techIn.whatsapp || '',
+          telegram: techIn.telegram || ''
+        };
         const config = loadConfig();
         const sections = Array.isArray(d.sections) ? d.sections : [];
         if (!sections.length) return sendJson(res, 400, { error: 'Select at least one checklist section' });
@@ -530,7 +606,7 @@ http.createServer((req, res) => {
           tmv: d.tmv,
           vanType: d.vanType || '',
           location: d.location || '',
-          technician: d.technician,
+          technician: techIn,
           date: d.date || new Date().toISOString().slice(0, 10),
           createdAt: Date.now(),
           status: 'assigned',           // assigned → in_progress → completed
@@ -581,6 +657,26 @@ http.createServer((req, res) => {
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
+  }
+
+  // DELETE /api/assignments/:id — remove a single assignment (admin only). NOT a purge.
+  const assignDel = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignDel && req.method === 'DELETE') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assignments' });
+    const assignments = loadAssignments();
+    const idx = assignments.findIndex(x => x.id === assignDel[1]);
+    if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+    const removed = assignments[idx];
+    // Clean up associated photo files for this assignment only
+    if (Array.isArray(removed.photos)) {
+      removed.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p.file || p);
+        try { if (fp && fs.existsSync(fp)) fs.unlinkSync(fp); } catch (e) {}
+      });
+    }
+    assignments.splice(idx, 1);
+    saveAssignments(assignments);
+    return sendJson(res, 200, { ok: true, deleted: removed.id });
   }
 
   // POST /api/assignments/:id/photos — upload a photo (base64) for an assignment

@@ -52,6 +52,21 @@
   .subview.active{display:block}
 
   .tbl-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px}
+  /* detail modal (View assignment) */
+  #detailPanel{display:none;position:fixed;inset:0;z-index:1000;background:rgba(20,15,15,.55);overflow-y:auto;padding:40px 16px}
+  #detailBox{position:relative;max-width:720px;margin:0 auto;background:#fff;border-radius:14px;padding:22px 24px 28px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+  #detailClose{position:absolute;top:12px;right:14px;cursor:pointer;font-weight:700;color:#888;font-size:18px;line-height:1;padding:4px 8px;border-radius:8px}
+  #detailClose:hover{background:#f0f0f0;color:#333}
+  #detailTitle{margin:0 36px 14px 0;font-size:19px;color:var(--cudd)}
+  #detailContent .section{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+  #detailContent .section h3{margin:0 0 8px;font-size:14px;background:#eaf2fb;padding:7px 10px;border-radius:7px}
+  #detailContent .checklist{display:flex;flex-direction:column;gap:4px}
+  #detailContent .cl-item{display:flex;gap:10px;align-items:center;padding:4px 2px;border-bottom:1px dashed #eee}
+  #detailContent .cl-item:last-child{border-bottom:0}
+  #detailContent .cl-val{display:inline-block;min-width:52px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px}
+  #detailContent .cl-val.yes{background:#e7f6ec;color:#15803d}
+  #detailContent .cl-val.no{background:#fde8e8;color:#b91c1c}
+  #detailContent .cl-val.na{background:#f1f1f1;color:#888}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{background:#f8f8fa;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
@@ -109,6 +124,8 @@
   .mblock .cnt{color:#999;font-weight:normal;font-size:13px}
   .mrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .mrow.addrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);margin-bottom:0}
+  .contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .contact-grid .minput{margin-top:0}
   .msel{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
   .minput{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
   /* category cards */
@@ -119,6 +136,8 @@
   .catname .car{color:var(--cudd);width:14px;display:inline-block}
   .catname .cnt{color:#999;font-weight:normal;font-size:13px}
   .catbtns{display:flex;gap:8px}
+  .incToggle{display:flex;align-items:center;gap:5px;font-size:13px;color:#555;font-weight:600;cursor:pointer;background:#f3f6f9;border:1px solid var(--line);padding:5px 10px;border-radius:7px}
+  .incToggle input{accent-color:var(--cudd)}
   .cattasks{padding:12px 14px;border-top:1px solid var(--line);background:#fff}
   .taskline{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed #eee}
   .taskline:last-child{border-bottom:none}
@@ -134,8 +153,8 @@
 <div id="loginOverlay">
   <div id="loginBox">
     <h2>Admin Login</h2>
-    <input id="user" type="text" placeholder="Username" value="admin">
-    <input id="pass" type="password" placeholder="Password" value="admin123">
+    <input id="user" type="text" placeholder="Username" value="admin" autocomplete="username" name="login_user">
+    <input id="pass" type="password" placeholder="Password" value="admin123" autocomplete="current-password" name="login_pass">
     <div id="loginErr"></div>
     <button class="btn" onclick="doLogin()" style="width:100%">Log In</button>
   </div>
@@ -146,8 +165,7 @@
   <h1>TMV Preventive Maintenance Admin</h1>
   <nav>
     <button id="tabAssign" class="active" onclick="switchTab('assign')">Assignments</button>
-    <button id="tabAssets" onclick="switchTab('assets')">Configure</button>
-    <button id="tabConfig" onclick="switchTab('config')">Categories</button>
+    <button id="tabAssets" onclick="switchTab('assets')">Setup</button>
     <a class="backbtn" href="/" title="Back to main app">← Main App</a>
   </nav>
 </header>
@@ -189,8 +207,8 @@
       <section class="mblock">
         <h3>TMV Units <span class="cnt" id="cntTmv"></span></h3>
         <div class="mrow">
-          <select id="selTmv" class="msel" onchange="onSelTmv()"></select>
-          <select id="selTmvType" class="msel" title="Van type" onchange="updateTmvType()"></select>
+          <select id="selTmv" class="msel" onchange="onSelTmv()" autocomplete="off" name="setup_tmv"></select>
+          <select id="selTmvType" class="msel" title="Van type" onchange="updateTmvType()" autocomplete="off" name="setup_tmvtype"></select>
           <button class="btn sm danger" onclick="deleteTmv()">× Remove</button>
         </div>
         <div class="mrow addrow">
@@ -204,7 +222,7 @@
       <section class="mblock">
         <h3>Locations <span class="cnt" id="cntLoc"></span></h3>
         <div class="mrow">
-          <select id="selLoc" class="msel"></select>
+          <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
           <button class="btn sm ghost" onclick="renameLoc()">Rename</button>
           <button class="btn sm danger" onclick="deleteLoc()">× Remove</button>
         </div>
@@ -218,14 +236,55 @@
       <section class="mblock">
         <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
         <div class="mrow">
-          <select id="selTech" class="msel"></select>
+          <select id="selTech" class="msel" onchange="fillTechContact()" autocomplete="off" name="setup_tech"></select>
           <button class="btn sm ghost" onclick="renameTech()">Rename</button>
           <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
         </div>
+        <div class="contact-grid">
+          <input id="techEmail" class="minput" placeholder="Email (name@co.com)">
+          <input id="techPhone" class="minput" placeholder="Phone (+1…)">
+          <input id="techWa" class="minput" placeholder="WhatsApp # (+1…)">
+          <input id="techTg" class="minput" placeholder="Telegram @handle">
+        </div>
+        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button>
         <div class="mrow addrow">
           <input id="newTech" class="minput" placeholder="Jason Guynes">
           <button class="btn sm" onclick="addTech()">+ Add Technician</button>
         </div>
+      </section>
+
+      <!-- MANAGERS -->
+      <section class="mblock">
+        <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
+        <div class="mrow">
+          <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
+          <button class="btn sm danger" onclick="deleteMgr()">× Remove</button>
+        </div>
+        <div class="contact-grid">
+          <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
+          <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
+          <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
+        </div>
+        <button class="btn sm" onclick="saveMgr()">Save Manager</button>
+        <div class="mrow addrow">
+          <input id="newMgr" class="minput" placeholder="Add by name…">
+          <button class="btn sm" onclick="addMgr()">+ Add Manager</button>
+        </div>
+      </section>
+
+      <!-- INSPECTION SETTINGS -->
+      <section class="mblock">
+        <h3>Inspection Settings</h3>
+        <div style="margin-bottom:14px">
+          <label>Inspection Intervals (days, comma-separated):</label><br>
+          <input id="cfgIntervals" style="width:300px" placeholder="e.g. 30,60,90">
+        </div>
+        <div style="margin-bottom:14px">
+          <label>Unit Options (one per line):</label><br>
+          <textarea id="cfgUnits" rows="3" style="width:100%;max-width:500px"></textarea>
+        </div>
+        <button class="btn" onclick="saveConfig()">Save Settings</button>
+        <span id="cfgStatus" style="margin-left:12px;color:var(--ok);font-size:13px"></span>
       </section>
 
       <!-- CATEGORIES (expandable cards) -->
@@ -237,30 +296,11 @@
         </div>
         <div id="catCards"></div>
       </section>
+      <div style="margin-top:18px">
+        <button class="btn danger ghost" onclick="purgeData()">Purge All Assignment Records</button>
+        <span style="color:#999;font-size:12px;margin-left:8px">Wipes all temp data before production</span>
+      </div>
     </div>
-  </div>
-
-  <!-- CONFIG TAB -->
-  <div id="viewConfig" class="view">
-    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px">
-      <div style="margin-bottom:14px">
-        <label>Inspection Intervals (days, comma-separated):</label><br>
-        <input id="cfgIntervals" style="width:300px" placeholder="e.g. 30,60,90">
-      </div>
-      <div style="margin-bottom:14px">
-        <label>Locations (one per line):</label><br>
-        <textarea id="cfgLocations" rows="4" style="width:100%;max-width:500px"></textarea>
-      </div>
-      <div style="margin-bottom:14px">
-        <label>Unit Options (one per line):</label><br>
-        <textarea id="cfgUnits" rows="3" style="width:100%;max-width:500px"></textarea>
-      </div>
-      <button class="btn" onclick="saveConfig()">Save Config</button>
-      <span id="cfgStatus" style="margin-left:12px;color:var(--ok);font-size:13px"></span>
-    </div>
-    <br>
-    <button class="btn danger ghost" onclick="purgeData()">Purge All Assignment Records</button>
-    <span style="color:#999;font-size:12px;margin-left:8px">Wipes all temp data before production</span>
   </div>
 </main>
 
@@ -345,17 +385,31 @@ function statusBadge(s){
 
 /* TABS */
 function switchTab(tab){
-  ['assign','assets','config'].forEach(t => {
+  ['assign','assets'].forEach(t => {
     document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.remove('active');
     document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1)).classList.remove('active');
   });
   document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
   document.getElementById('view'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
   if(tab === 'assets'){ renderAssetManager(); }
-  if(tab === 'config'){ populateConfig(); }
 }
 
 /* ASSIGNMENTS */
+function techName(t){
+  if(!t) return '-';
+  if(typeof t === 'string') return t;
+  return t.name || '-';
+}
+function deleteAssignment(id, tmv){
+  if(!confirm('Delete assignment '+(tmv||id)+'?\n\nThis removes only this one record. It cannot be undone.')) return;
+  fetch('/api/assignments/'+id, { method:'DELETE', headers: authHdr() })
+    .then(r => r.json().then(d => ({ ok:r.ok, status:r.status, d })))
+    .then(({ ok, status, d }) => {
+      if(!ok){ alert('Delete failed ('+status+'): '+((d&&d.error)||'unknown error')); return; }
+      loadData();
+    })
+    .catch(e => alert('Delete failed: '+e.message));
+}
 function renderAssignments(){
   const filter = document.getElementById('filterStatus').value;
   const q = document.getElementById('searchAssign').value.toLowerCase();
@@ -363,7 +417,7 @@ function renderAssignments(){
   if(filter!=='all') list = list.filter(x => x.status === filter);
   if(q) list = list.filter(x =>
     (x.tmv||'').toLowerCase().includes(q) ||
-    (x.technician||'').toLowerCase().includes(q) ||
+    techName(x.technician).toLowerCase().includes(q) ||
     (x.location||'').toLowerCase().includes(q)
   );
   const tbody = document.getElementById('assignBody');
@@ -371,13 +425,29 @@ function renderAssignments(){
   tbody.innerHTML = '';
   list.forEach(a => {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+statusBadge(a.status)+'</td>' +
-      '<td><strong>'+esc(a.tmv||'-')+'</strong></td>' +
-      '<td>'+esc(a.technician||'-')+'</td>' +
-      '<td>'+esc(a.location||'-')+'</td>' +
-      '<td>'+(a.date||'-')+'</td>' +
-      '<td class="ts">'+ts(a.completedAt)+'</td>' +
-      '<td><button class="btn sm ghost" onclick="showAssignment(' + JSON.stringify(a.id) + ')">View</button></td>';
+    // static cells
+    const cells = [
+      statusBadge(a.status),
+      '<strong>'+esc(a.tmv||'-')+'</strong>',
+      esc(techName(a.technician)),
+      esc(a.location||'-'),
+      (a.date||'-'),
+      '<span class="ts">'+ts(a.completedAt)+'</span>'
+    ];
+    cells.forEach(c => { const td=document.createElement('td'); td.innerHTML=c; tr.appendChild(td); });
+    // actions — built via DOM so string ids never break an HTML attribute
+    const tdAct = document.createElement('td');
+    tdAct.style.whiteSpace = 'nowrap';
+    const vb = document.createElement('button');
+    vb.className='btn sm ghost'; vb.textContent='View';
+    vb.addEventListener('click', function(){ showAssignment(a.id); });
+    const dbn = document.createElement('button');
+    dbn.className='btn sm danger'; dbn.textContent='Delete';
+    dbn.addEventListener('click', function(){ deleteAssignment(a.id, a.tmv||''); });
+    tdAct.appendChild(vb);
+    tdAct.appendChild(document.createTextNode(' '));
+    tdAct.appendChild(dbn);
+    tr.appendChild(tdAct);
     tbody.appendChild(tr);
   });
 }
@@ -385,8 +455,8 @@ function renderAssignments(){
 function showAssignment(id){
   const a = dbData.assignments.find(x => x.id == id);
   if(!a) return;
-  document.getElementById('detailTitle').textContent = (a.tmv||'Assignment') + ' - ' + (a.technician||'Unassigned');
-  let html = '<div class="section"><h3>Info</h3><p>Status: <b>'+a.status+'</b><br>Technician: '+esc(a.technician||'-')+'<br>Completed: '+(a.completedAt||'-')+'</p></div>';
+  document.getElementById('detailTitle').textContent = (a.tmv||'Assignment') + ' - ' + techName(a.technician);
+  let html = '<div class="section"><h3>Info</h3><p>Status: <b>'+a.status+'</b><br>Technician: '+esc(techName(a.technician))+'<br>Completed: '+(a.completedAt||'-')+'</p></div>';
   if(a.results && a.results.length){
     html += '<div class="section"><h3>Checklist</h3><div class="checklist">';
     a.results.forEach(function(sec){
@@ -450,6 +520,14 @@ function renderAssetManager(){
     return {value:String(i), label:name};
   }));
   document.getElementById('cntTech').textContent = '(' + cfg.technicians.length + ')';
+
+  // --- Managers ---
+  _fill('selMgr', (cfg.managers||[]).map(function(t,i){
+    var name = t.name || t.username || '';
+    return {value:String(i), label:name};
+  }));
+  document.getElementById('cntMgr').textContent = '(' + (cfg.managers||[]).length + ')';
+  fillMgr();
 
   // --- Categories (expandable cards) ---
   renderCatCards();
@@ -528,8 +606,37 @@ function addTech(){
   var v = document.getElementById('newTech').value.trim();
   if(!v){ alert('Technician name required'); return; }
   if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:v, whatsapp:'', telegram:''});
+  cfg.technicians.push({name:v, email:'', phone:'', whatsapp:'', telegram:''});
   document.getElementById('newTech').value = '';
+  saveConfigArray('technicians', cfg.technicians);
+}
+function techObj(i){
+  var cfg = dbData.config;
+  var cur = cfg.technicians[i];
+  if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, email:'', phone:'', whatsapp:'', telegram:''}; cur = cfg.technicians[i]; }
+  if(!cur.email)   cur.email='';
+  if(!cur.phone)   cur.phone='';
+  if(!cur.whatsapp)cur.whatsapp='';
+  if(!cur.telegram)cur.telegram='';
+  return cur;
+}
+function fillTechContact(){
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)) return;
+  var t = techObj(i);
+  document.getElementById('techEmail').value = t.email || '';
+  document.getElementById('techPhone').value = t.phone || '';
+  document.getElementById('techWa').value    = t.whatsapp || '';
+  document.getElementById('techTg').value    = t.telegram || '';
+}
+function saveTechContact(){
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)){ alert('Select a technician first'); return; }
+  var t = techObj(i);
+  t.email    = document.getElementById('techEmail').value.trim();
+  t.phone    = document.getElementById('techPhone').value.trim();
+  t.whatsapp = document.getElementById('techWa').value.trim();
+  t.telegram = document.getElementById('techTg').value.trim();
   saveConfigArray('technicians', cfg.technicians);
 }
 function renameTech(){
@@ -540,8 +647,9 @@ function renameTech(){
   var curName = typeof cur==='string' ? cur : (cur.name||'');
   var v = prompt('Rename technician:', curName);
   if(v!==null && v.trim()){
-    if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), whatsapp:'', telegram:''};
+    if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), email:'', phone:'', whatsapp:'', telegram:''};
     else cur.name = v.trim();
+    if(document.getElementById('selTech').value==String(i)) fillTechContact();
     saveConfigArray('technicians', cfg.technicians);
   }
 }
@@ -554,6 +662,73 @@ function deleteTech(){
   if(!confirm('Remove technician "' + name + '"?')) return;
   cfg.technicians.splice(i,1);
   saveConfigArray('technicians', cfg.technicians);
+}
+
+/* ---- Managers (full admin rights) ---- */
+function mgrObj(i){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var cur = cfg.managers[i];
+  if(!cur) return null;
+  if(typeof cur==='string'){ cfg.managers[i] = {name:cur, username:cur, password:''}; cur = cfg.managers[i]; }
+  if(!cur.username) cur.username = cur.name || '';
+  if(!cur.name) cur.name = cur.username || '';
+  if(typeof cur.password==='undefined') cur.password = '';
+  return cur;
+}
+function fillMgr(){
+  var i = parseInt(document.getElementById('selMgr').value, 10);
+  if(isNaN(i)) return;
+  var m = mgrObj(i);
+  if(!m) return;
+  document.getElementById('mgrName').value = m.name || '';
+  document.getElementById('mgrUser').value = m.username || '';
+  document.getElementById('mgrPass').value = ''; // never echo the stored hash
+}
+function addMgr(){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var v = document.getElementById('newMgr').value.trim();
+  if(!v){ alert('Manager name required'); return; }
+  cfg.managers.push({name:v, username:v, password:''});
+  document.getElementById('newMgr').value = '';
+  saveConfigArray('managers', cfg.managers);
+}
+function saveMgr(){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var i = parseInt(document.getElementById('selMgr').value, 10);
+  if(isNaN(i)){ alert('Add the manager first (use + Add Manager), then set username & password.'); return; }
+  var m = mgrObj(i);
+  if(!m) return;
+  var nm = document.getElementById('mgrName').value.trim();
+  var un = document.getElementById('mgrUser').value.trim();
+  var pw = document.getElementById('mgrPass').value;
+  if(!un){ alert('Login username required'); return; }
+  m.name = nm || un;
+  m.username = un;
+  if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
+  // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
+  fetch('/api/managers', {
+    method:'PUT',
+    headers:{ ...authHdr(), 'Content-Type':'application/json' },
+    body: JSON.stringify({ managers: cfg.managers.map(function(x){
+      return { name:x.name, username:x.username, password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
+    }) })
+  })
+  .then(function(){ loadData(); })
+  .catch(function(){ alert('Manager save failed'); });
+}
+function deleteMgr(){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var i = parseInt(document.getElementById('selMgr').value, 10);
+  if(isNaN(i)) return;
+  var m = mgrObj(i);
+  if(!m) return;
+  if(!confirm('Remove manager "' + (m.name||m.username) + '"? They will lose admin access.')) return;
+  cfg.managers.splice(i,1);
+  saveConfigArray('managers', cfg.managers);
 }
 
 /* ---- Categories (checklist sections) — expandable cards ---- */
@@ -579,10 +754,12 @@ function renderCatCards(){
   cfg.checklist.forEach(function(c, ci){
     var title = typeof c==='string' ? c : (c.title||c.label||('Category '+(ci+1)));
     var items = (typeof c==='object' && c.items) ? c.items : [];
+    var inc = (typeof c==='object') ? (c.include!==false) : true;
     var html = '<div class="catcard">' +
       '<div class="cathead">' +
         '<div class="catname" onclick="toggleCat(' + ci + ')"><span class="car">' + (isCatOpen(ci)?'▾':'▸') + '</span> ' + esc(title) + ' <span class="cnt">(' + items.length + ')</span></div>' +
         '<div class="catbtns">' +
+          '<label class="incToggle" title="Show this section on inspection forms"><input type="checkbox" onchange="toggleCatInclude(' + ci + ',this.checked)"' + (inc?' checked':'') + '> include</label>' +
           '<button class="btn sm ghost" onclick="renameCat(' + ci + ')">Rename</button>' +
           '<button class="btn sm danger" onclick="deleteCat(' + ci + ')">× Remove</button>' +
         '</div>' +
@@ -615,8 +792,9 @@ function renderCatCards(){
         '</select>' +
         '<button class="btn sm" onclick="addTask(' + ci + ')">+ Add Task</button>' +
       '</div>';
+
       html += '</div>';
-    }
+      }
     html += '</div>';
     wrap.innerHTML += html;
   });
@@ -625,6 +803,13 @@ function renderCatCards(){
 var _openCats = {};
 function isCatOpen(ci){ return _openCats[ci] === true; }
 function toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }
+function toggleCatInclude(ci, val){
+  var cfg = dbData.config;
+  if(!cfg.checklist[ci]) return;
+  if(typeof cfg.checklist[ci]==='string') cfg.checklist[ci] = {title:cfg.checklist[ci], appliesTo:[], items:[]};
+  cfg.checklist[ci].include = !!val;
+  saveConfigArray('checklist', cfg.checklist);
+}
 
 function addCat(){
   var cfg = dbData.config;
@@ -700,14 +885,12 @@ function saveConfigArray(key, value){
 function populateConfig(){
   const cfg = dbData.config || {};
   document.getElementById('cfgIntervals').value = (cfg.intervals||[]).join(', ');
-  document.getElementById('cfgLocations').value = (cfg.locations||[]).join('\n');
   document.getElementById('cfgUnits').value = (cfg.unitOptions||[]).join('\n');
 }
 
 function saveConfig(){
   const cfg = {
     intervals: document.getElementById('cfgIntervals').value.split(',').map(Number).filter(function(n){return n>0}),
-    locations: document.getElementById('cfgLocations').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),
     unitOptions: document.getElementById('cfgUnits').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),
   };
   fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })

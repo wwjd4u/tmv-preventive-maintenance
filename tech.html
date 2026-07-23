@@ -19,6 +19,20 @@
   .meta b{color:var(--cudd)}
   .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:#6b7280}
   .badge.assigned{background:#6b7280}.badge.in_progress{background:var(--warn)}.badge.completed{background:var(--ok)}
+  /* technician contact shortcuts (mobile) */
+  .contactbar{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px 14px;margin-bottom:12px}
+  .contactbar .ct-title{font-size:13px;font-weight:600;color:#666;margin-bottom:8px}
+  .contactbar .ct-name{font-size:16px;font-weight:700;color:var(--cudd);margin-bottom:10px}
+  .ct-shortcuts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .ct-shortcuts a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:10px 4px;border-radius:10px;color:#fff;text-decoration:none;font-size:12px;font-weight:600;text-align:center}
+  .ct-shortcuts a .ci{font-size:20px;line-height:1}
+  .ct-call{background:#16a34a}
+  .ct-mail{background:#812F2F}
+  .ct-wa{background:#25D366}
+  .ct-tg{background:#229ED9}
+  .ct-none{color:#999;font-size:13px;font-style:italic}
+  .ct-linkbox{margin-top:10px;background:#f8f8fa;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;word-break:break-all;color:#444}
+  .ct-linkbox b{color:#1a1a1a}
   .section{border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px;margin-bottom:12px}
   .section h3{margin:0 0 4px;font-size:15px;background:#eaf2fb;padding:8px 10px;border-radius:8px}
   .row{padding:10px 4px;border-bottom:1px solid #f0f0f0}
@@ -74,11 +88,12 @@ function render(){
   if(ASSIGN.status==='completed'){
     document.getElementById('completeBtn').style.display='none';
     document.getElementById('app').innerHTML =
+      contactHtml() +
       '<div class="ok">✓ Task completed'+(ASSIGN.completedAt?(' '+new Date(ASSIGN.completedAt).toLocaleString()):'')+'</div>'
       +metaHtml();
     return;
   }
-  var html = metaHtml();
+  var html = contactHtml() + metaHtml();
   html += ASSIGN.sections.map(function(s,si){
     var items = s.items.map(function(it,ii){
       return '<div class="row"><div class="lbl">'+esc(it.label)+'</div>'+ctlHtml(si,ii,it)+'</div>';
@@ -102,6 +117,23 @@ function metaHtml(){
     +'<div style="color:#666;font-size:13px">Tech: '+esc(ASSIGN.technician)+'</div>'
     +'<span class="badge '+(ASSIGN.status||'assigned')+'">'+(ASSIGN.status||'assigned').replace('_',' ')+'</span>'
     +'</div>';
+}
+function contactHtml(){
+  var t = ASSIGN.technician;
+  if(typeof t==='string') t = {name:t};
+  if(!t) return '';
+  var name = t.name||'Technician';
+  var phone = (t.phone||'').trim();
+  var email = (t.email||'').trim();
+  var wa = (t.whatsapp||'').replace(/\D/g,'');
+  var tg = (t.telegram||'').replace(/^@/,'');
+  var links = [];
+  if(phone) links.push('<a class="ct-call" href="tel:'+encodeURIComponent(phone)+'"><span class="ci">📞</span>Call</a>');
+  if(email) links.push('<a class="ct-mail" href="mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent('Work Order — '+ASSIGN.tmv)+'&body='+encodeURIComponent('Open your task: '+location.origin+'/tech/'+AID)+'"><span class="ci">✉️</span>Email</a>');
+  if(wa) links.push('<a class="ct-wa" href="https://wa.me/'+wa+'?text='+encodeURIComponent('Your CUDD work order: '+location.origin+'/tech/'+AID)+'"><span class="ci">💬</span>WhatsApp</a>');
+  if(tg) links.push('<a class="ct-tg" href="https://t.me/'+tg+'"><span class="ci">✈️</span>Telegram</a>');
+  if(!links.length) return '<div class="contactbar"><div class="ct-title">Technician</div><div class="ct-name">'+esc(name)+'</div><div class="ct-none">No contact info on file.</div></div>';
+  return '<div class="contactbar"><div class="ct-title">Contact '+esc(name)+'</div><div class="ct-name">'+esc(name)+'</div><div class="ct-shortcuts">'+links.join('')+'</div></div>';
 }
 function ctlHtml(si,ii,it){
   var cur = (ASSIGN.results&&ASSIGN.results[si]&&ASSIGN.results[si].items[ii])?ASSIGN.results[si].items[ii].value:'';

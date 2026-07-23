@@ -67,7 +67,10 @@ function saveAssignments(list) {
   const ins = db.prepare('INSERT OR REPLACE INTO assignments (id, data, status, technician, completedAt) VALUES (@id, @data, @status, @technician, @completedAt)');
   const tx = db.transaction((items) => {
     db.prepare('DELETE FROM assignments').run();
-    for (const x of items) ins.run({ id: x.id, data: JSON.stringify(x), status: x.status, technician: x.technician || null, completedAt: x.completedAt || null });
+    for (const x of items) {
+      const techName = (typeof x.technician === 'object' && x.technician) ? (x.technician.name || 'Unassigned') : (x.technician || null);
+      ins.run({ id: x.id, data: JSON.stringify(x), status: x.status, technician: techName, completedAt: x.completedAt || null });
+    }
   });
   tx(list || []);
 }
