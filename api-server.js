@@ -51,6 +51,9 @@ function mergeTechPhones(cfg) {
       cfg.technicians.forEach(t => { if (t && map[t.name] != null) t.phone = String(map[t.name]).replace(/\D/g, ''); });
     }
   } catch (e) { /* ignore malformed TECH_PHONES */ }
+  // Public app URL (e.g. Cloudflare Tunnel) so SMS links work off-network.
+  const pub = process.env.APP_PUBLIC_URL;
+  if (pub && cfg) cfg.appUrl = pub.replace(/\/+$/, '');
   return cfg;
 }
 
@@ -369,15 +372,18 @@ http.createServer((req, res) => {
     });
   }
   function sendViaTwilio(to, message) {
-    const sid = process.env.TWILIO_SID, token = process.env.TWILIO_TOKEN, from = process.env.TWILIO_FROM;
-    if (!sid || !token || !from) return Promise.resolve({ ok: false, error: 'Twilio env not configured' });
-    const auth = Buffer.from(sid + ':' + token).toString('base64');
+    const accountSid = process.env.TWILIO_SID;
+    const authSid = process.env.TWILIO_API_KEY_SID || accountSid;
+    const token = process.env.TWILIO_API_KEY_SECRET || process.env.TWILIO_TOKEN;
+    const from = process.env.TWILIO_FROM;
+    if (!accountSid || !token || !from) return Promise.resolve({ ok: false, error: 'Twilio env not configured' });
+    const auth = Buffer.from(authSid + ':' + token).toString('base64');
     const postData = require('querystring').stringify({ To: '+' + to, From: from, Body: message });
     return new Promise((resolve) => {
       const req = require('https').request({
         method: 'POST',
         hostname: 'api.twilio.com',
-        path: '/2010-04-01/Accounts/' + sid + '/Messages.json',
+        path: '/2010-04-01/Accounts/' + accountSid + '/Messages.json',
         headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData) }
       }, (r) => {
         let data = '';
