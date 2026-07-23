@@ -126,6 +126,7 @@
   .mrow.addrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);margin-bottom:0}
   .contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
   .contact-grid .minput{margin-top:0}
+  .saved-ok{margin-left:10px;color:#16a34a;font-weight:600;font-size:13px;vertical-align:middle}
   .msel{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
   .minput{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
   /* category cards */
@@ -243,10 +244,8 @@
         <div class="contact-grid">
           <input id="techEmail" class="minput" placeholder="Email (name@co.com)">
           <input id="techPhone" class="minput" placeholder="Phone (+1…)">
-          <input id="techWa" class="minput" placeholder="WhatsApp # (+1…)">
-          <input id="techTg" class="minput" placeholder="Telegram @handle">
         </div>
-        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button>
+        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button><span id="techStatus" class="saved-ok"></span>
         <div class="mrow addrow">
           <input id="newTech" class="minput" placeholder="Jason Guynes">
           <button class="btn sm" onclick="addTech()">+ Add Technician</button>
@@ -515,10 +514,16 @@ function renderAssetManager(){
   document.getElementById('cntLoc').textContent = '(' + cfg.locations.length + ')';
 
   // --- Technicians ---
+  var prevTechName = (function(){ var s=document.getElementById('selTech'); return (s && s.selectedIndex>=0) ? s.options[s.selectedIndex].text : null; })();
   _fill('selTech', cfg.technicians.map(function(t,i){
     var name = typeof t==='string' ? t : (t.name||'');
     return {value:String(i), label:name};
   }));
+  if(prevTechName){
+    var st = document.getElementById('selTech');
+    for(var k=0;k<st.options.length;k++){ if(st.options[k].text===prevTechName){ st.value=st.options[k].value; break; } }
+  }
+  fillTechContact();
   document.getElementById('cntTech').textContent = '(' + cfg.technicians.length + ')';
 
   // --- Managers ---
@@ -606,18 +611,16 @@ function addTech(){
   var v = document.getElementById('newTech').value.trim();
   if(!v){ alert('Technician name required'); return; }
   if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:v, email:'', phone:'', whatsapp:'', telegram:''});
+  cfg.technicians.push({name:v, email:'', phone:''});
   document.getElementById('newTech').value = '';
   saveConfigArray('technicians', cfg.technicians);
 }
 function techObj(i){
   var cfg = dbData.config;
   var cur = cfg.technicians[i];
-  if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, email:'', phone:'', whatsapp:'', telegram:''}; cur = cfg.technicians[i]; }
+  if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, email:'', phone:''}; cur = cfg.technicians[i]; }
   if(!cur.email)   cur.email='';
   if(!cur.phone)   cur.phone='';
-  if(!cur.whatsapp)cur.whatsapp='';
-  if(!cur.telegram)cur.telegram='';
   return cur;
 }
 function fillTechContact(){
@@ -626,17 +629,14 @@ function fillTechContact(){
   var t = techObj(i);
   document.getElementById('techEmail').value = t.email || '';
   document.getElementById('techPhone').value = t.phone || '';
-  document.getElementById('techWa').value    = t.whatsapp || '';
-  document.getElementById('techTg').value    = t.telegram || '';
 }
 function saveTechContact(){
+  var cfg = dbData.config;
   var i = parseInt(document.getElementById('selTech').value, 10);
   if(isNaN(i)){ alert('Select a technician first'); return; }
   var t = techObj(i);
   t.email    = document.getElementById('techEmail').value.trim();
   t.phone    = document.getElementById('techPhone').value.trim();
-  t.whatsapp = document.getElementById('techWa').value.trim();
-  t.telegram = document.getElementById('techTg').value.trim();
   saveConfigArray('technicians', cfg.technicians);
 }
 function renameTech(){
@@ -647,7 +647,7 @@ function renameTech(){
   var curName = typeof cur==='string' ? cur : (cur.name||'');
   var v = prompt('Rename technician:', curName);
   if(v!==null && v.trim()){
-    if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), email:'', phone:'', whatsapp:'', telegram:''};
+    if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), email:'', phone:''};
     else cur.name = v.trim();
     if(document.getElementById('selTech').value==String(i)) fillTechContact();
     saveConfigArray('technicians', cfg.technicians);
@@ -874,11 +874,19 @@ function changeTaskType(ci, ii, val){
 
 
 /* CONFIG HELPERS */
+function showSaved(elId){
+  var el = elId ? document.getElementById(elId) : null;
+  if(!el){ el = document.getElementById('globalStatus'); }
+  if(!el) return;
+  el.textContent = 'Saved ✓';
+  el.className = 'saved-ok';
+  setTimeout(function(){ if(el){ el.textContent=''; el.className=''; } }, 2500);
+}
 function saveConfigArray(key, value){
   var cfg = dbData.config;
   cfg[key] = value;
   fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
-    .then(function(){ loadData(); })
+    .then(function(){ loadData(); showSaved('techStatus'); })
     .catch(function(){ alert('Update failed'); });
 }
 

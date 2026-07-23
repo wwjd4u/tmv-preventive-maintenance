@@ -15,6 +15,9 @@ watchdog.log
 node_modules/
 npm-debug.log*
 
+# Secrets (NEVER commit — contains live API keys)
+.env
+
 # OS / editor
 .DS_Store
 *.swp

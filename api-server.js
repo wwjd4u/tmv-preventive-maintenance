@@ -5,6 +5,18 @@ const crypto = require('crypto');
 const db = require('./db');
 const { DB_PATH } = db;
 
+// Load .env (git-ignored) for local secrets — dependency-free.
+(function loadDotEnv(){
+  try{
+    const ef = path.join(__dirname, '.env');
+    if(!fs.existsSync(ef)) return;
+    fs.readFileSync(ef,'utf8').split('\n').forEach(function(line){
+      const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)\s*$/);
+      if(m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g,'');
+    });
+  }catch(e){ /* ignore missing/invalid .env */ }
+})();
+
 const PORT = 9240;
 const DATA_FILE = path.join(__dirname, 'assets.json');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
@@ -29,6 +41,18 @@ const DEFAULT_CONFIG = {
   locations: ['Odessa', 'Snyder', 'Seminole', 'Kilgore', 'Odessa Test Shack', 'Woodlands Lab', 'UAT-Kilgore'],
   unitOptions: ['days', 'weeks', 'months']
 };
+
+function mergeTechPhones(cfg) {
+  const raw = process.env.TECH_PHONES;
+  if (!raw) return cfg;
+  try {
+    const map = JSON.parse(raw);
+    if (cfg && Array.isArray(cfg.technicians)) {
+      cfg.technicians.forEach(t => { if (t && map[t.name] != null) t.phone = String(map[t.name]).replace(/\D/g, ''); });
+    }
+  } catch (e) { /* ignore malformed TECH_PHONES */ }
+  return cfg;
+}
 
 function loadConfig() {
   return db.loadConfig();
@@ -228,16 +252,17 @@ http.createServer((req, res) => {
   }
 
   // ── GET /api/config — public config (no auth needed) ────
+  // Real technician phones live in the git-ignored TECH_PHONES env var
+  // (a JSON map of name -> phone) so they never hit the public repo.
   if (url.pathname === '/api/config' && req.method === 'GET') {
-    sendJson(res, 200, loadConfig());
+    sendJson(res, 200, mergeTechPhones(loadConfig()));
     return;
   }
 
   // ── POST /api/dispatch — build a technician ticket (public) ──
-  // Body: { tmv, vanType, functions:[names], technician:{name,whatsapp,telegram} }
-  // Returns: ticket text + wa.me / t.me deep-links.
-  // (For now delivery is a click-to-send deep-link. Swap sendTicket() for a
-  //  real WhatsApp/Telegram API later without touching the UI.)
+  // Body: { tmv, vanType, functions:[names], technician:{name,email,phone} }
+  // Returns: ticket text + mailto + smsDigits for server-side SMS send.
+  // (Email opens a mailto; SMS is sent via POST /api/sms. No WhatsApp/Telegram.)
   if (url.pathname === '/api/dispatch' && req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);
@@ -266,17 +291,8 @@ http.createServer((req, res) => {
           '────────────────────────────────\n' +
           'Please confirm completion by logging each item in the PM app.';
 
-        // WhatsApp deep-link (wa.me). Phone must be E.164; strip non-digits.
-        const waDigits = (tech.whatsapp || '').replace(/\D/g, '');
-        const waLink = waDigits
-          ? 'https://wa.me/' + waDigits + '?text=' + encodeURIComponent(ticket)
-          : '';
-        // Telegram deep-link (t.me/share). Uses @handle if present.
-        const tgHandle = (tech.telegram || '').replace(/^@/, '');
-        const tgLink = tgHandle
-          ? 'https://t.me/share/url?url=' + encodeURIComponent('CUDD PM Ticket') +
-            '&text=' + encodeURIComponent(ticket)
-          : '';
+        // SMS (server-side send). Phone must be E.164; strip non-digits.
+        const smsDigits = (tech.phone || '').replace(/\D/g, '');
         // Email deep-link.
         const email = (tech.email || '').trim();
         const mailto = email
@@ -287,14 +303,9 @@ http.createServer((req, res) => {
         sendJson(res, 200, {
           ok: true,
           ticket,
-          waLink,
-          tgLink,
           mailto,
-          waDigits,
-          tgHandle,
+          smsDigits,
           email,
-          hasWhatsapp: !!waDigits,
-          hasTelegram: !!tgHandle,
           hasEmail: !!email,
           technician: tech.name
         });
@@ -303,6 +314,112 @@ http.createServer((req, res) => {
       }
     });
     return;
+  }
+
+  // ── POST /api/sms — actually send an SMS (server-side) ──
+  // Provider selected by env SMS_PROVIDER (default: textbelt).
+  // Twilio: set SMS_PROVIDER=twilio + TWILIO_SID / TWILIO_TOKEN / TWILIO_FROM (see .env, git-ignored).
+  if (url.pathname === '/api/sms' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const to = (d.to || '').replace(/\D/g, '');
+        const message = (d.message || '').toString().slice(0, 1600);
+        if (!to) return sendJson(res, 400, { ok: false, error: 'Recipient phone required' });
+        if (!message.trim()) return sendJson(res, 400, { ok: false, error: 'Message required' });
+
+        const provider = (process.env.SMS_PROVIDER || 'textbelt').toLowerCase();
+        let p;
+        if (provider === 'twilio') p = sendViaTwilio(to, message);
+        else if (provider === 'carrier') p = sendViaCarrier(to, message);
+        else p = sendViaTextbelt(to, message);
+        p.then(r => sendJson(res, r.ok ? 200 : 502, Object.assign({ ok: r.ok }, r)))
+         .catch(e => sendJson(res, 502, { ok: false, error: 'SMS send failed: ' + e.message }));
+      } catch (e) {
+        sendJson(res, 400, { ok: false, error: 'Invalid request: ' + e.message });
+      }
+    });
+    return;
+  }
+
+  // ── SMS provider helpers ───────────────────────────────
+  function sendViaTextbelt(to, message) {
+    return new Promise((resolve) => {
+      const postData = require('querystring').stringify({ number: to, message, key: process.env.TEXTBELT_KEY || 'textbelt' });
+      const req = require('https').request({
+        method: 'POST',
+        hostname: 'textbelt.com',
+        path: '/text',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData) }
+      }, (r) => {
+        let data = '';
+        r.on('data', c => data += c);
+        r.on('end', () => {
+          try {
+            const j = JSON.parse(data);
+            resolve({ ok: !!j.success, error: j.error || (j.success ? null : 'textbelt rejected'), quota: j.quotaRemaining, textId: j.textId });
+          } catch (e) { resolve({ ok: false, error: 'bad response' }); }
+        });
+      });
+      req.on('error', e => resolve({ ok: false, error: e.message }));
+      req.write(postData);
+      req.end();
+    });
+  }
+  function sendViaTwilio(to, message) {
+    const sid = process.env.TWILIO_SID, token = process.env.TWILIO_TOKEN, from = process.env.TWILIO_FROM;
+    if (!sid || !token || !from) return Promise.resolve({ ok: false, error: 'Twilio env not configured' });
+    const auth = Buffer.from(sid + ':' + token).toString('base64');
+    const postData = require('querystring').stringify({ To: '+' + to, From: from, Body: message });
+    return new Promise((resolve) => {
+      const req = require('https').request({
+        method: 'POST',
+        hostname: 'api.twilio.com',
+        path: '/2010-04-01/Accounts/' + sid + '/Messages.json',
+        headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData) }
+      }, (r) => {
+        let data = '';
+        r.on('data', c => data += c);
+        r.on('end', () => {
+          try { const j = JSON.parse(data); resolve({ ok: !j.error_code, error: j.error_message || null, sid: j.sid }); }
+          catch (e) { resolve({ ok: false, error: 'bad response' }); }
+        });
+      });
+      req.on('error', e => resolve({ ok: false, error: e.message }));
+      req.write(postData);
+      req.end();
+    });
+  }
+  function sendViaCarrier(to, message) {
+    const key = process.env.SENDGRID_API_KEY, from = process.env.SENDGRID_FROM || 'pm-app@localhost', domain = process.env.CARRIER_DOMAIN || 'vtext.com';
+    if (!key) return Promise.resolve({ ok: false, error: 'SendGrid env not configured (SENDGRID_API_KEY)' });
+    const toAddr = to.replace(/^\+/, '') + '@' + domain;
+    const payload = JSON.stringify({
+      personalizations: [{ to: [{ email: toAddr }] }],
+      from: { email: from },
+      subject: 'PM',
+      content: [{ type: 'text/plain', value: message }]
+    });
+    return new Promise((resolve) => {
+      const req = require('https').request({
+        method: 'POST', hostname: 'api.sendgrid.com',
+        path: '/v3/mail/send',
+        headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+      }, (r) => {
+        let s = ''; r.on('data', c => s += c);
+        r.on('end', () => {
+          // SendGrid returns 202 Accepted with empty body on success
+          if (r.statusCode === 202) resolve({ ok: true, carrier: toAddr });
+          else { try { const j = JSON.parse(s); resolve({ ok: false, error: (j.errors && j.errors[0] && j.errors[0].message) || ('status ' + r.statusCode) }); }
+                 catch (e) { resolve({ ok: false, error: 'status ' + r.statusCode + ' ' + s.slice(0, 200) }); } }
+        });
+      });
+      req.on('error', e => resolve({ ok: false, error: e.message }));
+      req.write(payload);
+      req.end();
+    });
   }
 
   // ── POST /api/login — authenticate admin, return bearer token ──
@@ -593,9 +710,7 @@ http.createServer((req, res) => {
         techIn = {
           name: techIn.name || 'Unassigned',
           email: techIn.email || '',
-          phone: techIn.phone || '',
-          whatsapp: techIn.whatsapp || '',
-          telegram: techIn.telegram || ''
+          phone: techIn.phone || ''
         };
         const config = loadConfig();
         const sections = Array.isArray(d.sections) ? d.sections : [];

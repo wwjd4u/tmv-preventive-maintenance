@@ -21,8 +21,7 @@
   .card .ct a{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:999px;color:#fff;text-decoration:none;font-size:12px;font-weight:600}
   .card .ct .c-call{background:#16a34a}
   .card .ct .c-mail{background:#812F2F}
-  .card .ct .c-wa{background:#25D366}
-  .card .ct .c-tg{background:#229ED9}
+  .card .ct .c-sms{background:#2563eb}
   .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:#6b7280;margin-top:8px}
   .badge.assigned{background:#6b7280}.badge.in_progress{background:var(--warn)}.badge.completed{background:var(--ok)}
   .empty{text-align:center;color:#888;padding:40px 10px}
@@ -45,15 +44,13 @@ async function load(){
     el.innerHTML=list.map(function(a){
       var t = a.technician;
       if(typeof t==='string') t = {name:t};
-      var phone = (t.phone||'').trim();
-      var email = (t.email||'').trim();
-      var wa = (t.whatsapp||'').replace(/\D/g,'');
-      var tg = (t.telegram||'').replace(/^@/,'');
-      var ct = [];
-      if(phone) ct.push('<a class="c-call" href="tel:'+encodeURIComponent(phone)+'">📞</a>');
-      if(email) ct.push('<a class="c-mail" href="mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent('Work Order — '+a.tmv)+'&body='+encodeURIComponent('Open your task: '+location.origin+'/tech/'+encodeURIComponent(a.id))+'">✉️</a>');
-      if(wa) ct.push('<a class="c-wa" href="https://wa.me/'+wa+'?text='+encodeURIComponent('Your CUDD work order: '+location.origin+'/tech/'+encodeURIComponent(a.id))+'">💬</a>');
-      if(tg) ct.push('<a class="c-tg" href="https://t.me/'+tg+'">✈️</a>');
+      var phone=(t.phone||'').trim();
+      var email=(t.email||'').trim();
+      var sms=phone.replace(/\D/g,'');
+      var links=[];
+      if(phone) links.push('<a class="ct-call" href="tel:'+encodeURIComponent(phone)+'"><span class="ci">📞</span>Call</a>');
+      if(email) links.push('<a class="ct-mail" href="mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent('Work Order — '+ASSIGN.tmv)+'&body='+encodeURIComponent('Open your task: '+location.origin+'/tech/'+AID)+'"><span class="ci">✉️</span>Email</a>');
+      if(sms) links.push('<a class="ct-sms" href="sms:'+encodeURIComponent(sms)+'?&body='+encodeURIComponent('CUDD work order: '+location.origin+'/tech/'+AID)+'"><span class="ci">💬</span>Text</a>');
       return '<a class="card" href="/tech/'+encodeURIComponent(a.id)+'">'
         +'<div class="t">'+esc(a.tmv)+'</div>'
         +'<div class="sub">'+esc(a.vanType||'')+(a.location?(' · '+esc(a.location)):'')+' · '+esc(a.date)+'</div>'

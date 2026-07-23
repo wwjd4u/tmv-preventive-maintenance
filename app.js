@@ -74,15 +74,12 @@ function buildTechFilter(){
 function contactBar(tech){
   if(!tech) return '';
   var phone=tech.phone||'';
-  var wa=tech.whatsapp||'';
-  var tg=tech.telegram||'';
   var em=tech.email||'';
-  var waDigits=(wa||phone).replace(/\D/g,'');
+  var smsDigits=phone.replace(/\D/g,'');
   var bars='<div class="contact-bar">';
   if(phone) bars+='<a class="cb-call" href="tel:'+escAttr(phone)+'">📞 Call</a>';
   if(em) bars+='<a class="cb-email" href="mailto:'+escAttr(em)+'">✉️ Email</a>';
-  if(waDigits) bars+='<a class="cb-wa" target="_blank" href="https://wa.me/'+escAttr(waDigits)+'">💬 WhatsApp</a>';
-  if(tg) bars+='<a class="cb-tg" target="_blank" href="https://t.me/'+escAttr(tg.replace(/^@/,''))+'">✈️ Telegram</a>';
+  if(smsDigits) bars+='<button class="cb-sms" data-sms="'+escAttr(smsDigits)+'" onclick="sendSms(this)">💬 Text / SMS</button>';
   bars+='</div>';
   return bars;
 }
@@ -298,16 +295,75 @@ async function submitInspection(){
     out.innerHTML='<div class="ticket"><h3>Ticket — '+escapeHtml(tech.name)+'</h3>'
       +'<pre>'+escapeHtml(d.ticket)+'</pre>'
       +'<div class="links">'
-      +(d.hasWhatsapp?'<a class="wa" href="'+d.waLink+'" target="_blank">Send via WhatsApp</a>':'')
-      +(d.hasTelegram?'<a class="tg" href="'+d.tgLink+'" target="_blank">Send via Telegram</a>':'')
-      +(d.hasEmail?'<a class="em" href="'+d.mailto+'" target="_blank">Send via Email</a>':'')
-      +'<button class="btn ghost" onclick="copyTicket()">Copy</button></div>'
+      +(d.hasEmail?'<a class="em" href="'+d.mailto+'" onclick="return mailtoFallback(event)" title="Opens your mail app">Send via Email</a>':'')
+      +(d.hasEmail?'<button class="btn ghost" onclick="copyMailTo()">Copy Email Text</button>':'')
+      +(d.smsDigits?'<button class="btn sms" data-sms="'+escAttr(d.smsDigits)+'" data-ticket="'+encodeURIComponent(d.ticket)+'" onclick="sendDispatchSms(this)">Send via SMS</button>':'')
+      +'<button class="btn ghost" onclick="copyTicket()">Copy Ticket</button></div>'
       +'<div class="ok-note">✓ Inspection logged for '+escapeHtml(selectedTmv)+' ('+escapeHtml(loc)+', '+escapeHtml(date)+')</div></div>';
     window.__lastTicket=d.ticket;
   }catch(e){ showErr('submit failed: '+((e&&(e.message))||e)); }
   finally{ btn.disabled=false; btn.textContent='Generate Ticket & Log'; updateGen(); }
 }
 function copyTicket(){ if(navigator.clipboard&&window.__lastTicket){ navigator.clipboard.writeText(window.__lastTicket).then(function(){alert('Copied');},function(){alert('Copy failed');}); } }
+// Send an SMS via the server (which calls the SMS provider). Works from any browser.
+function appBaseUrl(){ return (configData && configData.appUrl) || (window.location && window.location.origin) || ''; }
+async function sendSms(btn){
+  var num = btn.getAttribute('data-sms') || '';
+  if(!num){ alert('No phone number on file for this technician.'); return; }
+  // Build a short default message that links back to the app
+  var msg = 'CUDD PM: you have a work order update. Open the PM app: ' + appBaseUrl();
+  _doSms(num, msg, btn);
+}
+async function sendDispatchSms(btn){
+  var num = btn.getAttribute('data-sms') || '';
+  var ticket = decodeURIComponent(btn.getAttribute('data-ticket') || '');
+  if(!num){ alert('No phone number on file for this technician.'); return; }
+  var link = appBaseUrl();
+  _doSms(num, ticket + (link ? '\n\nOpen the PM app: ' + link : ''), btn);
+}
+async function _doSms(num, msg, btn){
+  var prev = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try{
+    var r = await fetch('/api/sms', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({to:num, message:msg})});
+    var d = await r.json();
+    if(!r.ok || !d.ok) throw new Error(d.error || ('HTTP '+r.status));
+    btn.textContent = '✓ Sent';
+    setTimeout(function(){ btn.textContent = prev; btn.disabled = false; }, 2500);
+  }catch(e){
+    btn.disabled = false; btn.textContent = prev;
+    alert('SMS failed: ' + (e.message||e) + (d && d.quota ? ' (quota: '+d.quota+')' : ''));
+  }
+}
+// If the browser has no mail client, the mailto link would leave a blank tab.
+// This opens the mailto in the SAME tab (so no orphan blank tab) and if it fails,
+// we copy the message text to clipboard and tell the user to paste it into their email.
+function mailtoFallback(e){
+  e.preventDefault();
+  var href=document.querySelector('.em').getAttribute('href');
+  // try opening in same tab; if OS doesn't catch it, fall back to copy
+  var w=window.open(href, '_self');
+  // give the OS a moment; if still on same page, copy text
+  setTimeout(function(){
+    if(window.location.href.indexOf('mailto:')!==0){
+      copyMailTo();
+    }
+  }, 300);
+  return false;
+}
+function copyMailTo(){
+  var a=document.querySelector('.em');
+  if(!a) return;
+  var href=a.getAttribute('href')||'';
+  // decode mailto into To / Subject / Body for a clean copy
+  var to=(href.match(/^mailto:([^?]+)/)||[])[1]||'';
+  var subj=decodeURIComponent((href.match(/[?&]subject=([^&]+)/)||[])[1]||'');
+  var body=decodeURIComponent((href.match(/[?&]body=([^&]+)/)||[])[1]||'');
+  var text='To: '+to+'\nSubject: '+subj+'\n\n'+body;
+  if(navigator.clipboard){ navigator.clipboard.writeText(text).then(function(){alert('Email text copied — paste it into your mail app');},function(){alert('Copy failed');}); }
+  else { alert(text); }
+  window.__lastMail=text;
+}
 
 // ── Assign to Technician (handoff to mobile) ─────────────
 async function assignToTech(){
