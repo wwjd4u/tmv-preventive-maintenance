@@ -33,7 +33,7 @@ async function boot(){
 }
 function showViewFromHash(){
   var v = (location.hash||'').replace('#','');
-  if(v!=='tracker' && v!=='tmv') v='tmv';
+  if(v!=='tracker' && v!=='tmv' && v!=='tech') v='tmv';
   showView(v);
   if(v==='tracker') buildTracker();
 }
@@ -181,8 +181,10 @@ var _ft=document.getElementById('filterText'); if(_ft) _ft.addEventListener('inp
 function showView(v){
   document.getElementById('viewTracker').classList.toggle('active', v==='tracker');
   document.getElementById('viewTmv').classList.toggle('active', v==='tmv');
+  document.getElementById('viewTech').classList.toggle('active', v==='tech');
   document.getElementById('tabTracker').classList.toggle('active', v==='tracker');
   document.getElementById('tabTmv').classList.toggle('active', v==='tmv');
+  document.getElementById('tabTech').classList.toggle('active', v==='tech');
 }
 
 // ── TMV grid ───────────────────────────────────────────

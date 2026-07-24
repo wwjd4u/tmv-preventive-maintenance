@@ -31,6 +31,7 @@
   main{padding:18px;max-width:1100px;margin:0 auto}
   .view{display:none}
   .view.active{display:block}
+  #techFrame{width:100%;height:calc(100vh - 130px);border:0;background:#f5f6f8}
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
   select,input,textarea{font:14px inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
   option{background:#fff;color:#1a1a1a}
@@ -116,6 +117,7 @@
   <nav>
     <button id="tabTmv" class="active" onclick="showView('tmv')">🚚 TMV Inspections</button>
     <button id="tabTracker" onclick="showView('tracker')">Tracker</button>
+    <button id="tabTech" onclick="showView('tech')">Tech</button>
     <button id="tabDb" onclick="goDb()">Task.db</button>
   </nav>
 </header>
@@ -157,6 +159,11 @@
       <div id="assignOut" class="hidden"></div>
       <div id="ticketOut" class="hidden"></div>
     </div>
+  </section>
+
+  <!-- TECH VIEW — embeds the technician work-order page -->
+  <section id="viewTech" class="view">
+    <iframe id="techFrame" src="techindex.html" title="Tech work orders" loading="lazy"></iframe>
   </section>
 </main>
 
