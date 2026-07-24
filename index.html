@@ -75,13 +75,14 @@
   .wa{background:#25D366} .tg{background:#229ED9} .em{background:#812F2F}
   .hidden{display:none}
   /* Tracker assignments board */
-  .assign-card{cursor:pointer;border:1px solid var(--line);border-left:4px solid var(--cudd);border-radius:12px;background:#fff;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
+  .assign-card{display:block;text-decoration:none;color:inherit;cursor:pointer;border:1px solid var(--line);border-left:4px solid var(--cudd);border-radius:12px;background:#fff;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
   .assign-card:hover{box-shadow:0 6px 18px rgba(129,47,47,.18);transform:translateY(-2px);border-color:var(--cudd)}
   .assign-card .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .assign-card h3{margin:0;font-size:16px}
   .assign-card .sub{color:#666;font-size:13px;margin:6px 0 2px}
   .assign-card .tech{color:#444;font-size:13px;margin-top:2px}
   .assign-card .cnt{color:#9aa;font-size:12px;margin-top:6px}
+  .assign-card .open-cue{margin-top:10px;color:var(--cudd);font-weight:700;font-size:13px}
   .st{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff}
   .st-assigned{background:#2563eb} .st-in_progress{background:#d97706} .st-completed{background:#16a34a} .st-rejected{background:#dc2626}
   .assign-detail{border-top:1px solid #eee;margin-top:12px;padding-top:12px}

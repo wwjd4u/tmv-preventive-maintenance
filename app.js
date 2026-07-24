@@ -136,19 +136,15 @@ function trackerCard(a){
   var detId='det_'+a.id;
   var techLine = t.name ? ('<div class="tech">👷 '+escapeHtml(t.name)+'</div>') : '';
   var sub = [a.vanType, a.location, a.date].filter(Boolean).map(escapeHtml).join(' · ');
-  // Build full detail (hidden until expand): contact + results + photos
-  var detail =
-    contactBar(t)
-    + resultsHtml(a)
-    + photoGrid(a.photos);
-  return '<div class="assign-card" onclick="toggleAssign(\''+escAttr(a.id)+'\')">'
+  // Card is a link → opens the full, readable work-order page (assign.html).
+  return '<a class="assign-card" href="assign.html?id='+encodeURIComponent(a.id)+'">'
     + '<div class="top"><h3>'+escapeHtml(a.tmv||'Untitled')+'</h3>'
     + '<span class="st st-'+(a.status||'assigned')+'">'+(SL2[a.status]||a.status)+'</span></div>'
     + (sub?'<div class="sub">'+sub+'</div>':'')
     + techLine
     + '<div class="cnt">'+cnt+' items · '+a.sections.length+' sections</div>'
-    + '<div class="assign-detail hidden" id="'+detId+'">'+detail+'</div>'
-    + '</div>';
+    + '<div class="open-cue">View work order →</div>'
+    + '</a>';
 }
 function buildTracker(){
   var f=document.getElementById('filter').value;
@@ -169,10 +165,6 @@ function buildTracker(){
     +'<div class="pill"><b style="color:#d97706">'+counts.in_progress+'</b>In Progress</div>'
     +'<div class="pill"><b style="color:#16a34a">'+counts.completed+'</b>Completed</div>'
     +'<div class="pill"><b style="color:#dc2626">'+counts.rejected+'</b>Rejected</div>';
-}
-function toggleAssign(id){
-  var el=document.getElementById('det_'+id);
-  if(el) el.classList.toggle('hidden');
 }
 ['filter','filterTech'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', buildTracker); });
 var _ft=document.getElementById('filterText'); if(_ft) _ft.addEventListener('input', buildTracker);
