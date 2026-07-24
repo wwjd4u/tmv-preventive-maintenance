@@ -26,7 +26,16 @@ async function boot(){
     buildTechFilter();
     buildTmvGrid();
     buildTechSelect();
+    // Honor #tracker / #tmv deep links (e.g. "Back to Tracker" from assign.html)
+    showViewFromHash();
+    window.addEventListener('hashchange', showViewFromHash);
   }catch(e){ showErr('boot failed: '+((e&&(e.stack||e.message))||e)); }
+}
+function showViewFromHash(){
+  var v = (location.hash||'').replace('#','');
+  if(v!=='tracker' && v!=='tmv') v='tmv';
+  showView(v);
+  if(v==='tracker') buildTracker();
 }
 
 async function loadAssignments(){
