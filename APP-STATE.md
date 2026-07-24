@@ -4,7 +4,7 @@
 > start a PM-app task. The full README.md is STALE (describes the old assets.json
 > checklist era) — ignore it.
 >
-> Last updated: 2026-07-22
+> Last updated: 2026-07-23
 
 ## Run / access
 ```bash
@@ -85,7 +85,33 @@ cd ~/preventive-maintenance-app && node api-server.js
   once deleted during a test — avoid repeating.)
 - WSL↔Windows port squatting (see Run/access above).
 
-## Open/uncommitted work (as of 2026-07-22)
+## SMS / Twilio / Off-network (added 2026-07-23)
+- **SMS provider: Twilio** (`SMS_PROVIDER=twilio`). Auth uses a **rotatable API Key**
+  (`TWILIO_API_KEY_SID` + `TWILIO_API_KEY_SECRET` in .env) — see `sendViaTwilio` in
+  api-server.js (Basic auth `APIKEYSID:SECRET`). The old `TWILIO_TOKEN` (Auth Token)
+  is present but UNUSED and should be ROTATED (it was exposed in chat).
+- **Sending number: Twilio LOCAL number +1 832 402 6102** (Cypress, TX) — bought to
+  avoid the toll-free business-verification wall. Acct SID `ACae182d…`.
+- **10DLC A2P registration COMPLETED 2026-07-23**: Brand `BN05ef0…`, Campaign
+  `CM6f4b2bd…`, Profile `BU9e7015…`. Status was **PENDING campaign vetting** at
+  close — Verizon holds delivery until it flips to "Approved" (API returns ok:true,
+  but the phone stays silent). **TODO: when Approved, re-fire live test to
+  +18324441054 and rotate the old Auth Token.**
+- **Off-network access: Cloudflare named tunnel `tmv-app`** (config `./tmv-app.yml`)
+  → **https://tmvapp.local-journal.com** (stable URL on the local-journal.com domain,
+  your own Cloudflare creds in `~/.cloudflared/`). Start it with:
+  `cloudflared tunnel --config ./tmv-app.yml run tmv-app`. (Quick `trycloudflare`
+  tunnels are NOT used — they collide and 404.)
+- **`APP_PUBLIC_URL=https://tmvapp.local-journal.com`** in .env is injected into
+  `/api/config` (merged in `mergeTechPhones`) so SMS "Open the PM app" links work
+  off-network (techs on cellular).
+- **Compliance pages** (committed, live via tunnel): `/privacy.html`, `/terms.html`.
+  Used for the 10DLC consent form.
+- `POST /api/sms` (api-server.js) is the send endpoint; `TECH_PHONES` env (git-ignored)
+  maps name→phone so real numbers never hit the public repo.
+- Test harness: `/tmp/twilio_test2.js` POSTs a dispatch SMS via the local server.
+- Pushed to GitHub `jguynes74-create/tmv-preventive-maintenance` (origin/master):
+  TextBelt→Twilio switch, API-key auth, appUrl injection, privacy/terms pages.
 - Feature batch in flight, NOT committed: managers auth, DELETE assignment
   (admin+photo cleanup), technician-as-object, email/dispatch links, contact bar,
   removed per-section "include" checkbox (config `include:false`), UI polish
