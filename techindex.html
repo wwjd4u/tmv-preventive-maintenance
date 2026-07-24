@@ -49,13 +49,13 @@ async function load(){
       var sms=phone.replace(/\D/g,'');
       var links=[];
       if(phone) links.push('<a class="ct-call" href="tel:'+encodeURIComponent(phone)+'"><span class="ci">📞</span>Call</a>');
-      if(email) links.push('<a class="ct-mail" href="mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent('Work Order — '+ASSIGN.tmv)+'&body='+encodeURIComponent('Open your task: '+location.origin+'/tech/'+AID)+'"><span class="ci">✉️</span>Email</a>');
-      if(sms) links.push('<a class="ct-sms" href="sms:'+encodeURIComponent(sms)+'?&body='+encodeURIComponent('CUDD work order: '+location.origin+'/tech/'+AID)+'"><span class="ci">💬</span>Text</a>');
+      if(email) links.push('<a class="ct-mail" href="mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent('Work Order — '+a.tmv)+'&body='+encodeURIComponent('Open your task: '+location.origin+'/tech/'+a.id)+'"><span class="ci">✉️</span>Email</a>');
+      if(sms) links.push('<a class="ct-sms" href="sms:'+encodeURIComponent(sms)+'?&body='+encodeURIComponent('CUDD work order: '+location.origin+'/tech/'+a.id)+'"><span class="ci">💬</span>Text</a>');
       return '<a class="card" href="/tech/'+encodeURIComponent(a.id)+'">'
         +'<div class="t">'+esc(a.tmv)+'</div>'
         +'<div class="sub">'+esc(a.vanType||'')+(a.location?(' · '+esc(a.location)):'')+' · '+esc(a.date)+'</div>'
-        +'<div class="tech">Tech: '+esc(a.technician)+'</div>'
-        +(ct.length?'<div class="ct">'+ct.join('')+'</div>':'')
+        +'<div class="tech">Tech: '+esc(t.name||a.technician)+'</div>'
+        +(links.length?'<div class="ct">'+links.join('')+'</div>':'')
         +'<span class="badge '+a.status+'">'+(a.status||'assigned').replace('_',' ')+'</span>'
         +'</a>';
     }).join('');
