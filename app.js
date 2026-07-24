@@ -90,17 +90,43 @@ function photoGrid(photos){
     return '<div class="photo"><img src="'+escAttr(src)+'" alt="" loading="lazy"></div>';
   }).join('')+'</div>';
 }
+// Merge the full checklist (labels) with the tech's results (values) into one
+// flat list, tagged done (= answered / non-empty value) or todo (= empty).
+function mergeProgress(a){
+  var out=[];
+  var secs=a.sections||[];
+  (a.results||[]).forEach(function(rs){
+    var sec=secs.find(function(s){ return s.title===rs.title; })||{};
+    var labels=(sec.items||[]).map(function(it){ return it.label; });
+    (rs.items||[]).forEach(function(it,ii){
+      var label=it.label || labels[ii] || ('Item '+(ii+1));
+      var val=it.value==null ? '' : String(it.value).trim();
+      out.push({ section:rs.title, label:label, value:val, done: val.length>0 });
+    });
+  });
+  return out;
+}
 function resultsHtml(a){
   if(!a.results||!a.results.length) {
     return a.status==='completed' ? '<div class="results-sec"><b>No results recorded.</b></div>' : '';
   }
-  var h='<div class="results-sec"><b>Results</b>';
-  a.results.forEach(function(s){
-    h+='<div style="margin-top:6px"><u>'+escapeHtml(s.title)+'</u></div>';
-    (s.items||[]).forEach(function(it){
-      h+='<div class="row" style="border:0;padding:2px 0"><span class="lbl" style="font-size:13px">'+escapeHtml(it.label)+'</span><span class="ctl">'+escapeHtml(it.value==null?'':it.value)+'</span></div>';
-    });
-  });
+  var items=mergeProgress(a);
+  var done=items.filter(function(x){ return x.done; });
+  var todo=items.filter(function(x){ return !x.done; });
+  function row(x){
+    var v = x.done ? (x.value||'—') : 'Needs answer';
+    return '<div class="row prog-row '+(x.done?'prog-done':'prog-todo')+'">'
+      +'<span class="lbl">'+escapeHtml(x.label)+'</span>'
+      +'<span class="sec-tag">'+escapeHtml(x.section)+'</span>'
+      +'<span class="ctl">'+escapeHtml(v)+'</span></div>';
+  }
+  var h='<div class="results-sec"><b>Progress</b>';
+  if(done.length){
+    h+='<div class="prog-group"><div class="prog-head prog-head-done">✅ Completed ('+done.length+')</div>'+done.map(row).join('')+'</div>';
+  }
+  if(todo.length){
+    h+='<div class="prog-group"><div class="prog-head prog-head-todo">⬜ Needs attention ('+todo.length+')</div>'+todo.map(row).join('')+'</div>';
+  }
   h+='</div>';
   return h;
 }
