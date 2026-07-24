@@ -67,6 +67,12 @@
   #detailContent .cl-val.yes{background:#e7f6ec;color:#15803d}
   #detailContent .cl-val.no{background:#fde8e8;color:#b91c1c}
   #detailContent .cl-val.na{background:#f1f1f1;color:#888}
+  /* Merged work-order sheet: question on the left, color-coded answer on the right */
+  #detailContent .checklist.merged{gap:0}
+  #detailContent .sheet-sec{margin-top:10px;margin-bottom:2px;color:#234;font-size:13px}
+  #detailContent .cl-item.sheet-row{display:flex;justify-content:space-between;gap:12px}
+  #detailContent .sheet-row .q{flex:1;text-align:left;color:#222}
+  #detailContent .sheet-row .cl-val{margin-left:auto}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{background:#f8f8fa;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
@@ -451,44 +457,52 @@ function renderAssignments(){
   });
 }
 
+function mergeSheet(a){
+  // answers keyed by section title -> ordered values from tech's returned results
+  var resBySec = {};
+  (a.results||[]).forEach(function(sec){
+    resBySec[sec.title] = (sec.items||[]).map(function(it){ return it.value; });
+  });
+  function valCell(v){
+    var vLabel = '-', vCls = 'na';
+    if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
+    else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
+    else if(v!=='' && v!=null){ vLabel=esc(String(v)); vCls=''; }
+    return '<span class="cl-val '+vCls+'">'+vLabel+'</span>';
+  }
+  var out = '';
+  (a.sections||[]).forEach(function(sec){
+    var answers = resBySec[sec.title];
+    out += '<div class="sheet-sec"><strong>'+esc(sec.title||'Section')+'</strong></div>';
+    (sec.items||[]).forEach(function(item, ii){
+      var ans = (answers && answers[ii]!=null) ? answers[ii] : (item.value||'');
+      out += '<div class="cl-item sheet-row"><span class="q">'+esc(item.label||'')+'</span>'+valCell(ans)+'</div>';
+    });
+  });
+  // defensive: any result sections not present in the dispatched checklist
+  (a.results||[]).forEach(function(sec){
+    if(!(a.sections||[]).some(function(s){ return s.title===sec.title; })){
+      out += '<div class="sheet-sec"><strong>'+esc(sec.title||'Section')+'</strong></div>';
+      (sec.items||[]).forEach(function(item){
+        out += '<div class="cl-item sheet-row"><span class="q">'+esc(item.label||'')+'</span>'+valCell(item.value||'')+'</div>';
+      });
+    }
+  });
+  return out;
+}
+
 function showAssignment(id){
   const a = dbData.assignments.find(x => x.id == id);
   if(!a) return;
   document.getElementById('detailTitle').textContent = (a.tmv||'Assignment') + ' - ' + techName(a.technician);
   let html = '<div class="section"><h3>Info</h3><p>Status: <b>'+a.status+'</b><br>Technician: '+esc(techName(a.technician))+'<br>Completed: '+(a.completedAt||'-')+'</p></div>';
-  // SENT TO TECH — what was dispatched to the technician (the source-of-truth
-  // checklist for this van type). Lets you review what's being sent out right
-  // here on the Task.db page instead of hunting through a separate tech page.
-  if(a.sections && a.sections.length){
-    html += '<div class="section"><h3>Sent to Tech (Checklist)</h3><div class="checklist">';
-    a.sections.forEach(function(sec){
-      html += '<div style="margin-bottom:10px"><strong>'+esc(sec.title||'Section')+'</strong></div>';
-      (sec.items||[]).forEach(function(item){
-        var v = item.value;
-        var vLabel = '-', vCls = 'na';
-        if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
-        else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
-        else if(v){ vLabel=esc(String(v)); vCls=''; }
-        html += '<div class="cl-item"><span class="cl-val '+vCls+'">'+vLabel+'</span><span>'+esc(item.label||'')+'</span></div>';
-      });
-    });
-    html += '</div></div>';
-  }
-  // RESULTS — what the technician actually returned
-  if(a.results && a.results.length){
-    html += '<div class="section"><h3>Returned Results</h3><div class="checklist">';
-    a.results.forEach(function(sec){
-      html += '<div style="margin-bottom:10px"><strong>'+esc(sec.title||'Section')+'</strong></div>';
-      (sec.items||[]).forEach(function(item){
-        var v = item.value;
-        var vLabel = '-', vCls = 'na';
-        if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
-        else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
-        else if(v){ vLabel=esc(String(v)); vCls=''; }
-        html += '<div class="cl-item"><span class="cl-val '+vCls+'">'+vLabel+'</span><span>'+esc(item.label||'')+'</span></div>';
-      });
-    });
-    html += '</div></div>';
+  // MERGED WORK-ORDER SHEET — question (left) + tech answer (right), aligned
+  // row-by-row and color-coded. Dispatched checklist (a.sections) supplies the
+  // question text; the technician's returned results (a.results) supply answers.
+  // Replaces the old two-panel layout (checklist stacked above a separate
+  // answers list).
+  if((a.sections && a.sections.length) || (a.results && a.results.length)){
+    html += '<div class="section"><h3>Work Order Checklist</h3><div class="checklist merged">' + mergeSheet(a) + '</div></div>';
   }
   document.getElementById('detailContent').innerHTML = html;
   document.getElementById('detailPanel').style.display = 'block';
