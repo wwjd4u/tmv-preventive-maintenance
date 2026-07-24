@@ -456,8 +456,27 @@ function showAssignment(id){
   if(!a) return;
   document.getElementById('detailTitle').textContent = (a.tmv||'Assignment') + ' - ' + techName(a.technician);
   let html = '<div class="section"><h3>Info</h3><p>Status: <b>'+a.status+'</b><br>Technician: '+esc(techName(a.technician))+'<br>Completed: '+(a.completedAt||'-')+'</p></div>';
+  // SENT TO TECH — what was dispatched to the technician (the source-of-truth
+  // checklist for this van type). Lets you review what's being sent out right
+  // here on the Task.db page instead of hunting through a separate tech page.
+  if(a.sections && a.sections.length){
+    html += '<div class="section"><h3>Sent to Tech (Checklist)</h3><div class="checklist">';
+    a.sections.forEach(function(sec){
+      html += '<div style="margin-bottom:10px"><strong>'+esc(sec.title||'Section')+'</strong></div>';
+      (sec.items||[]).forEach(function(item){
+        var v = item.value;
+        var vLabel = '-', vCls = 'na';
+        if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
+        else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
+        else if(v){ vLabel=esc(String(v)); vCls=''; }
+        html += '<div class="cl-item"><span class="cl-val '+vCls+'">'+vLabel+'</span><span>'+esc(item.label||'')+'</span></div>';
+      });
+    });
+    html += '</div></div>';
+  }
+  // RESULTS — what the technician actually returned
   if(a.results && a.results.length){
-    html += '<div class="section"><h3>Checklist</h3><div class="checklist">';
+    html += '<div class="section"><h3>Returned Results</h3><div class="checklist">';
     a.results.forEach(function(sec){
       html += '<div style="margin-bottom:10px"><strong>'+esc(sec.title||'Section')+'</strong></div>';
       (sec.items||[]).forEach(function(item){

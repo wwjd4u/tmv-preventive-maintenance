@@ -159,7 +159,21 @@ function showView(v){
 }
 
 // ── TMV grid ───────────────────────────────────────────
-function buildTmvGrid(){
+// Full checklist (schema only) for a vanType string, filtered by config `appliesTo`.
+// This is the single source of truth emitted to the tech page, ticket and Task.db.
+function fullChecklistFor(vanType) {
+  var vts = String(vanType || '').split(/\s*\+\s*/).map(function(s){return s.trim();}).filter(Boolean);
+  return (configData.checklist || []).filter(function(s){
+    if (typeof s === 'string') return true;
+    if (s.include === false) return false;
+    return s.appliesTo.some(function(v){ return vts.indexOf(v) >= 0; });
+  }).map(function(s){
+    if (typeof s === 'string') return { title: s, items: [] };
+    return { title: s.title, items: (s.items || []).map(function(it){ return { label: it.label, type: it.type }; }) };
+  });
+}
+
+function buildTmvGrid() {
   var grid=document.getElementById('tmvGrid');
   var map=configData.tmvVanMap||{}, keys=Object.keys(map);
   if(!keys.length){ grid.innerHTML='<p style="color:#888">No TMV units configured.</p>'; return; }
@@ -279,16 +293,19 @@ async function submitInspection(){
   var date=document.getElementById('dDate').value;
   var tech=(configData.technicians||[]).filter(function(t){return t.name===techName;})[0]||{name:techName};
   var sections=collectSections();
+  // Ticket + inspection log should reflect the FULL checklist, not just the
+  // items the admin typed into. Build a complete section list for the ticket.
+  var full=fullChecklistFor(selectedVan);
   var btn=document.getElementById('genBtn');
   btn.disabled=true; btn.textContent='Working…';
   try{
     // 1) ticket
     var r=await fetch('/api/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, functions:sections.map(function(s){return s.title+': '+s.items.map(function(i){return i.label+'='+i.value;}).join(', ');}), technician:tech})});
+      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, functions:full.map(function(s){return s.title+': '+s.items.map(function(i){return i.label+'=';}).join(', ');}), technician:tech})});
     var d=await r.json(); if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
     // 2) log inspection
     var r2=await fetch('/api/inspection',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:tech, sections:sections})});
+      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:tech, sections:full})});
     var d2=await r2.json(); if(!r2.ok) throw new Error(d2.error||('log HTTP '+r2.status));
     await loadAssets(); buildTracker();
     var out=document.getElementById('ticketOut'); out.classList.remove('hidden');
@@ -370,7 +387,9 @@ async function assignToTech(){
   var techName=document.getElementById('dTech').value;
   var loc=document.getElementById('dLoc').value;
   var date=document.getElementById('dDate').value;
-  var sections=collectSections();
+  // Emit the FULL checklist (single source of truth) for this van type,
+  // not just the items the admin happened to type into before assigning.
+  var sections=fullChecklistFor(selectedVan);
   var tech=(configData.technicians||[]).filter(function(t){return t.name===techName;})[0]||{name:techName};
   var btn=document.getElementById('assignBtn');
   btn.disabled=true; btn.textContent='Working…';

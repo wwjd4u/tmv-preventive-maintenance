@@ -73,6 +73,49 @@ function saveAssignments(list) {
   db.saveAssignments(list);
 }
 
+// ── Checklist is the single source of truth ───────────────
+// Given a vanType string (possibly "A + B + C"), return the FULL expected
+// checklist sections (schema only: {title, items:[{label,type}]}) filtered by
+// config.json `appliesTo`. This is what every assignment MUST carry so the
+// tech page, ticket, tracker and Task.db all stay in sync.
+function expectedSections(vanType, config) {
+  const vts = String(vanType || '')
+    .split(/\s*\+\s*/).map(s => s.trim()).filter(Boolean);
+  return (config.checklist || []).filter(s => {
+    if (typeof s === 'string') return true;
+    if (s.include === false) return false;
+    return s.appliesTo.some(v => vts.indexOf(v) >= 0);
+  }).map(s => {
+    if (typeof s === 'string') return { title: s, items: [] };
+    // Preserve the FULL item schema (label, type, opts, placeholder, etc.) so
+    // the tech page's choice/select controls have the options they need.
+    return {
+      title: s.title,
+      items: (s.items || []).map(it => Object.assign({}, it))
+    };
+  });
+}
+
+// Merge an incoming (possibly partial) sections array onto the FULL expected
+// checklist so the stored assignment always contains the complete checklist.
+// Any values the tech/admin already entered are preserved by title+label.
+function reconcileSections(incoming, full) {
+  const inc = Array.isArray(incoming) ? incoming : [];
+  return full.map(fs => {
+    const match = inc.find(x => x && x.title === fs.title);
+    const items = (fs.items || []).map(fit => {
+      const iit = match && Array.isArray(match.items)
+        ? match.items.find(x => x && x.label === fit.label)
+        : null;
+      const val = iit && iit.value != null ? iit.value : '';
+      // Keep the full item schema (label, type, opts, placeholder...) and only
+      // overlay the previously-entered value, so choice/select controls work.
+      return Object.assign({}, fit, { value: val });
+    });
+    return { title: fs.title, items: items };
+  });
+}
+
 // ── MIME types ────────────────────────────────────────────
 const MIME = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
@@ -472,6 +515,27 @@ http.createServer((req, res) => {
     return sendJson(res, 200, { ok: true, message: 'All assignment records purged.' });
   }
 
+  // ── POST /api/admin/backfill — reconcile existing assignments to the full
+  // checklist so every stored record carries the complete, van-type-appropriate
+  // sections (main → tech → tracker → Task.db stay in sync). Values already
+  // entered by techs are preserved. (admin only)
+  if (url.pathname === '/api/admin/backfill' && req.method === 'POST') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    const config = loadConfig();
+    const assignments = loadAssignments();
+    let updated = 0, missingVan = 0;
+    assignments.forEach(a => {
+      if (!a.vanType) { missingVan++; return; }
+      const full = expectedSections(a.vanType, config);
+      if (!full.length) { missingVan++; return; }
+      const reconciled = reconcileSections(a.sections, full);
+      a.sections = reconciled;
+      updated++;
+    });
+    saveAssignments(assignments);
+    return sendJson(res, 200, { ok: true, updated, missingVan, message: `Reconciled ${updated} assignment(s) to the full checklist.` });
+  }
+
   // ── PUT /api/config — full config save (admin only) ─────
   // Persists the entire config object so the admin viewer can manage
   // intervals, locations, unitOptions, technicians, districts, checklist, etc.
@@ -719,8 +783,9 @@ http.createServer((req, res) => {
           phone: techIn.phone || ''
         };
         const config = loadConfig();
-        const sections = Array.isArray(d.sections) ? d.sections : [];
-        if (!sections.length) return sendJson(res, 400, { error: 'Select at least one checklist section' });
+        const full = expectedSections(d.vanType, config);
+        const sections = reconcileSections(d.sections, full);
+        if (!sections.length) return sendJson(res, 400, { error: 'No checklist sections apply to this van type' });
         const assignments = loadAssignments();
         const assignment = {
           id: crypto.randomBytes(6).toString('hex'),
