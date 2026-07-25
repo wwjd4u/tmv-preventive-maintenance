@@ -14,6 +14,8 @@
   header{background:var(--cudd);color:#fff;padding:14px 20px;position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px}
   header img{height:52px}
   header h1{font-size:22px;margin:0;font-weight:700}
+  header .hdr-back{margin-left:auto;color:#fff;text-decoration:none;font-size:14px;font-weight:600;background:rgba(255,255,255,.18);padding:8px 12px;border-radius:8px;white-space:nowrap}
+  header .hdr-back:active{background:rgba(255,255,255,.32)}
   main{padding:14px;max-width:560px;margin:0 auto;padding-bottom:90px}
   .meta{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px}
   .meta b{color:var(--cudd)}
@@ -52,7 +54,9 @@
   .photo input[type=text]{border:0;border-top:1px solid var(--line);border-radius:0;font-size:13px}
   .photo .x{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer}
   .pbtn{display:block;width:100%;padding:12px;margin:8px 0;border:2px dashed var(--cudd);border-radius:10px;background:#fff;color:var(--cudd);font-weight:600;cursor:pointer;font-size:14px}
-  .btn{position:fixed;left:0;right:0;bottom:0;background:var(--cudd);color:#fff;border:0;padding:16px;font-size:17px;font-weight:700;cursor:pointer;z-index:60}
+  .btn{position:fixed;left:0;right:0;bottom:0;background:var(--cudd);color:#fff;border:0;padding:16px;font-size:17px;font-weight:700;cursor:pointer;z-index:60;text-align:center;text-decoration:none}
+  .btn.done-back{background:#16a34a}
+  .btn.done-back:active{background:#15803d}
   .btn:disabled{opacity:.5}
   .ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:14px;border-radius:10px;margin-bottom:14px;font-weight:600}
   .err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:12px 14px;border-radius:10px;margin-bottom:14px}
@@ -63,6 +67,7 @@
 <header>
   <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
   <h1>TMV Field Task</h1>
+  <a class="hdr-back" href="/techindex.html">← Orders</a>
 </header>
 <main id="app"><div class="load">Loading task…</div></main>
 <div class="btn" id="completeBtn" style="display:none" onclick="completeTask()">✓ Complete Task</div>
@@ -89,7 +94,9 @@ function render(){
     document.getElementById('app').innerHTML =
       contactHtml() +
       '<div class="ok">✓ Task completed'+(ASSIGN.completedAt?(' '+new Date(ASSIGN.completedAt).toLocaleString()):'')+'</div>'
-      +metaHtml();
+      +metaHtml()
+      +'<a class="btn done-back" href="/techindex.html">✓ Done — Back to Work Orders</a>';
+    window.scrollTo(0,0);
     return;
   }
   var html = contactHtml() + metaHtml();
