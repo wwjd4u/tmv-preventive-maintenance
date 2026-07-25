@@ -269,10 +269,16 @@ http.createServer((req, res) => {
     return serveFile(res, path.join(__dirname, 'techindex.html'));
   }
 
+  // ── favicon (avoid console 404 noise) ──
+  if (url.pathname === '/favicon.ico') {
+    res.writeHead(204); res.end();
+    return;
+  }
+
   // ── Serve static assets (.js / .css / images) with correct content-type ──
   const ext = url.pathname.split('.').pop().toLowerCase();
   const STATIC_TYPES = { js:'application/javascript', html:'text/html', css:'text/css', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', ico:'image/x-icon' };
-  if (STATIC_TYPES[ext]) {
+  if (STATIC_TYPES[ext] && !url.pathname.startsWith('/uploads/')) {
     const safe = url.pathname.replace(/^\/+/, '').split('/').pop();
     const full = path.join(__dirname, safe);
     if (full.startsWith(__dirname)) {
@@ -796,6 +802,7 @@ http.createServer((req, res) => {
           date: d.date || new Date().toISOString().slice(0, 10),
           createdAt: Date.now(),
           status: 'assigned',           // assigned → in_progress → completed
+          order: loadAssignments().filter(a => (a.technician && (a.technician.name || a.technician)) === (techIn.name || techIn)).length,
           sections,                     // [{title, items:[{label,type}]}]
           results: null,                // filled by technician
           completedAt: null,
@@ -837,9 +844,43 @@ http.createServer((req, res) => {
         if (d.status) assignments[idx].status = d.status;
         if (d.results) assignments[idx].results = d.results;
         if (Array.isArray(d.photos)) assignments[idx].photos = d.photos;
+        if (typeof d.order === 'number' && isFinite(d.order)) assignments[idx].order = d.order;
+        // Persist reassignment to a different technician (drag-and-drop move).
+        if (d.technician) {
+          if (typeof d.technician === 'string') assignments[idx].technician = { name: d.technician };
+          else if (typeof d.technician === 'object') assignments[idx].technician = d.technician;
+        }
         if (d.status === 'completed') assignments[idx].completedAt = Date.now();
         saveAssignments(assignments);
         sendJson(res, 200, { ok: true, assignment: assignments[idx] });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PATCH /api/assignments/order — bulk-save drag reorder + reassignment ──
+  // Body: { items: [{ id, technician, order }] }  (technician may be null/'' = Unassigned)
+  if (url.pathname === '/api/assignments/order' && req.method === 'PATCH') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const updates = Array.isArray(d.items) ? d.items : [];
+        const assignments = loadAssignments();
+        const byId = {};
+        assignments.forEach(a => { byId[a.id] = a; });
+        updates.forEach(u => {
+          const a = byId[u.id];
+          if (!a) return;
+          if (typeof u.order === 'number' && isFinite(u.order)) a.order = u.order;
+          if ('technician' in u) {
+            const t = u.technician;
+            a.technician = t ? (typeof t === 'string' ? { name: t } : t) : { name: '' };
+          }
+        });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, saved: updates.length });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;

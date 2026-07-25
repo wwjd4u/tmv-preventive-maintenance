@@ -141,39 +141,139 @@ function resultsHtml(a){
 }
 function trackerCard(a){
   var t=a.technician||{};
+  var techName=t&&t.name?t.name:'';
   var cnt=0; (a.sections||[]).forEach(function(s){ cnt+=(s.items||[]).length; });
   var detId='det_'+a.id;
-  var techLine = t.name ? ('<div class="tech">👷 '+escapeHtml(t.name)+'</div>') : '';
   var sub = [a.vanType, a.location, a.date].filter(Boolean).map(escapeHtml).join(' · ');
   // Card is a link → opens the full, readable work-order page (assign.html).
-  return '<a class="assign-card" href="assign.html?id='+encodeURIComponent(a.id)+'">'
+  // draggable=true enables drag-and-drop reorder + reassign to another tech.
+  return '<a class="assign-card" draggable="true" data-id="'+escAttr(a.id)+'" href="assign.html?id='+encodeURIComponent(a.id)+'">'
     + '<div class="top"><h3>'+escapeHtml(a.tmv||'Untitled')+'</h3>'
     + '<span class="st st-'+(a.status||'assigned')+'">'+(SL2[a.status]||a.status)+'</span></div>'
     + (sub?'<div class="sub">'+sub+'</div>':'')
-    + techLine
+    + (techName?'<div class="tech">👷 '+escapeHtml(techName)+'</div>':'')
     + '<div class="cnt">'+cnt+' items · '+a.sections.length+' sections</div>'
     + '<div class="open-cue">View work order →</div>'
     + '</a>';
+}
+function techGroupHeader(name, n, filtered){
+  var label = name || 'Unassigned';
+  var avatar = name ? name.trim().charAt(0).toUpperCase() : '?';
+  return '<div class="tech-group-head" data-tech="'+escAttr(name||'')+'">'
+    + '<div class="tg-avatar">'+escapeHtml(avatar)+'</div>'
+    + '<div class="tg-name">'+escapeHtml(label)+'</div>'
+    + '<div class="tg-count">'+n+' '+(n===1?'task':'tasks')+(filtered?' (filtered)':'')+'</div>'
+    + '</div>';
 }
 function buildTracker(){
   var f=document.getElementById('filter').value;
   var ft=document.getElementById('filterTech').value;
   var q=(document.getElementById('filterText').value||'').toLowerCase();
-  var counts={assigned:0,in_progress:0,completed:0,rejected:0}, html='';
+  // status summary (across all, unfiltered by tech/search)
+  var counts={assigned:0,in_progress:0,completed:0,rejected:0};
+  assignments.forEach(function(a){ if(counts[a.status]!=null) counts[a.status]++; });
+
+  // Group by technician name ('' / missing → "Unassigned")
+  var groups={}; // name -> [assignments]
   assignments.forEach(function(a){
-    if(counts[a.status]!=null) counts[a.status]++;
-    if(f!=='all'&&a.status!==f) return;
-    if(ft!=='all'&&!(a.technician&&a.technician.name===ft)) return;
-    var hay=((a.tmv||'')+' '+(a.technician&&a.technician.name||'')+' '+(a.vanType||'')+' '+(a.location||'')).toLowerCase();
-    if(q&&hay.indexOf(q)<0) return;
-    html+=trackerCard(a);
+    var tn=(a.technician&&a.technician.name)||'';
+    if(!groups[tn]) groups[tn]=[];
+    groups[tn].push(a);
   });
-  document.getElementById('cards').innerHTML = html || '<p style="color:#888">No assignments match.</p>';
+  // Stable tech order: known techs from config first (in config order), then others, then Unassigned last.
+  var known=(configData.technicians||[]).map(function(t){return t.name;});
+  var allNames=Object.keys(groups);
+  var ordered=known.filter(function(n){return allNames.indexOf(n)>=0;});
+  allNames.filter(function(n){return ordered.indexOf(n)<0 && n!=='';}).forEach(function(n){ordered.push(n);});
+  if('' in groups) ordered.push('');
+
+  var html='';
+  ordered.forEach(function(name){
+    var items=groups[name].slice().sort(function(x,y){ return (x.order||0)-(y.order||0) || (x.createdAt||0)-(y.createdAt||0); });
+    // apply status + search filters (tech filter 'all' shows every group; specific tech shows only that group)
+    var visible=items.filter(function(a){
+      if(ft!=='all' && name!==ft) return false;
+      if(f!=='all' && a.status!==f) return false;
+      var hay=((a.tmv||'')+' '+(a.technician&&a.technician.name||'')+' '+(a.vanType||'')+' '+(a.location||'')).toLowerCase();
+      if(q && hay.indexOf(q)<0) return false;
+      return true;
+    });
+    if(ft!=='all' && name!==ft) return; // when filtering to one tech, skip other groups entirely
+    html+= '<div class="tech-group" data-tech="'+escAttr(name||'')+'">';
+    html+= techGroupHeader(name, items.length, visible.length!==items.length);
+    if(visible.length){
+      html+= '<div class="cards tech-cards" data-tech="'+escAttr(name||'')+'">'+visible.map(trackerCard).join('')+'</div>';
+    } else {
+      html+= '<div class="tech-empty">No tasks here'+(f!=='all'?' for status "'+f+'"':'')+'.</div>';
+    }
+    html+= '</div>';
+  });
+  if(!html) html='<p style="color:#888">No assignments match.</p>';
+  document.getElementById('cards').innerHTML = html;
   document.getElementById('summary').innerHTML =
     '<div class="pill"><b>'+counts.assigned+'</b>Assigned</div>'
     +'<div class="pill"><b style="color:#d97706">'+counts.in_progress+'</b>In Progress</div>'
     +'<div class="pill"><b style="color:#16a34a">'+counts.completed+'</b>Completed</div>'
-    +'<div class="pill"><b style="color:#dc2626">'+counts.rejected+'</b>Rejected</div>';
+    +'<div class="pill"><b style="color:#dc2626">'+counts.rejected+'</b>Rejected</div>'
+    +'<div class="pill hint">Drag a card to reorder · drag onto another tech to reassign</div>';
+  wireTrackerDnd();
+}
+// ── Drag & drop: reorder within a tech, or reassign across techs ──
+var _dragId=null;
+function wireTrackerDnd(){
+  var cards=document.querySelectorAll('#cards .assign-card');
+  cards.forEach(function(card){
+    card.addEventListener('dragstart', function(e){
+      _dragId=card.getAttribute('data-id');
+      card.classList.add('dragging');
+      try{ e.dataTransfer.setData('text/plain', _dragId); e.dataTransfer.effectAllowed='move'; }catch(_){}
+    });
+    card.addEventListener('dragend', function(){
+      _dragId=null; card.classList.remove('dragging');
+      document.querySelectorAll('.tech-group.drag-over').forEach(function(g){ g.classList.remove('drag-over'); });
+    });
+  });
+  var groups=document.querySelectorAll('#cards .tech-group');
+  groups.forEach(function(group){
+    group.addEventListener('dragover', function(e){ e.preventDefault(); group.classList.add('drag-over'); try{ e.dataTransfer.dropEffect='move'; }catch(_){} });
+    group.addEventListener('dragleave', function(e){ if(!group.contains(e.relatedTarget)) group.classList.remove('drag-over'); });
+    group.addEventListener('drop', function(e){
+      e.preventDefault(); group.classList.remove('drag-over');
+      var id=_dragId||''; if(!id) return;
+      var targetTech=group.getAttribute('data-tech')||'';
+      // Determine new order: position of drop within this group's visible cards.
+      var container=group.querySelector('.tech-cards');
+      var sibs=container?Array.prototype.slice.call(container.querySelectorAll('.assign-card')):[];
+      // remove the dragged one, insert at end if no precise slot (keep simple: append)
+      applyTrackerMove(id, targetTech, sibs);
+    });
+  });
+}
+function applyTrackerMove(id, targetTech, sibs){
+  // Recompute order for every assignment in the affected tech group(s) and persist.
+  var targetName=targetTech||'';
+  // Build the new order list: all cards currently in the target group's DOM (after drop) plus the moved one.
+  var updates=[];
+  // For simplicity + correctness: re-derive order for ALL assignments per tech from current data + the move.
+  // 1) Set the moved assignment's technician to targetTech.
+  var moved=assignments.find(function(a){ return a.id===id; });
+  if(!moved) return;
+  moved.technician = targetName ? { name: targetName } : { name: '' };
+  // 2) For each tech group, sort remaining by existing order, then assign sequential order.
+  var groups={};
+  assignments.forEach(function(a){ var tn=(a.technician&&a.technician.name)||''; (groups[tn]=groups[tn]||[]).push(a); });
+  Object.keys(groups).forEach(function(tn){
+    groups[tn].sort(function(x,y){ return (x.order||0)-(y.order||0) || (x.createdAt||0)-(y.createdAt||0); })
+      .forEach(function(a,i){ a.order=i; updates.push({ id:a.id, technician:(a.technician&&a.technician.name)||'', order:i }); });
+  });
+  // optimistic UI refresh
+  buildTracker();
+  // persist
+  fetch('/api/assignments/order', { method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ items: updates }) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(!d.ok) console.warn('order save failed', d.error); })
+    .catch(function(e){ console.warn('order save error', e); });
 }
 ['filter','filterTech'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', buildTracker); });
 var _ft=document.getElementById('filterText'); if(_ft) _ft.addEventListener('input', buildTracker);
