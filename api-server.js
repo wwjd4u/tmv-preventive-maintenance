@@ -425,9 +425,15 @@ http.createServer((req, res) => {
     const authSid = process.env.TWILIO_API_KEY_SID || accountSid;
     const token = process.env.TWILIO_API_KEY_SECRET || process.env.TWILIO_TOKEN;
     const from = process.env.TWILIO_FROM;
-    if (!accountSid || !token || !from) return Promise.resolve({ ok: false, error: 'Twilio env not configured' });
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+    if (!accountSid || !token || (!from && !messagingServiceSid)) return Promise.resolve({ ok: false, error: 'Twilio env not configured' });
     const auth = Buffer.from(authSid + ':' + token).toString('base64');
-    const postData = require('querystring').stringify({ To: '+' + to, From: from, Body: message });
+    // Route through the registered 10DLC Messaging Service when configured, so the
+    // campaign/brand is applied (avoids carrier filtering on direct from-number sends).
+    const body = { To: '+' + to, Body: message };
+    if (messagingServiceSid) body.MessagingServiceSid = messagingServiceSid;
+    else body.From = from;
+    const postData = require('querystring').stringify(body);
     return new Promise((resolve) => {
       const req = require('https').request({
         method: 'POST',
