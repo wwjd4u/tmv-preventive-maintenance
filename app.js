@@ -139,9 +139,10 @@ function resultsHtml(a){
   h+='</div>';
   return h;
 }
+function techNameOf(a){ var t=a&&a.technician; if(t&&typeof t==='object') return t.name||''; if(typeof t==='string') return t; return ''; }
 function trackerCard(a){
-  var t=a.technician||{};
-  var techName=t&&t.name?t.name:'';
+  var t=a.technician;
+  var techName=techNameOf(a);
   var cnt=0; (a.sections||[]).forEach(function(s){ cnt+=(s.items||[]).length; });
   var detId='det_'+a.id;
   var sub = [a.vanType, a.location, a.date].filter(Boolean).map(escapeHtml).join(' · ');
@@ -176,7 +177,7 @@ function buildTracker(){
   // Group by technician name ('' / missing → "Unassigned")
   var groups={}; // name -> [assignments]
   assignments.forEach(function(a){
-    var tn=(a.technician&&a.technician.name)||'';
+    var tn=techNameOf(a);
     if(!groups[tn]) groups[tn]=[];
     groups[tn].push(a);
   });

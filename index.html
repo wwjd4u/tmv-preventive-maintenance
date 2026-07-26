@@ -35,18 +35,22 @@
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
   select,input,textarea{font:14px inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
   option{background:#fff;color:#1a1a1a}
-  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
-  /* Grouped tracker (by technician) */
-  .tech-group{border:1px solid var(--line);border-radius:14px;background:#fff;margin:14px 0;overflow:hidden;transition:box-shadow .15s,background .15s}
+  /* Tracker layout: each technician is a row — name on the LEFT, tasks stacked to the RIGHT */
+  .tracker{display:block}
+  .tech-group{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:14px;background:#fff;margin:14px 0;overflow:hidden;transition:box-shadow .15s,background .15s}
   .tech-group.drag-over{box-shadow:0 0 0 3px var(--cudd);background:#fff7f7}
-  .tech-group-head{display:flex;align-items:center;gap:12px;padding:12px 16px;background:linear-gradient(90deg,#faf3f3,#fff);border-bottom:1px solid var(--line)}
-  .tg-avatar{width:34px;height:34px;border-radius:50%;background:var(--cudd);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:none}
-  .tg-name{font-weight:700;font-size:15px;color:var(--cudd-dk)}
-  .tg-count{margin-left:auto;font-size:13px;color:#777;background:#f0f0f2;border-radius:999px;padding:3px 10px}
-  .tech-cards{padding:14px}
+  .tech-group-head{flex:0 0 200px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;padding:16px;background:linear-gradient(180deg,#faf3f3,#fff);border-right:1px solid var(--line)}
+  .tg-avatar{width:40px;height:40px;border-radius:50%;background:var(--cudd);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;flex:none}
+  .tg-name{font-weight:700;font-size:16px;color:var(--cudd-dk);line-height:1.2}
+  .tg-count{font-size:13px;color:#777;background:#f0f0f2;border-radius:999px;padding:3px 10px}
+  .tech-cards{flex:1;display:flex;flex-direction:column;gap:10px;padding:14px;min-width:0}
   .tech-empty{color:#9aa;font-size:13px;padding:14px 16px;font-style:italic}
   .assign-card[draggable=true]{cursor:grab}
   .assign-card.dragging{opacity:.45;transform:scale(.98)}
+  @media (max-width:640px){
+    .tech-group{flex-direction:column}
+    .tech-group-head{flex:none;flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--line)}
+  }
   .summary .pill.hint{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
   .card{border:1px solid var(--line);border-left:4px solid var(--cudd);border-radius:12px;background:#fff;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
   .card:hover{box-shadow:0 6px 18px rgba(129,47,47,.18);transform:translateY(-2px);border-color:var(--cudd)}
@@ -145,7 +149,7 @@
       <select id="filterTech"><option value="all">All technicians</option></select>
       <input type="search" id="filterText" placeholder="Search TMV / tech…">
     </div>
-    <div class="cards" id="cards"></div>
+    <div class="tracker" id="cards"></div>
   </section>
 
   <!-- TMV INSPECTIONS VIEW -->
