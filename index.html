@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#812F2F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TMV PM">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.ico">
 <title>TMV Preventive Maintenance</title>
 <style>
   :root{
@@ -25,37 +33,72 @@
   header{background:var(--cudd);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:50}
   header img{height:52px}
   header h1{font-size:22px;margin:0;font-weight:700;letter-spacing:.4px}
-  nav{margin-left:auto;display:flex;gap:8px}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+  nav{display:flex;gap:8px}
   nav button{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer}
   nav button.active{background:#fff;color:var(--cudd);font-weight:600}
   main{padding:18px;max-width:1100px;margin:0 auto}
+  /* Tracker: keep the compact original width (no full-bleed). The one-line row
+     is made to FIT this width by tightening cell spacing (below), so no scroll. */
   .view{display:none}
   .view.active{display:block}
   #techFrame{width:100%;height:calc(100vh - 130px);border:0;background:#f5f6f8}
   .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
   select,input,textarea{font:14px inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
   option{background:#fff;color:#1a1a1a}
-  /* Tracker layout: each technician is a row — name on the LEFT, tasks stacked to the RIGHT */
+  /* Tracker board layout: each technician is a row — name on the LEFT, tasks stacked to the RIGHT (mirrors Assignments board) */
   .tracker{display:block}
-  .tech-group{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:14px;background:#fff;margin:14px 0;overflow:hidden;transition:box-shadow .15s,background .15s}
-  .tech-group.drag-over{box-shadow:0 0 0 3px var(--cudd);background:#fff7f7}
+  .tech-group{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:14px;background:#fff;margin:14px 0;overflow:hidden}
   .tech-group-head{flex:0 0 200px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;padding:16px;background:linear-gradient(180deg,#faf3f3,#fff);border-right:1px solid var(--line)}
   .tg-avatar{width:40px;height:40px;border-radius:50%;background:var(--cudd);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;flex:none}
   .tg-name{font-weight:700;font-size:16px;color:var(--cudd-dk);line-height:1.2}
   .tg-count{font-size:13px;color:#777;background:#f0f0f2;border-radius:999px;padding:3px 10px}
   .tech-cards{flex:1;display:flex;flex-direction:column;gap:10px;padding:14px;min-width:0}
   .tech-empty{color:#9aa;font-size:13px;padding:14px 16px;font-style:italic}
-  .assign-card[draggable=true]{cursor:grab}
-  .assign-card.dragging{opacity:.45;transform:scale(.98)}
   @media (max-width:640px){
     .tech-group{flex-direction:column}
     .tech-group-head{flex:none;flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--line)}
   }
+  .role-toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:#555;background:#fff;padding:6px 10px;border:1px solid var(--line);border-radius:999px}
+  .role-toggle select{padding:4px 6px;border:1px solid var(--line);border-radius:8px;font:13px inherit;background:#fff}
+  .assign-card.dragging{opacity:.4}
+  .tech-group.drag-over{outline:2px dashed var(--cudd);outline-offset:-4px;background:#fff7f7}
   .summary .pill.hint{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
   .card{border:1px solid var(--line);border-left:4px solid var(--cudd);border-radius:12px;background:#fff;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
   .card:hover{box-shadow:0 6px 18px rgba(129,47,47,.18);transform:translateY(-2px);border-color:var(--cudd)}
   .card h3{margin:0 0 8px;font-size:16px}
-  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;white-space:nowrap}
+  /* Location (lat/long) status badges */
+  .geo{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .geo-fence{background:#eef2f7;color:#475569;border:1px solid #d6dde6}
+  .geo-on{background:#dcfce7;color:#15803d}
+  .geo-off{background:#fee2e2;color:#b91c1c}
+  .geo-demo{background:#fef3c7;color:#92400e;font-size:10px;padding:1px 6px;border-radius:999px;margin-left:4px;vertical-align:middle}
+  .geo-coord{font-size:11px;color:#64748b;margin-left:6px;font-variant-numeric:tabular-nums}
+  .geo-map{display:inline-flex;align-items:center;gap:6px}
+  .geo-thumb{width:34px;height:26px;border-radius:5px;border:1px solid #cbd5e1;background:#eef2f7;cursor:zoom-in;vertical-align:middle;flex:0 0 auto;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  /* Keep the whole Location display on ONE line (badge + map + tag + coords) */
+  .geo-cell{white-space:nowrap;vertical-align:middle}
+  .geo-cell .geo-map{vertical-align:middle}
+  .geo-cell .geo-demo{margin-left:4px}
+  .geo-cell .geo-coord{margin-left:4px}
+  .geo-thumb:hover{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.25)}
+  /* Location expand modal */
+  .map-modal-back{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
+  .map-modal-back.open{display:flex}
+  .map-modal{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:92vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+  .map-modal header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eef2f7}
+  .map-modal header h3{margin:0;font-size:16px}
+  .map-modal .x{cursor:pointer;border:0;background:#f1f5f9;border-radius:8px;width:30px;height:30px;font-size:18px;line-height:1;color:#475569}
+  .map-modal .x:hover{background:#e2e8f0}
+  .map-modal .body{padding:16px}
+  .map-modal .bigmap{width:100%;height:300px;border:0;border-radius:10px;background:#eef2f7}
+  .map-modal .coords{font-variant-numeric:tabular-nums;color:#334155;margin:10px 0;font-size:14px}
+  .map-modal .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .map-modal .actions a{display:inline-block;padding:9px 14px;border-radius:9px;background:#2563eb;color:#fff;text-decoration:none;font-size:14px;font-weight:600}
+  .map-modal .actions a.sec{background:#0f766e}
+  .map-modal .actions a:hover{filter:brightness(1.08)}
+  .demo-banner{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;padding:6px 12px;border-radius:8px;margin:8px 0;font-size:13px}
   .b-ok{background:var(--ok)} .b-warn{background:var(--warn)} .b-due{background:var(--due)} .b-none{background:var(--none)}
   .meta{color:#666;font-size:13px;margin:4px 0}
   .err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:12px 14px;border-radius:10px;margin-bottom:14px;white-space:pre-wrap;font:13px/1.4 monospace}
@@ -91,17 +134,39 @@
   .links a{text-decoration:none;padding:10px 16px;border-radius:9px;color:#fff;font-weight:600}
   .wa{background:#25D366} .tg{background:#229ED9} .em{background:#812F2F}
   .hidden{display:none}
-  /* Tracker assignments board */
-  .assign-card{display:block;text-decoration:none;color:inherit;cursor:pointer;border:1px solid var(--line);border-left:4px solid var(--cudd);border-radius:12px;background:#fff;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
-  .assign-card:hover{box-shadow:0 6px 18px rgba(129,47,47,.18);transform:translateY(-2px);border-color:var(--cudd)}
-  .assign-card .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .assign-card h3{margin:0;font-size:16px}
-  .assign-card .sub{color:#666;font-size:13px;margin:6px 0 2px}
-  .assign-card .tech{color:#444;font-size:13px;margin-top:2px}
-  .assign-card .cnt{color:#9aa;font-size:12px;margin-top:6px}
-  .assign-card .open-cue{margin-top:10px;color:var(--cudd);font-weight:700;font-size:13px}
-  .st{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff}
-  .st-assigned{background:#2563eb} .st-in_progress{background:#d97706} .st-completed{background:#16a34a} .st-rejected{background:#dc2626}
+  /* Tracker — Assignments TABLE (matches db-viewer Assignments tab) */
+  .tbl-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px}
+  /* Tracker table fills the white box with EVEN columns (no trailing gap on the
+     right of Delete). table-layout:fixed distributes width per col below. */
+  table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px}
+  /* column width shares (sum = 100%); one-line text is protected by nowrap+ellipsis */
+  table col.col-status{width:10%}
+  table col.col-tmv{width:10%}
+  table col.col-tech{width:14%}
+  table col.col-district{width:11%}
+  table col.col-date{width:10%}
+  table col.col-completed{width:11%}
+  table col.col-location{width:13%}
+  table col.col-actions{width:18%}
+  /* Actions cell must show BOTH View + Delete buttons — never clip them */
+  .tbl-wrap td.tk-actions{overflow:visible}
+  /* compact the Tracker action buttons so both fit on one line */
+  .tbl-wrap td.tk-actions .btn.sm{font-size:12px;padding:4px 9px}
+  /* Keep every Tracker row on ONE line: no cell wraps; middle-aligned */
+  .tbl-wrap td{white-space:nowrap;vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
+  th{background:#f8f8fa;padding:8px 9px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:7px 9px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  tr:hover td{background:#fafbfc}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;white-space:nowrap}
+  .b-assigned{background:#3b82f6}
+  .b-in_progress{background:#d97706}
+  .b-completed{background:#16a34a}
+  .b-rejected{background:#dc2626}
+  .b-none{background:#9ca3af}
+  .tk-actions{white-space:nowrap}
+  .tk-actions .btn{margin:0 2px}
+  .tk-empty{color:#999;text-align:center;padding:30px;font-style:italic}
   .assign-detail{border-top:1px solid #eee;margin-top:12px;padding-top:12px}
   .contact-bar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
   .contact-bar a,.contact-bar button{text-decoration:none;color:#fff;font-size:13px;font-weight:600;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
@@ -122,20 +187,61 @@
   .prog-todo .ctl{color:#b91c1c}
   .pill b{font-size:22px}
   footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
+  footer a{color:#9aa;text-decoration:none}
+  footer a:hover{text-decoration:underline}
   .ok-note{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:10px 14px;border-radius:10px;margin-top:14px}
   .assign-link{margin-top:12px;font-size:14px;word-break:break-all}
+  /* ── Big tap-friendly Yes/No segmented controls (mobile-first) ── */
+  .seg{display:flex;gap:8px;flex-wrap:wrap;width:100%}
+  .rdo{flex:1;min-width:64px;position:relative;display:flex;align-items:center;justify-content:center;gap:6px;padding:13px 8px;border:2px solid var(--line);border-radius:10px;background:#fff;font-size:15px;font-weight:600;color:#444;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+  .rdo input{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+  .rdo.checked{border-color:var(--cudd);background:#fdf2f2;color:var(--cudd)}
+  .rdo-yes.checked,.rdo-pass.checked{border-color:var(--ok);background:#f0fdf4;color:var(--ok)}
+  .rdo-no.checked,.rdo-fail.checked{border-color:var(--due);background:#fef2f2;color:var(--due)}
+  .ver-in{margin-top:8px;width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+  /* ── Mobile (phone) layout: full-width, stacked, reachable buttons ── */
+  @media (max-width:768px){
+    main{padding:12px;max-width:none}
+    header{padding:12px 14px;gap:10px}
+    header h1{font-size:18px}
+    nav{flex-wrap:wrap;gap:6px}
+    nav button{padding:9px 12px;font-size:13px}
+    .tmv-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .tmv-btn{padding:14px}
+    .tmv-btn::before{margin:-14px -14px 10px}
+    .meta-bar{position:static;flex-direction:column;align-items:stretch;gap:8px;padding:12px}
+    .meta-bar label{font-size:13px}
+    .meta-bar select,.meta-bar input{width:100%;font-size:15px;padding:10px}
+    .section{padding:12px 10px}
+    .row{flex-direction:column;align-items:stretch;gap:7px;padding:11px 2px}
+    .row .lbl{min-width:0;font-size:15px}
+    .row .ctl{width:100%}
+    .row input[type=text],.row input[type=number],.row input[type=date],.row select{width:100%;padding:11px;font-size:15px}
+    .actionbar{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;gap:8px;background:#fff;border-top:1px solid var(--line);padding:10px 12px;box-shadow:0 -2px 12px rgba(0,0,0,.10)}
+    .actionbar .btn{flex:1;margin:0!important;padding:15px 8px;font-size:15px;width:auto}
+    #tmvDetail{padding-bottom:90px}
+    .ticket pre{font-size:12px}
+  }
 </style>
 </head>
 <body>
 <header>
   <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
   <h1>TMV Preventive Maintenance</h1>
-  <nav>
-    <button id="tabTmv" class="active" onclick="showView('tmv')">🚚 TMV Inspections</button>
-    <button id="tabTracker" onclick="showView('tracker')">Tracker</button>
-    <button id="tabTech" onclick="showView('tech')">Tech</button>
-    <button id="tabDb" onclick="goDb()">Task.db</button>
-  </nav>
+  <div class="header-right">
+    <nav>
+      <button id="tabTmv" class="active" onclick="showView('tmv')">🚚 TMV Inspections</button>
+      <button id="tabTracker" onclick="showView('tracker')">Tracker</button>
+      <button id="tabTech" onclick="showView('tech')">Tech</button>
+      <button id="tabDb" onclick="goDb()">Task.db</button>
+    </nav>
+    <label class="role-toggle">Role:
+      <select id="roleSel">
+        <option value="admin">Admin</option>
+        <option value="tech">Tech</option>
+      </select>
+    </label>
+  </div>
 </header>
 
 <main>
@@ -144,9 +250,11 @@
   <!-- TRACKER VIEW — Assignments board -->
   <section id="viewTracker" class="view">
     <div class="summary" id="summary"></div>
+    <div class="demo-banner hidden" id="demoBanner">⚠ DEMO DATA — simulated TMV lat/long around Odessa, TX. Real feed requires DevIoT (Entra-ID) credentials. (<a href="index.html">exit demo</a>)</div>
     <div class="bar">
       <select id="filter"><option value="all">All statuses</option><option value="assigned">Assigned</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select>
       <select id="filterTech"><option value="all">All technicians</option></select>
+      <select id="filterGeo"><option value="all">All locations</option><option value="fence">Location set</option><option value="nofence">No location</option></select>
       <input type="search" id="filterText" placeholder="Search TMV / tech…">
     </div>
     <div class="tracker" id="cards"></div>
@@ -164,14 +272,16 @@
       <div class="meta-bar">
         <label>TMV Unit<input type="text" id="dTmv" readonly></label>
         <label>Van Type<input type="text" id="dVan" readonly></label>
-        <label>Location<select id="dLoc"></select></label>
+        <label>District<select id="dLoc"></select></label>
         <label>Date<input type="date" id="dDate"></label>
         <label>Technician<select id="dTech"><option value="">— choose —</option></select></label>
       </div>
       <div id="sections"></div>
-      <button class="btn" id="genBtn" onclick="submitInspection()" disabled>Generate Ticket &amp; Log</button>
-      <button class="btn ghost" id="assignBtn" onclick="assignToTech()" disabled style="margin-top:10px">📲 Assign to Technician</button>
-      <button class="btn ghost" id="demoBtn" onclick="loadDemo()" style="margin-top:10px">🧪 Load Demo Work Orders</button>
+      <div class="actionbar">
+        <button class="btn" id="genBtn" onclick="submitInspection()" disabled>Generate Ticket &amp; Log</button>
+        <button class="btn ghost" id="assignBtn" onclick="assignToTech()" disabled>📲 Assign to Technician</button>
+      </div>
+      <button class="btn ghost" id="demoBtn" onclick="loadDemo()" style="margin-top:10px;width:100%">🧪 Load Demo Work Orders</button>
       <div id="assignOut" class="hidden"></div>
       <div id="ticketOut" class="hidden"></div>
     </div>
@@ -183,8 +293,39 @@
   </section>
 </main>
 
-<footer>CUDD Energy Services · Preventive Maintenance</footer>
+<!-- Location expand modal (tiny map → click to enlarge + navigate) -->
+<div id="mapModalBack" class="map-modal-back" onclick="if(event.target===this)closeMapModal()">
+  <div class="map-modal" role="dialog" aria-modal="true" aria-label="Location map">
+    <header>
+      <h3 id="mapModalTitle">Location</h3>
+      <button class="x" onclick="closeMapModal()" aria-label="Close">×</button>
+    </header>
+    <div class="body">
+      <iframe id="mapModalFrame" class="bigmap" title="Map" loading="lazy"></iframe>
+      <div class="coords" id="mapModalCoords"></div>
+      <div class="actions">
+        <a id="mapModalGoogle" href="#" target="_blank" rel="noopener">Open in Google Maps</a>
+        <a id="mapModalOsm" class="sec" href="#" target="_blank" rel="noopener">Open in OpenStreetMap</a>
+      </div>
+    </div>
+  </div>
+</div>
 
-<script src="app.js?v=20260721B"></script>
+<footer>
+  <a href="security.html">Security</a> · <a href="terms.html">Terms &amp; Conditions</a><br>
+  CUDD Energy Services · Preventive Maintenance
+</footer>
+
+<script src="app.js?v=20260727J"></script>
+<script>
+  // Register PWA service worker (installable + offline support)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (e) {
+        console.warn('[TMV] SW registration failed:', e.message);
+      });
+    });
+  }
+</script>
 </body>
 </html>

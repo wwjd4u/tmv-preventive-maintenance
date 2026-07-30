@@ -61,6 +61,9 @@
   .ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:14px;border-radius:10px;margin-bottom:14px;font-weight:600}
   .err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:12px 14px;border-radius:10px;margin-bottom:14px}
   .load{padding:40px;text-align:center;color:#888}
+  .app-footer{text-align:center;color:#9aa;font-size:12px;padding:18px;margin-top:8px}
+  .app-footer a{color:#9aa;text-decoration:none}
+  .app-footer a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -71,6 +74,10 @@
 </header>
 <main id="app"><div class="load">Loading task…</div></main>
 <div class="btn" id="completeBtn" style="display:none" onclick="completeTask()">✓ Complete Task</div>
+<footer class="app-footer">
+  <a href="security.html">Security</a> · <a href="terms.html">Terms &amp; Conditions</a><br>
+  CUDD Energy Services · Preventive Maintenance
+</footer>
 
 <script>
 var AID = location.pathname.split('/').pop();

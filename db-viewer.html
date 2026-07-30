@@ -33,6 +33,7 @@
   .btn.sm{padding:6px 12px;font-size:13px}
   .btn.danger{background:var(--due)}
   .btn.xs{padding:4px 8px;font-size:12px}
+  select.reassign-sel{background:#fff;color:var(--cudd);border:1px solid var(--cudd);cursor:pointer;max-width:140px}
 
   #loginOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:center;justify-content:center}
   #loginBox{background:#fff;border-radius:14px;padding:28px 32px;min-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.18)}
@@ -73,6 +74,10 @@
   #detailContent .cl-item.sheet-row{display:flex;justify-content:space-between;gap:12px}
   #detailContent .sheet-row .q{flex:1;text-align:left;color:#222}
   #detailContent .sheet-row .cl-val{margin-left:auto}
+  #detailContent .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:6px}
+  #detailContent .photo-thumb{width:100%;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer;background:#fff}
+  #detailContent .photo-wrap{display:flex;flex-direction:column;gap:4px}
+  #detailContent .photo-cap{font-size:12px;color:#666;text-align:center}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{background:#f8f8fa;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
@@ -121,6 +126,8 @@
   .line-item button:hover{color:var(--due)}
 
   footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
+  footer a{color:#9aa;text-decoration:none}
+  footer a:hover{text-decoration:underline}
 
   /* SINGLE-PAGE ASSET MANAGER */
   .muted{color:#888;font-size:13px;margin-left:8px}
@@ -130,6 +137,9 @@
   .mblock .cnt{color:#999;font-weight:normal;font-size:13px}
   .mrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .mrow.addrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);margin-bottom:0}
+  .geo-row{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .geo-row label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px}
+  .geo-note{display:block;margin-top:8px;font-size:12px;color:#888}
   .contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
   .contact-grid .minput{margin-top:0}
   .saved-ok{margin-left:10px;color:#16a34a;font-weight:600;font-size:13px;vertical-align:middle}
@@ -194,7 +204,7 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Status</th><th>TMV</th><th>Technician</th><th>Location</th><th>Date</th><th>Completed</th><th></th></tr></thead>
+        <thead><tr><th>Status</th><th>TMV</th><th>Technician</th><th>District</th><th>Date</th><th>Completed</th><th></th></tr></thead>
         <tbody id="assignBody"></tbody>
       </table>
     </div>
@@ -212,7 +222,7 @@
 
       <!-- TMV UNITS -->
       <section class="mblock">
-        <h3>TMV Units <span class="cnt" id="cntTmv"></span></h3>
+        <h3>Equipment Units <span class="cnt" id="cntTmv"></span></h3>
         <div class="mrow">
           <select id="selTmv" class="msel" onchange="onSelTmv()" autocomplete="off" name="setup_tmv"></select>
           <select id="selTmvType" class="msel" title="Van type" onchange="updateTmvType()" autocomplete="off" name="setup_tmvtype"></select>
@@ -223,11 +233,22 @@
           <select id="newTmvType" class="msel"></select>
           <button class="btn sm" onclick="addTmv()">+ Add TMV</button>
         </div>
+        <div class="geo-row">
+          <label>Location (lat / lng / radius m)</label>
+          <div class="mrow">
+            <input id="geoLat" class="minput" placeholder="lat" inputmode="decimal" style="max-width:110px">
+            <input id="geoLng" class="minput" placeholder="lng" inputmode="decimal" style="max-width:110px">
+            <input id="geoRad" class="minput" placeholder="200" inputmode="numeric" style="max-width:80px">
+            <button class="btn sm ghost" onclick="geoHere()">Use my location</button>
+            <button class="btn sm" onclick="setGeofence()">Save location</button>
+          </div>
+          <span class="geo-note">Location saved. Live position feed (DevIoT) not connected yet — tracker shows “Location set” until then.</span>
+        </div>
       </section>
 
       <!-- LOCATIONS -->
       <section class="mblock">
-        <h3>Locations <span class="cnt" id="cntLoc"></span></h3>
+        <h3>Districts <span class="cnt" id="cntLoc"></span></h3>
         <div class="mrow">
           <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
           <button class="btn sm ghost" onclick="renameLoc()">Rename</button>
@@ -235,7 +256,7 @@
         </div>
         <div class="mrow addrow">
           <input id="newLoc" class="minput" placeholder="Midland">
-          <button class="btn sm" onclick="addLoc()">+ Add Location</button>
+          <button class="btn sm" onclick="addLoc()">+ Add District</button>
         </div>
       </section>
 
@@ -317,7 +338,10 @@
   </div>
 </div>
 
-<footer>CUDD Energy Services TMV Admin</footer>
+<footer>
+  <a href="security.html">Security</a> · <a href="terms.html">Terms &amp; Conditions</a><br>
+  CUDD Energy Services TMV Admin
+</footer>
 
 <script>
 let token = null;
@@ -415,6 +439,16 @@ function deleteAssignment(id, tmv){
     })
     .catch(e => alert('Delete failed: '+e.message));
 }
+function reassignAssignment(id, techNameNew){
+  if(!confirm('Reassign this assignment to '+techNameNew+'?')) return;
+  fetch('/api/assignments/'+id, { method:'PUT', headers: Object.assign({'Content-Type':'application/json'}, authHdr()), body: JSON.stringify({ technician: { name: techNameNew } }) })
+    .then(r => r.json().then(d => ({ ok:r.ok, status:r.status, d })))
+    .then(({ ok, status, d }) => {
+      if(!ok){ alert('Reassign failed ('+status+'): '+((d&&d.error)||'unknown error')); return; }
+      loadData();
+    })
+    .catch(e => alert('Reassign failed: '+e.message));
+}
 function renderAssignments(){
   const filter = document.getElementById('filterStatus').value;
   const q = document.getElementById('searchAssign').value.toLowerCase();
@@ -449,7 +483,30 @@ function renderAssignments(){
     const dbn = document.createElement('button');
     dbn.className='btn sm danger'; dbn.textContent='Delete';
     dbn.addEventListener('click', function(){ deleteAssignment(a.id, a.tmv||''); });
+    // Reassign dropdown — reassign this one assignment to another technician
+    const rsel = document.createElement('select');
+    rsel.className='btn xs reassign-sel';
+    const cfg = dbData.config || {};
+    const techs = (cfg.technicians || []).map(t => (typeof t==='string'? t : (t&&t.name)||''));
+    const curName = techName(a.technician);
+    const ropt0 = document.createElement('option');
+    ropt0.value=''; ropt0.textContent='Reassign…'; rsel.appendChild(ropt0);
+    techs.forEach(function(nm){
+      if(!nm) return;
+      const o = document.createElement('option');
+      o.value = nm; o.textContent = nm;
+      if(nm === curName) o.selected = true;
+      rsel.appendChild(o);
+    });
+    rsel.addEventListener('change', function(){
+      const nv = rsel.value;
+      if(!nv || nv === curName){ if(nv===curName) rsel.value=''; return; }
+      reassignAssignment(a.id, nv);
+      rsel.value='';
+    });
     tdAct.appendChild(vb);
+    tdAct.appendChild(document.createTextNode(' '));
+    tdAct.appendChild(rsel);
     tdAct.appendChild(document.createTextNode(' '));
     tdAct.appendChild(dbn);
     tr.appendChild(tdAct);
@@ -504,10 +561,29 @@ function showAssignment(id){
   if((a.sections && a.sections.length) || (a.results && a.results.length)){
     html += '<div class="section"><h3>Work Order Checklist</h3><div class="checklist merged">' + mergeSheet(a) + '</div></div>';
   }
+  // PHOTOS — uploaded proof photos (file names stored on the assignment;
+  // served from /uploads/). Restored after the merged-sheet rewrite dropped it.
+  if(a.photos && a.photos.length){
+    html += '<div class="section"><h3>Photos ('+a.photos.length+')</h3><div class="photo-grid">';
+    a.photos.forEach(function(p){
+      var f = p.file || '';
+      var cap = p.caption || '';
+      html += '<div class="photo-wrap">'
+            + '<img class="photo-thumb" src="/uploads/'+esc(f)+'" alt="'+esc(cap)+'" loading="lazy" data-full="/uploads/'+esc(f)+'">'
+            + (cap ? '<div class="photo-cap">'+esc(cap)+'</div>' : '')
+            + '</div>';
+    });
+    html += '</div></div>';
+  }
   document.getElementById('detailContent').innerHTML = html;
   document.getElementById('detailPanel').style.display = 'block';
 }
 function closeDetail(){ document.getElementById('detailPanel').style.display = 'none'; }
+// Tap a photo thumbnail in the detail modal to open the full-size image.
+document.getElementById('detailContent').addEventListener('click', function(e){
+  var img = e.target.closest && e.target.closest('.photo-thumb');
+  if(img && img.dataset.full){ window.open(img.dataset.full, '_blank'); }
+});
 
 /* ===== SINGLE-PAGE ASSET MANAGER (dropdown-driven) ===== */
 
@@ -532,7 +608,12 @@ function renderAssetManager(){
   cfg.vanTypes    = cfg.vanTypes    || [];
   cfg.tmvVanMap   = cfg.tmvVanMap   || {};
 
-  // --- TMV Units (from tmvVanMap) ---
+  // Ensure "Equipment" and "Misc." are available as van-type dropdown entries.
+  ['Equipment','Misc.'].forEach(function(t){
+    if(cfg.vanTypes.indexOf(t) === -1) cfg.vanTypes.push(t);
+  });
+
+  // --- Equipment Units (from tmvVanMap) ---
   var tmvIds = Object.keys(cfg.tmvVanMap);
   _fill('selTmv', tmvIds.map(function(id){ return {value:id, label:id}; }));
   // van-type dropdowns
@@ -580,6 +661,11 @@ function onSelTmv(){
   var curType = Array.isArray(cur) ? (cur[0]||'') : (cur||'');
   var sel = document.getElementById('selTmvType');
   if(sel && curType) sel.value = curType;
+  // populate geofence fields for this unit
+  var g = (cfg.geofences && cfg.geofences[id]) || {};
+  document.getElementById('geoLat').value = g.lat||'';
+  document.getElementById('geoLng').value = g.lng||'';
+  document.getElementById('geoRad').value = g.radius||'';
 }
 
 function updateTmvType(){
@@ -609,14 +695,37 @@ function deleteTmv(){
   if(!id) return;
   if(!confirm('Remove TMV unit "' + id + '"?')) return;
   delete cfg.tmvVanMap[id];
+  if(cfg.geofences) delete cfg.geofences[id];
   saveConfigArray('tmvVanMap', cfg.tmvVanMap);
+}
+
+// ── Geofencing (fence definition only; live position feed pending Samsera) ──
+function geoHere(){
+  if(!navigator.geolocation){ alert('Geolocation not available'); return; }
+  navigator.geolocation.getCurrentPosition(function(p){
+    document.getElementById('geoLat').value = p.coords.latitude.toFixed(6);
+    document.getElementById('geoLng').value = p.coords.longitude.toFixed(6);
+    if(!document.getElementById('geoRad').value) document.getElementById('geoRad').value = 200;
+  }, function(e){ alert('Could not get location: ' + e.message); }, { enableHighAccuracy:true, timeout:10000 });
+}
+function setGeofence(){
+  var cfg = dbData.config;
+  var id = document.getElementById('selTmv').value;
+  if(!id){ alert('Select a TMV unit first'); return; }
+  var lat = parseFloat(document.getElementById('geoLat').value);
+  var lng = parseFloat(document.getElementById('geoLng').value);
+  if(isNaN(lat) || isNaN(lng)){ alert('Enter a valid lat & lng'); return; }
+  var rad = parseFloat(document.getElementById('geoRad').value) || 200;
+  if(!cfg.geofences) cfg.geofences = {};
+  cfg.geofences[id] = { lat:lat, lng:lng, radius:rad };
+  saveConfigArray('geofences', cfg.geofences);
 }
 
 /* ---- Locations ---- */
 function addLoc(){
   var cfg = dbData.config;
   var v = document.getElementById('newLoc').value.trim();
-  if(!v){ alert('Location name required'); return; }
+  if(!v){ alert('District name required'); return; }
   if(!cfg.locations) cfg.locations = [];
   cfg.locations.push(v);
   document.getElementById('newLoc').value = '';
@@ -626,14 +735,14 @@ function renameLoc(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selLoc').value, 10);
   if(isNaN(i)) return;
-  var v = prompt('Rename location:', cfg.locations[i]);
+  var v = prompt('Rename district:', cfg.locations[i]);
   if(v!==null && v.trim()){ cfg.locations[i] = v.trim(); saveConfigArray('locations', cfg.locations); }
 }
 function deleteLoc(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selLoc').value, 10);
   if(isNaN(i)) return;
-  if(!confirm('Remove location "' + cfg.locations[i] + '"?')) return;
+  if(!confirm('Remove district "' + cfg.locations[i] + '"?')) return;
   cfg.locations.splice(i,1);
   saveConfigArray('locations', cfg.locations);
 }

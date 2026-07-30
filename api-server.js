@@ -57,6 +57,102 @@ function mergeTechPhones(cfg) {
   return cfg;
 }
 
+// ── DevIoT position feed (Microsoft Entra ID / API-key protected) ────────
+// The vendor dashboard (deviotinfo.azurewebsites.net/tmv-dashboard) is gated
+// by Entra ID. We never expose those secrets to the browser — this server
+// proxies the position feed and exposes it at GET /api/positions as
+// { [tmvId]: { lat, lng } }, so the Tracker's geofence column can flip to
+// On-site / Off-site. Configure via env vars (see .env.example.deviot). If no
+// credentials are present the feed is simply "not live" and the Tracker keeps
+// showing "Fence set". Token + payload are cached so we don't hammer the API.
+const DEVIOT = {
+  authority: process.env.DEVIOT_AUTHORITY || 'https://login.windows.net/bda43523-4404-4833-b00d-90e88aa1f2b3',
+  clientId: process.env.DEVIOT_CLIENT_ID || '',
+  clientSecret: process.env.DEVIOT_CLIENT_SECRET || '',
+  resource: process.env.DEVIOT_RESOURCE || 'e87edb1a-d08f-417f-87ff-dce775153729',
+  base: process.env.DEVIOT_BASE || 'https://deviotinfo.azurewebsites.net',
+  path: process.env.DEVIOT_POSITIONS_PATH || '/api/positions',
+  apiKey: process.env.DEVIOT_API_KEY || '',
+  apiKeyHeader: process.env.DEVIOT_API_KEY_HEADER || 'x-api-key',
+  noAuth: (process.env.DEVIOT_NO_AUTH === 'true'),   // for known-open / test endpoints (no token)
+  cacheMs: (process.env.DEVIOT_CACHE_MS && +process.env.DEVIOT_CACHE_MS) || 60000
+};
+let _deviotCache = { at: 0, data: null, logged: false };
+
+async function deviotGetToken() {
+  if (!DEVIOT.clientId || !DEVIOT.clientSecret) return null;
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: DEVIOT.clientId,
+    client_secret: DEVIOT.clientSecret,
+    scope: `${DEVIOT.resource}/.default`
+  });
+  try {
+    const r = await fetch(`${DEVIOT.authority}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    if (!r.ok) { console.error('[deviot] token request failed', r.status); return null; }
+    const j = await r.json().catch(() => null);
+    return j && j.access_token ? j.access_token : null;
+  } catch (e) { console.error('[deviot] token error', e.message); return null; }
+}
+
+function num(v) { return (v == null ? null : +v); }
+// Best-effort normalization of an unknown vendor payload into { tmvId:{lat,lng} }.
+function deviotNormalize(raw) {
+  const out = {};
+  let arr = null;
+  if (Array.isArray(raw)) arr = raw;
+  else if (raw && typeof raw === 'object') {
+    const maybe = raw.items || raw.data || raw.results || raw.positions || raw.units || raw.value;
+    arr = Array.isArray(maybe) ? maybe : null;
+    if (!arr) { // assume a keyed map of tmvId -> {lat,lng}
+      Object.keys(raw).forEach(k => {
+        const v = raw[k];
+        const lat = num(v && v.lat != null ? v.lat : v.latitude);
+        const lng = num(v && v.lng != null ? v.lng : v.longitude);
+        if (lat != null && lng != null) out[k] = { lat, lng };
+      });
+      return out;
+    }
+  }
+  if (arr) arr.forEach(it => {
+    if (!it) return;
+    const id = it.tmv || it.id || it.unit || it.tmvId || it.name;
+    const pos = it.position || {};
+    const lat = num(it.lat != null ? it.lat : it.latitude != null ? it.latitude : pos.lat != null ? pos.lat : pos.latitude);
+    const lng = num(it.lng != null ? it.lng : it.lon != null ? it.lon : it.longitude != null ? it.longitude : pos.lng != null ? pos.lng : pos.lon != null ? pos.lon : pos.longitude);
+    if (id != null && lat != null && lng != null) out[String(id)] = { lat, lng };
+  });
+  return out;
+}
+
+async function fetchDevIoTPositions() {
+  const configured = DEVIOT.clientId || DEVIOT.clientSecret || DEVIOT.apiKey || DEVIOT.noAuth;
+  if (!configured) return null; // no feed configured
+  const now = Date.now();
+  if (_deviotCache.data && now - _deviotCache.at < DEVIOT.cacheMs) return _deviotCache.data;
+  try {
+    const headers = { 'Accept': 'application/json' };
+    let token = null;
+    if (DEVIOT.apiKey) headers[DEVIOT.apiKeyHeader] = DEVIOT.apiKey;
+    else if (!DEVIOT.noAuth) { token = await deviotGetToken(); if (token) headers['Authorization'] = 'Bearer ' + token; }
+    if (!DEVIOT.apiKey && !DEVIOT.noAuth && !token) return null;
+    const r = await fetch(DEVIOT.base + DEVIOT.path, { headers });
+    if (!r.ok) { console.error('[deviot] positions HTTP', r.status); return _deviotCache.data || {}; }
+    const raw = await r.json().catch(() => null);
+    if (raw && !_deviotCache.logged) { console.log('[deviot] raw positions sample:', JSON.stringify(raw).slice(0, 500)); _deviotCache.logged = true; }
+    const norm = deviotNormalize(raw);
+    _deviotCache = { at: now, data: norm, logged: true };
+    return norm;
+  } catch (e) {
+    console.error('[deviot] fetch failed', e.message);
+    return _deviotCache.data || {};
+  }
+}
+
 function loadConfig() {
   return db.loadConfig();
 }
@@ -271,13 +367,31 @@ http.createServer((req, res) => {
 
   // ── favicon (avoid console 404 noise) ──
   if (url.pathname === '/favicon.ico') {
+    const fp = path.join(__dirname, 'favicon.ico');
+    if (fs.existsSync(fp)) return serveFile(res, fp, 'image/x-icon');
     res.writeHead(204); res.end();
     return;
   }
 
+  // ── Serve PWA manifest (installable app metadata) ──
+  if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
+    return serveFile(res, path.join(__dirname, 'manifest.webmanifest'), 'application/manifest+json');
+  }
+  // ── Serve PWA service worker (must be served from root scope) ──
+  if (url.pathname === '/sw.js') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Service-Worker-Allowed', '/');
+    return serveFile(res, path.join(__dirname, 'sw.js'), 'application/javascript');
+  }
+  // ── Serve PWA icons ──
+  if (['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'].includes(url.pathname)) {
+    const fn = url.pathname.replace(/^\//, '');
+    return serveFile(res, path.join(__dirname, fn), 'image/png');
+  }
+
   // ── Serve static assets (.js / .css / images) with correct content-type ──
   const ext = url.pathname.split('.').pop().toLowerCase();
-  const STATIC_TYPES = { js:'application/javascript', html:'text/html', css:'text/css', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', ico:'image/x-icon' };
+  const STATIC_TYPES = { js:'application/javascript', html:'text/html', css:'text/css', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', ico:'image/x-icon', webmanifest:'application/manifest+json' };
   if (STATIC_TYPES[ext] && !url.pathname.startsWith('/uploads/')) {
     const safe = url.pathname.replace(/^\/+/, '').split('/').pop();
     const full = path.join(__dirname, safe);
@@ -308,6 +422,25 @@ http.createServer((req, res) => {
   // (a JSON map of name -> phone) so they never hit the public repo.
   if (url.pathname === '/api/config' && req.method === 'GET') {
     sendJson(res, 200, mergeTechPhones(loadConfig()));
+    return;
+  }
+
+  // ── GET /api/positions — DevIoT live position feed (proxied) ──
+  // Returns { positions:{ [tmvId]:{lat,lng} }, live:bool }. When the feed is
+  // not configured (no credentials) live:false and positions:{} — the Tracker
+  // geofence column then shows "Fence set". Admin-only to avoid leaking the
+  // vendor feed shape to the public technician app.
+  if (url.pathname === '/api/positions' && req.method === 'GET') {
+    const auth = req.headers['authorization'] || '';
+    const ok = auth === 'Basic ' + Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');
+    // Unauthenticated (or not-yet-configured) → return empty feed (200) so the
+    // tracker renders without stalling. No vendor data is leaked: positions is {}.
+    if (!ok) { sendJson(res, 200, { live: false, positions: {} }); return; }
+    fetchDevIoTPositions().then(function (positions) {
+      sendJson(res, 200, { live: !!positions, positions: positions || {} });
+    }).catch(function (e) {
+      sendJson(res, 200, { live: false, positions: {}, error: e.message });
+    });
     return;
   }
 

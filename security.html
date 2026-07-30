@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security — CUDD Energy Services TMV Preventive Maintenance</title>
+<style>
+  :root { --c:#0b3d2e; --bg:#f7f8f7; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:var(--bg); color:#1a1a1a; line-height:1.6; }
+  .wrap { max-width:780px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { color:var(--c); font-size:1.6rem; margin-bottom:4px; }
+  h2 { color:var(--c); font-size:1.15rem; margin-top:32px; }
+  .meta { color:#666; font-size:.85rem; margin-bottom:24px; }
+  a { color:#0a6b4f; }
+  p, li { font-size:.96rem; }
+  code { background:#eef1ef; padding:1px 5px; border-radius:4px; }
+  .footer { margin-top:40px; padding-top:16px; border-top:1px solid #ddd; color:#888; font-size:.82rem; }
+  .footer a { color:#888; text-decoration:none; }
+  .footer a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Security</h1>
+  <div class="meta">CUDD Energy Services — TMV Preventive Maintenance · Effective date: July 23, 2026</div>
+
+  <h2>1. Transport Security</h2>
+  <p>All TMV Preventive Maintenance traffic is encrypted in transit with TLS. Access to the application and its APIs requires authenticated sessions; administrative functions require a valid bearer token.</p>
+
+  <h2>2. Access Control</h2>
+  <ul>
+    <li>Field technicians are granted read-only access to their assigned work orders.</li>
+    <li>Administrators authenticate with a username and password; admin sessions carry a bearer token used for assignment, reassignment, and configuration changes.</li>
+    <li>Manager and admin passwords are hashed server-side (scrypt) and are never returned to the client.</li>
+  </ul>
+
+  <h2>3. Data Protection</h2>
+  <p>Work-order data, checklists, and photos are stored on access-controlled servers. Uploaded photos are stored server-side and referenced by file name; they are not embedded in the database.</p>
+
+  <h2>4. Authentication &amp; Sessions</h2>
+  <p>API requests that modify data require a valid bearer token. The Task.db admin console reuses the authenticated session to perform assignment-level actions such as reassign and delete. Close your session on shared devices.</p>
+
+  <h2>5. Reporting a Security Issue</h2>
+  <p>To report a suspected vulnerability or security concern, contact the PM app administrator through the dispatcher console. Do not disclose details publicly until the issue is resolved.</p>
+
+  <div class="footer">
+    <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms &amp; Conditions</a> · <a href="index.html">App</a>
+  </div>
+</div>
+</body>
+</html>
