@@ -44,8 +44,7 @@ function buildTmvGrid() {
   const grid=document.getElementById('tmvGrid'); grid.replaceChildren();
   keys.forEach(k=>{
     const current=latestForUnit(k), card=document.createElement('div');card.className='fleet-card'+(dispatchUnit===k?' is-selected':'');
-    const button=document.createElement('button');button.className='tmv-btn';button.innerHTML='<div class="id">'+escapeHtml(k)+'</div><div class="vt">'+escapeHtml(map[k].join(' + '))+'</div>';
-    button.onclick=()=>openTmv(k);
+    const heading=document.createElement('div');heading.className='tmv-btn';heading.innerHTML='<div class="id">'+escapeHtml(k)+'</div><div class="vt">'+escapeHtml(map[k].join(' + '))+'</div>';
     const label=document.createElement('label');label.className='card-tech';label.append(document.createTextNode('Technician'));
     const select=document.createElement('select');select.setAttribute('aria-label','Technician for '+k);select.add(new Option('— choose technician —',''));
     techs.forEach(t=>select.add(new Option(t.name,t.name)));select.value=dispatchDrafts[k]??'';
@@ -54,7 +53,7 @@ function buildTmvGrid() {
       dispatchNotice(select.value?'Ready to assign '+k+' to '+select.value+'. Select a district and date, then click Assign Technician.':'Choose a technician for '+k+'.');
       buildTmvGrid();
     };
-    label.append(select);card.append(button,label);grid.append(card);
+    label.append(select);card.append(heading,label);grid.append(card);
   });
   if(!keys.length)grid.textContent='No matching TMV units.';
   updateDispatchButtons();

@@ -9,7 +9,7 @@ main{max-width:1100px}
 .fleet-card{display:flex;flex-direction:column;min-width:0;border:2px solid var(--cudd);background:#fff;border-radius:12px;padding:16px;overflow:hidden;transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
 .fleet-card::before{content:"";display:block;height:4px;background:var(--cudd);margin:-16px -16px 12px}
 .fleet-card:hover{border-color:var(--cudd-dk);box-shadow:0 6px 18px rgba(129,47,47,.22);transform:translateY(-2px)}
-.fleet-card .tmv-btn{display:block;flex:1;width:100%;min-width:0;min-height:54px;border:0;border-radius:0;padding:0 0 12px;background:transparent}
+.fleet-card .tmv-btn{display:block;flex:1;width:100%;min-width:0;min-height:54px;border:0;border-radius:0;padding:0 0 12px;background:transparent;cursor:default}
 .fleet-card .tmv-btn::before{display:none}
 .fleet-card .tmv-btn:hover{background:transparent;box-shadow:none;transform:none}
 .fleet-card .vt{font-size:13px;margin-top:4px;line-height:1.4}

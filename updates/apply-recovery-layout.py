@@ -56,7 +56,7 @@ def verify():
                 consent = json.load(response)
             with urllib.request.urlopen('http://127.0.0.1:9240/assign.html', timeout=3) as response:
                 assignment_page = response.read().decode()
-            if 'function workOrderEmail(' in assignment_page and 'jguynes@rpc.net' in privacy and consent.get('version') == '2026-09-04-v1' and 'dispatch.js?v=20260904R3' in page and 'work-order-builder.js?v=20260904R3' in builder and config.get('tmvVanMap'):
+            if 'function workOrderEmail(' in assignment_page and 'jguynes@rpc.net' in privacy and consent.get('version') == '2026-09-04-v1' and 'dispatch.js?v=20260904R4' in page and 'work-order-builder.js?v=20260904R3' in builder and config.get('tmvVanMap'):
                 return
         except Exception:
             pass
