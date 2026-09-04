@@ -399,7 +399,7 @@ http.createServer((req, res) => {
     const full = path.join(__dirname, safe);
     if (full.startsWith(__dirname)) {
       // app.js and index.html never cached; other static assets can cache.
-      if (['app.js','index.html','privacy.html','terms.html','sms-consent.html','sms-consent.js'].includes(safe)) {
+      if (['app.js','index.html','assign.html','privacy.html','terms.html','sms-consent.html','sms-consent.js'].includes(safe)) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         res.setHeader('Pragma', 'no-cache');
       }
