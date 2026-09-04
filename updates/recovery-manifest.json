@@ -1,8 +1,8 @@
 {
   "files": {
     "index.html": {
-      "before": "8a1026ec6ce3db4130ef697eb94caa01088f4bd82d0aafef040c8abb5c44e026",
-      "after": "b8922f56f42175b032bc524e0fefc3cf20a388aad8adb66497c6394b9c07051b"
+      "before": "b8922f56f42175b032bc524e0fefc3cf20a388aad8adb66497c6394b9c07051b",
+      "after": "db976c20ba1afa6319f21e351487a57635c2197da2ee015b561c4f11779996d8"
     },
     "app.js": {
       "before": "7bfa0dc1d1f1bd065a26185822f9e79940b443d0e9535b31ccb2113876e60520",
@@ -25,8 +25,8 @@
       "after": "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9"
     },
     "dispatch.js": {
-      "before": null,
-      "after": "8e1b708eeac0401167556b76f415ad5b0552917dfc5a0c45e05a7474ec049f59"
+      "before": "8e1b708eeac0401167556b76f415ad5b0552917dfc5a0c45e05a7474ec049f59",
+      "after": "ace7274b008e956dfd4f508196b13ac622fbaf0b6d8825f647761abd78f18963"
     },
     "work-orders.js": {
       "before": null,

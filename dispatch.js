@@ -48,7 +48,7 @@ function buildTmvGrid() {
     button.onclick=()=>openTmv(k);
     const label=document.createElement('label');label.className='card-tech';label.append(document.createTextNode('Technician'));
     const select=document.createElement('select');select.setAttribute('aria-label','Technician for '+k);select.add(new Option('— choose technician —',''));
-    techs.forEach(t=>select.add(new Option(t.name,t.name)));select.value=dispatchDrafts[k]??current?.technician?.name??'';
+    techs.forEach(t=>select.add(new Option(t.name,t.name)));select.value=dispatchDrafts[k]??'';
     select.onchange=()=>{
       dispatchDrafts[k]=select.value;dispatchUnit=k;
       dispatchNotice(select.value?'Ready to assign '+k+' to '+select.value+'. Select a district and date, then generate the report.':'Choose a technician for '+k+'.');
@@ -63,7 +63,7 @@ const openInspection = openTmv;
 openTmv = function(unit) {
   openInspection(unit); dispatchUnit=unit;
   const latest=latestForUnit(unit);
-  document.getElementById('dTech').value=dispatchDrafts[unit]??latest?.technician?.name??'';
+  document.getElementById('dTech').value=dispatchDrafts[unit]??'';
   document.getElementById('dLoc').value=document.getElementById('unitDistrict').value||latest?.location||'';
   document.getElementById('dDate').value=document.getElementById('unitDate').value;
   updateDispatchButtons();
