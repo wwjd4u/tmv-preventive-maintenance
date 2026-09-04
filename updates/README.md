@@ -5,8 +5,10 @@ This update is based on Jason's uploaded current source from the live
 page edits. It supersedes the earlier master-based deployment for that host.
 
 The layout has top controls and compact TMV cards with technician selectors.
-The combined action saves an assigned work order, report and creation log in one
-transaction, with retry protection. It does not mark maintenance completed or
+Assign Technician opens a separate section selection page. Sections start unchecked;
+Select All and Clear All are available. Generate Work Order saves only the selected
+sections, assignment, report and creation log in one transaction with retry protection.
+The administrative checklist backfill preserves these explicitly scoped orders. It does not mark maintenance completed or
 send messages automatically. Manual email/SMS controls remain available.
 
 Location/tracker logic, the Tech tab, map modal, checklist controls, existing
@@ -18,8 +20,8 @@ saved report can be reopened through Tracker's standalone assignment page.
 Fetch `tmv-layout-recovery` into the existing app repository and run
 `updates/apply-recovery-layout.py` from that revision using Python 3. The installer
 discovers the app from `tmvapp-node.service`, verifies each changed file against
-the uploaded source hashes, backs up source and SQLite, stages and syntax-checks
-the update using the service's Node executable, then updates only eight reviewed
+the previously deployed R2 source hashes, backs up source and SQLite, stages and syntax-checks
+the update using the service's Node executable, then updates only ten reviewed
 files and restarts the service. It does not switch branches, reset/stash Git,
 pull over local edits, replace configuration, touch uploads, or remove backups.
 
@@ -41,3 +43,6 @@ Backups are under `~/tmv-layout-backups/`.
 
 The branch is a reviewed source snapshot. Apply the targeted installer to retain
 host-only startup/watchdog changes that were not included in the upload.
+
+R3 validation also covers empty/invalid section selections, selected-only report and
+API persistence, Select All/Clear All, draft persistence, and retries after uncertain responses.

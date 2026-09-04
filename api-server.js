@@ -671,6 +671,7 @@ http.createServer((req, res) => {
     const assignments = loadAssignments();
     let updated = 0, missingVan = 0;
     assignments.forEach(a => {
+      if (Array.isArray(a.selectedSectionTitles)) return; // Preserve deliberately scoped work orders.
       if (!a.vanType) { missingVan++; return; }
       const full = expectedSections(a.vanType, config);
       if (!full.length) { missingVan++; return; }

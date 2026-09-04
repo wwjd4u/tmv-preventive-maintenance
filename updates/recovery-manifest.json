@@ -1,36 +1,44 @@
 {
   "files": {
     "index.html": {
-      "before": "b8922f56f42175b032bc524e0fefc3cf20a388aad8adb66497c6394b9c07051b",
-      "after": "db976c20ba1afa6319f21e351487a57635c2197da2ee015b561c4f11779996d8"
+      "before": "db976c20ba1afa6319f21e351487a57635c2197da2ee015b561c4f11779996d8",
+      "after": "f82ecf628cf01397d0d401d16c61983c4a5ef17e41aa1a789a647f623eb82cc1"
     },
     "app.js": {
-      "before": "7bfa0dc1d1f1bd065a26185822f9e79940b443d0e9535b31ccb2113876e60520",
+      "before": "d6ad963cb1c0f1c1514dfbbe74d7e73bd04b08f4274559c0ad9f626d53580eec",
       "after": "d6ad963cb1c0f1c1514dfbbe74d7e73bd04b08f4274559c0ad9f626d53580eec"
     },
     "api-server.js": {
-      "before": "39cfb9ade886687371208a13fa92e8bdb964cd2c950cd9dc139ce4ba522b8270",
-      "after": "463f195dc1df29adedafc28945cd12c583cde3dbdcfb4a55737db33b89830965"
+      "before": "463f195dc1df29adedafc28945cd12c583cde3dbdcfb4a55737db33b89830965",
+      "after": "bbde85b06eccda064173eead530d8c07b2ec4d689dbaf6dcd9ca4b2d7de09a4a"
     },
     "db.js": {
-      "before": "ad1bb50c4f12ab66b89381bd5723fe9c85243010a086b750c1eba12966a97080",
+      "before": "27a44fc8b23c981b2fff8877b608294c50e65db02547c722691ef97877f96729",
       "after": "27a44fc8b23c981b2fff8877b608294c50e65db02547c722691ef97877f96729"
     },
     "assign.html": {
-      "before": "afcc11473bd6b3bd60a67aa3a4b5b8e04ee6976706be3ef795a913b1d7d445ef",
+      "before": "7bf21242b7776ae6a86975cfdfaade8656add6439f9d091361a9a616b631de44",
       "after": "7bf21242b7776ae6a86975cfdfaade8656add6439f9d091361a9a616b631de44"
     },
     "dispatch.css": {
-      "before": null,
+      "before": "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9",
       "after": "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9"
     },
     "dispatch.js": {
-      "before": "8e1b708eeac0401167556b76f415ad5b0552917dfc5a0c45e05a7474ec049f59",
-      "after": "ace7274b008e956dfd4f508196b13ac622fbaf0b6d8825f647761abd78f18963"
+      "before": "ace7274b008e956dfd4f508196b13ac622fbaf0b6d8825f647761abd78f18963",
+      "after": "2455742768a969988dcd1975adc1ff56f21789d920b61bbf281ce7dcc1263f76"
     },
     "work-orders.js": {
+      "before": "926c25255089656a040cf9d6ae5664c0ff857bbec1153169e21be426d37a137f",
+      "after": "f689e3b11c47e7f22410739f40dde15f9e182fe19a1049d00288be7d4876bed8"
+    },
+    "work-order-builder.html": {
       "before": null,
-      "after": "926c25255089656a040cf9d6ae5664c0ff857bbec1153169e21be426d37a137f"
+      "after": "7af32b18f8fee5d9f62b3be9a4a55b31690ee24cea1fc417772d0b4c3c5fbdf5"
+    },
+    "work-order-builder.js": {
+      "before": null,
+      "after": "5232aa08d1b396016f10c2ca74d6ee2188724decdb27893d5d195eb6ce02e563"
     }
   }
 }

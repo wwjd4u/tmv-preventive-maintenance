@@ -12,14 +12,20 @@ const config = {
   technicians: [{ name:'Test Technician' }],
   checklist: [{ title:'Network', appliesTo:['Virtual TMV'], items:[
     {label:'Connection',type:'yn'}, {label:'Mode',type:'choice',opts:['Primary','Backup']}
-  ] }]
+  ] }, {title:'Power',appliesTo:['Virtual TMV'],items:[{label:'UPS battery',type:'text'}]}]
 };
-const payload = { tmv:'TEST_UNIT',technician:'Test Technician',location:'Test District',date:'2026-09-04',requestId:'test-request-00000001' };
+const payload = { tmv:'TEST_UNIT',technician:'Test Technician',location:'Test District',date:'2026-09-04',requestId:'test-request-00000001',selectedSectionTitles:['Network'] };
 
 test('validates unit, technician, date and checklist; preserves mobile controls', () => {
   const assignment=buildWorkOrder(payload,config);
   assert.equal(assignment.sections[0].items[0].type,'yn');
   assert.deepEqual(assignment.sections[0].items[1].opts,['Primary','Backup']);
+  assert.deepEqual(assignment.sections.map(s=>s.title),['Network']);
+  assert.doesNotMatch(assignment.report.text,/UPS battery/);
+  assert.deepEqual(assignment.dispatchLog.selectedSectionTitles,['Network']);
+  assert.equal(buildWorkOrder({...payload,selectedSectionTitles:['Power','Network']},config).sections.length,2);
+  assert.equal(buildWorkOrder({...payload,selectedSectionTitles:undefined},config).sections.length,2);
+  for(const selectedSectionTitles of [[],['Unknown'],['Network','Network'],null])assert.throws(()=>buildWorkOrder({...payload,selectedSectionTitles},config),error=>error.status===400);
   assert.equal(assignment.completedAt,null);assert.equal(assignment.results,null);
   assert.match(assignment.report.text,/awaiting technician completion/);
   for(const changed of [{tmv:'bad'},{technician:'bad'},{location:'bad'},{date:'2026-02-30'},{requestId:'short'},{sections:[{title:'Unknown',items:[]}]}]){
@@ -62,6 +68,7 @@ test('API saves assignment, report and log atomically; retries and restart prese
   assert.match(first.ticket,/Test Technician/);
   const work=await fetch('http://127.0.0.1:'+port+'/api/assignments/'+first.assignment.id).then(r=>r.json());
   assert.equal(work.assignment.sections[0].items[0].type,'yn');
+  assert.deepEqual(work.assignment.sections.map(s=>s.title),['Network']);
   inspect.exec("CREATE TRIGGER fail_test_log BEFORE INSERT ON work_order_logs BEGIN SELECT RAISE(ABORT, 'test log failure'); END;");
   assert.equal((await post({...payload,requestId:'test-request-00000002'})).status,500);
   assert.equal(db.loadAssignments().length,1,'Failed log must roll back assignment');
@@ -70,6 +77,6 @@ test('API saves assignment, report and log atomically; retries and restart prese
   const replay=await post(payload);assert.equal(replay.assignment.report.text,first.ticket);assert.equal(replay.replayed,true);
   assert.equal(inspect.prepare('SELECT COUNT(*) n FROM work_order_logs').get().n,1);
   const page=await fetch('http://127.0.0.1:'+port+'/').then(r=>r.text());
-  assert.match(page,/Assign Technician and Generate Report/);assert.doesNotMatch(page,/preview-api/);
-  for(const asset of ['/dispatch.js','/dispatch.css','/site-bg.png'])assert.equal((await fetch('http://127.0.0.1:'+port+asset)).status,200);
+  assert.match(page,/Assign Technician/);assert.doesNotMatch(page,/preview-api/);
+  for(const asset of ['/dispatch.js','/dispatch.css','/site-bg.png','/work-order-builder.html','/work-order-builder.js'])assert.equal((await fetch('http://127.0.0.1:'+port+asset)).status,200);
 });

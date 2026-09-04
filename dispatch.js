@@ -20,7 +20,7 @@ function updateDispatchButtons() {
   const ready = !!(values.tmv && values.technician && values.location && values.date);
   ['dispatchBtn','genBtn'].forEach(id => {
     const button=document.getElementById(id); button.disabled=dispatchBusy||!ready;
-    button.textContent=dispatchBusy?'Saving…':'Assign Technician and Generate Report';
+    button.textContent=dispatchBusy?'Saving…':'Assign Technician';
   });
 }
 function buildTmvGrid() {
@@ -51,7 +51,7 @@ function buildTmvGrid() {
     techs.forEach(t=>select.add(new Option(t.name,t.name)));select.value=dispatchDrafts[k]??'';
     select.onchange=()=>{
       dispatchDrafts[k]=select.value;dispatchUnit=k;
-      dispatchNotice(select.value?'Ready to assign '+k+' to '+select.value+'. Select a district and date, then generate the report.':'Choose a technician for '+k+'.');
+      dispatchNotice(select.value?'Ready to assign '+k+' to '+select.value+'. Select a district and date, then click Assign Technician.':'Choose a technician for '+k+'.');
       buildTmvGrid();
     };
     label.append(select);card.append(button,label);grid.append(card);
@@ -99,26 +99,15 @@ function showWorkOrder(assignment) {
   }
   out.append(note,report,actions);
 }
-async function assignAndGenerateReport() {
-  if(dispatchBusy)return;
+function assignAndGenerateReport() {
   const values=dispatchValues();
   if(!values.tmv||!values.technician||!values.location||!values.date){dispatchNotice('Select a TMV technician, district and date first.');return;}
-  const fingerprint=JSON.stringify(values);
-  if(!pendingDispatch||pendingDispatch.fingerprint!==fingerprint){
-    const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
-    pendingDispatch={fingerprint,requestId:Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')};
-    try{sessionStorage.setItem('tmv.pendingDispatch',JSON.stringify(pendingDispatch));}catch(_){}
-  }
-  dispatchBusy=true;updateDispatchButtons();document.getElementById('errSlot').replaceChildren();
-  let saved=false;
-  try{
-    const response=await fetch('/api/work-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,requestId:pendingDispatch.requestId})});
-    const data=await response.json();if(!response.ok)throw new Error(data.error||'Unable to save work order');
-    saved=true;dispatchDrafts[values.tmv]=values.technician;
-    assignments=assignments.filter(a=>a.id!==data.assignment.id).concat(data.assignment);
-    buildTracker();buildTechFilter();buildTmvGrid();showWorkOrder(data.assignment);
-  }catch(error){showErr(saved?'Work order saved. Refresh to view the report.':'Assignment was not confirmed. Retry with the same selections; this will not duplicate a saved request. '+error.message);}
-  finally{dispatchBusy=false;updateDispatchButtons();}
+  try {
+    // No assignment is saved until the section selection page is submitted.
+    const draftId=crypto.randomUUID();
+    sessionStorage.setItem('tmv.workOrderDraft.'+draftId,JSON.stringify(values));
+    window.location.assign('/work-order-builder.html?draft='+encodeURIComponent(draftId));
+  } catch(error) { showErr('Unable to open the work order. Enable browser session storage and try again. '+error.message); }
 }
 async function loadDemoFromToolbar(button){
   button.disabled=true;

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Select Work Order Sections — CUDD PM</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f5f9;color:#082b50;font:14px system-ui,sans-serif}main{max-width:860px;margin:20px auto;padding:0 18px}a{color:#2563eb}.sheet{background:white;border:1px solid #dfe4ed;border-radius:12px;padding:22px;margin-top:14px}h1{font-size:21px;margin:0 0 7px}.muted{color:#64748b;font-size:13px}.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:16px 0}.toolbar p{margin:0}.section{border:1px solid #dfe4ed;border-radius:9px;margin:12px 0;overflow:hidden}.section:has(input:checked){border-color:#3b82f6}.section label{display:flex;align-items:center;gap:12px;background:#eaf2fc;padding:14px;cursor:pointer;font-weight:650}.section input{width:20px;height:20px;accent-color:#2563eb;flex-shrink:0}.section ul{list-style:none;margin:0;padding:5px 16px 12px 46px}.section li{padding:7px 0;border-bottom:1px dashed #e8edf3;font-size:13px}.section li:last-child{border:0}.section small{margin-left:auto;white-space:nowrap;font-weight:400;color:#52667c}button{font:inherit;cursor:pointer;border:1px solid #ccd6e4;border-radius:8px;padding:10px 16px;background:white;color:#164172}button.primary{background:#2563eb;color:white;border:0}button:disabled{opacity:.5;cursor:default}.footer{position:sticky;bottom:0;background:white;border-top:1px solid #dfe4ed;padding:16px 0;display:flex;gap:15px;align-items:center;flex-wrap:wrap}#message{color:#b42318;white-space:pre-wrap}#message:empty{display:none}@media(max-width:480px){main{padding:0 10px}.sheet{padding:14px}.section small{display:none}}
+</style>
+<script src="/work-order-builder.js?v=20260904R3" defer></script>
+</head>
+<body><main>
+<a href="/">← Back to Main Page</a>
+<div class="sheet">
+<h1 id="unit">Work Order Checklist</h1><div id="details" class="muted"></div>
+<p>Select the sections to include in this work order. All items within each selected section will be included.</p>
+<div class="toolbar"><button id="selectAll" type="button" disabled>Select All</button><button id="clearAll" type="button" disabled>Clear All</button><p id="count" class="muted" aria-live="polite"></p></div>
+<div id="sections"></div>
+<p id="message" role="alert"></p>
+<div class="footer"><button id="generate" type="button" class="primary" disabled>Generate Work Order</button><span class="muted">Saves the assignment, checklist, report, and log.</span></div>
+</div></main></body></html>

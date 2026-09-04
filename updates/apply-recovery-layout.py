@@ -48,7 +48,9 @@ def verify():
                 page = response.read().decode()
             with urllib.request.urlopen('http://127.0.0.1:9240/api/config', timeout=3) as response:
                 config = json.load(response)
-            if 'dispatch.js?v=20260904R2' in page and config.get('tmvVanMap'):
+            with urllib.request.urlopen('http://127.0.0.1:9240/work-order-builder.html', timeout=3) as response:
+                builder = response.read().decode()
+            if 'dispatch.js?v=20260904R3' in page and 'work-order-builder.js?v=20260904R3' in builder and config.get('tmvVanMap'):
                 return
         except Exception:
             pass

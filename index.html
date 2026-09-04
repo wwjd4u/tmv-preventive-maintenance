@@ -235,7 +235,7 @@ footer a:active {
 }
 </style>
 
-<link rel="stylesheet" href="dispatch.css?v=20260904R2">
+<link rel="stylesheet" href="dispatch.css?v=20260904R3">
 </head>
 <body>
 <header>
@@ -275,7 +275,7 @@ footer a:active {
 
   <!-- TMV INSPECTIONS VIEW -->
   <section id="viewTmv" class="view active">
-    <div id="tmvPicker"><h2 class="picker-title" style="margin-top:0;color:#fff">Select a TMV Unit</h2><div class="dispatch-toolbar" aria-label="Unit controls"><label>TMV Unit<input id="unitSearch" type="search" placeholder="Search TMV…"></label><label>Van Type<select id="unitType"><option value="">All van types</option></select></label><label>District<select id="unitDistrict"><option value="">All districts</option></select></label><label>Date<input id="unitDate" type="date"></label><label>Technician<select id="unitTech"><option value="">All technicians</option></select></label><label>Status<select id="unitStatus" aria-label="Status"><option value="">All statuses</option><option value="unassigned">Unassigned</option><option value="assigned">Assigned</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></label><div class="sidebar-actions"><button class="btn" id="dispatchBtn" onclick="assignAndGenerateReport()" disabled>Assign Technician and Generate Report</button><button class="btn back" onclick="loadDemoFromToolbar(this)">🧪 Load Demo Work Orders</button></div></div><div class="dispatch-list"><div class="tmv-grid" id="tmvGrid"></div><p id="dispatchFeedback" aria-live="polite"></p></div>
+    <div id="tmvPicker"><h2 class="picker-title" style="margin-top:0;color:#fff">Select a TMV Unit</h2><div class="dispatch-toolbar" aria-label="Unit controls"><label>TMV Unit<input id="unitSearch" type="search" placeholder="Search TMV…"></label><label>Van Type<select id="unitType"><option value="">All van types</option></select></label><label>District<select id="unitDistrict"><option value="">All districts</option></select></label><label>Date<input id="unitDate" type="date"></label><label>Technician<select id="unitTech"><option value="">All technicians</option></select></label><label>Status<select id="unitStatus" aria-label="Status"><option value="">All statuses</option><option value="unassigned">Unassigned</option><option value="assigned">Assigned</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></label><div class="sidebar-actions"><button class="btn" id="dispatchBtn" onclick="assignAndGenerateReport()" disabled>Assign Technician</button><button class="btn back" onclick="loadDemoFromToolbar(this)">🧪 Load Demo Work Orders</button></div></div><div class="dispatch-list"><div class="tmv-grid" id="tmvGrid"></div><p id="dispatchFeedback" aria-live="polite"></p></div>
     </div>
 
     <div id="tmvDetail" class="hidden">
@@ -289,7 +289,7 @@ footer a:active {
       </div>
       <div id="sections"></div>
       <div class="actionbar">
-        <button class="btn" id="genBtn" onclick="assignAndGenerateReport()" disabled>Assign Technician and Generate Report</button>
+        <button class="btn" id="genBtn" onclick="assignAndGenerateReport()" disabled>Assign Technician</button>
       </div>
       <button class="btn ghost" id="demoBtn" onclick="loadDemo()" style="margin-top:10px;width:100%">🧪 Load Demo Work Orders</button>
       <div id="assignOut" class="hidden"></div>
@@ -326,8 +326,8 @@ footer a:active {
   CUDD Energy Services · Preventive Maintenance
 </footer>
 
-<script src="app.js?v=20260904R2"></script>
-<script src="dispatch.js?v=20260904R2"></script>
+<script src="app.js?v=20260904R3"></script>
+<script src="dispatch.js?v=20260904R3"></script>
 <script>
   // Register PWA service worker (installable + offline support)
   if ('serviceWorker' in navigator) {
