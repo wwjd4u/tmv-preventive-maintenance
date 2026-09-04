@@ -67,9 +67,12 @@ var SC={ok:'b-ok',warn:'b-warn',due:'b-due',none:'b-none'};
 var SL2={assigned:'Assigned',in_progress:'In Progress',completed:'Completed',rejected:'Rejected'};
 function buildTechFilter(){
   var sel=document.getElementById('filterTech');
+  var selected=sel.value;
+  sel.replaceChildren(new Option('All technicians','all'));
   var names=[];
   assignments.forEach(function(a){ if(a.technician&&a.technician.name&&names.indexOf(a.technician.name)<0) names.push(a.technician.name); });
   names.sort().forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
+  sel.value=names.includes(selected)?selected:'all';
 }
 function contactBar(tech){
   if(!tech) return '';
@@ -114,7 +117,8 @@ function trackerCard(a){
   var detail =
     contactBar(t)
     + resultsHtml(a)
-    + photoGrid(a.photos);
+    + photoGrid(a.photos)
+    + (a.report ? '<div class="ticket"><h3>Maintenance Report</h3><pre>'+escapeHtml(a.report.text)+'</pre><div class="meta">Assignment creation logged: '+escapeHtml(new Date(a.report.createdAt).toLocaleString())+'</div></div>' : '');
   return '<div class="assign-card" onclick="toggleAssign(\''+escAttr(a.id)+'\')">'
     + '<div class="top"><h3>'+escapeHtml(a.tmv||'Untitled')+'</h3>'
     + '<span class="st st-'+(a.status||'assigned')+'">'+(SL2[a.status]||a.status)+'</span></div>'
@@ -159,16 +163,6 @@ function showView(v){
 }
 
 // ── TMV grid ───────────────────────────────────────────
-function buildTmvGrid(){
-  var grid=document.getElementById('tmvGrid');
-  var map=configData.tmvVanMap||{}, keys=Object.keys(map);
-  if(!keys.length){ grid.innerHTML='<p style="color:#888">No TMV units configured.</p>'; return; }
-  grid.innerHTML=keys.map(function(k){
-    return '<button class="tmv-btn" onclick="openTmv(\''+escAttr(k)+'\')">'
-      +'<div class="id">'+escapeHtml(k)+'</div>'
-      +'<div class="vt">'+escapeHtml(map[k].join(' + '))+'</div></button>';
-  }).join('');
-}
 
 function openTmv(k){
   selectedTmv=k;
@@ -205,6 +199,8 @@ function buildSections(k){
     return '<div class="section" data-s="'+si+'"><h3>'+escapeHtml(s.title)+'</h3>'
       +'<div class="items">'+items+'</div></div>';
   }).join('');
+  wrap.querySelectorAll('.ctl').forEach(function(ctl,index){ ctl.querySelectorAll('input[type=radio]').forEach(function(radio){radio.name='item-'+index+'-'+radio.dataset.k;}); });
+  wrap.oninput=updateGen;
 }
 
 function renderCtl(it){
@@ -265,45 +261,9 @@ function buildTechSelect(){
 }
 ['dLoc','dDate'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', updateGen); });
 
-function updateGen(){
-  var loc=document.getElementById('dLoc').value;
-  var tech=document.getElementById('dTech').value;
-  var filled=collectSections().length>0;
-  document.getElementById('genBtn').disabled = !(selectedTmv && loc && tech && filled);
-  document.getElementById('assignBtn').disabled = !(selectedTmv && loc && tech && filled);
-}
+function updateGen(){ if(typeof updateDispatchButtons==='function') updateDispatchButtons(); }
+async function submitInspection(){ return assignAndGenerateReport(); }
 
-async function submitInspection(){
-  var techName=document.getElementById('dTech').value;
-  var loc=document.getElementById('dLoc').value;
-  var date=document.getElementById('dDate').value;
-  var tech=(configData.technicians||[]).filter(function(t){return t.name===techName;})[0]||{name:techName};
-  var sections=collectSections();
-  var btn=document.getElementById('genBtn');
-  btn.disabled=true; btn.textContent='Working…';
-  try{
-    // 1) ticket
-    var r=await fetch('/api/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, functions:sections.map(function(s){return s.title+': '+s.items.map(function(i){return i.label+'='+i.value;}).join(', ');}), technician:tech})});
-    var d=await r.json(); if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
-    // 2) log inspection
-    var r2=await fetch('/api/inspection',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:tech, sections:sections})});
-    var d2=await r2.json(); if(!r2.ok) throw new Error(d2.error||('log HTTP '+r2.status));
-    await loadAssets(); buildTracker();
-    var out=document.getElementById('ticketOut'); out.classList.remove('hidden');
-    out.innerHTML='<div class="ticket"><h3>Ticket — '+escapeHtml(tech.name)+'</h3>'
-      +'<pre>'+escapeHtml(d.ticket)+'</pre>'
-      +'<div class="links">'
-      +(d.hasEmail?'<a class="em" href="'+d.mailto+'" onclick="return mailtoFallback(event)" title="Opens your mail app">Send via Email</a>':'')
-      +(d.hasEmail?'<button class="btn ghost" onclick="copyMailTo()">Copy Email Text</button>':'')
-      +(d.smsDigits?'<button class="btn sms" data-sms="'+escAttr(d.smsDigits)+'" data-ticket="'+encodeURIComponent(d.ticket)+'" onclick="sendDispatchSms(this)">Send via SMS</button>':'')
-      +'<button class="btn ghost" onclick="copyTicket()">Copy Ticket</button></div>'
-      +'<div class="ok-note">✓ Inspection logged for '+escapeHtml(selectedTmv)+' ('+escapeHtml(loc)+', '+escapeHtml(date)+')</div></div>';
-    window.__lastTicket=d.ticket;
-  }catch(e){ showErr('submit failed: '+((e&&(e.message))||e)); }
-  finally{ btn.disabled=false; btn.textContent='Generate Ticket & Log'; updateGen(); }
-}
 function copyTicket(){ if(navigator.clipboard&&window.__lastTicket){ navigator.clipboard.writeText(window.__lastTicket).then(function(){alert('Copied');},function(){alert('Copy failed');}); } }
 // Send an SMS via the server (which calls the SMS provider). Works from any browser.
 function appBaseUrl(){ return (configData && configData.appUrl) || (window.location && window.location.origin) || ''; }
@@ -366,30 +326,8 @@ function copyMailTo(){
 }
 
 // ── Assign to Technician (handoff to mobile) ─────────────
-async function assignToTech(){
-  var techName=document.getElementById('dTech').value;
-  var loc=document.getElementById('dLoc').value;
-  var date=document.getElementById('dDate').value;
-  var sections=collectSections();
-  var tech=(configData.technicians||[]).filter(function(t){return t.name===techName;})[0]||{name:techName};
-  var btn=document.getElementById('assignBtn');
-  btn.disabled=true; btn.textContent='Working…';
-  try{
-    var r=await fetch('/api/assignments',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:tech, sections:sections})});
-    var d=await r.json();
-    if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
-    var link='http://'+location.host+'/tech/'+d.assignment.id;
-    var out=document.getElementById('assignOut'); out.classList.remove('hidden');
-    out.innerHTML='<div class="ok-note">✓ Assigned to '+escHtml(techName)+'</div>'
-      +'<div class="assign-link"><b>Technician link:</b><br><a href="'+link+'" target="_blank">'+escHtml(link)+'</a>'
-      +'<br><button class="btn ghost" style="margin-top:8px" id="copyLinkBtn">Copy Link</button></div>'
-      +'<div class="meta" style="margin-top:6px">Open on the tech\'s phone (text/email it). They complete the checklist with photos, then it returns here.</div>';
-    var cb=document.getElementById('copyLinkBtn');
-    if(cb) cb.addEventListener('click', function(){ copyLink(link); });
-  }catch(e){ showErr('assign failed: '+((e&&(e.message))||e)); }
-  finally{ btn.disabled=false; btn.textContent='📲 Assign to Technician'; updateGen(); }
-}
+async function assignToTech(){ return assignAndGenerateReport(); }
+
 async function loadDemo(){
   var btn=document.getElementById('demoBtn');
   btn.disabled=true; btn.textContent='Working…';
@@ -418,5 +356,4 @@ function goDb(){
 
 // ── Auth removed: app opens directly to the TMV grid ─────
 
-boot();
-
+window.addEventListener('DOMContentLoaded', boot);

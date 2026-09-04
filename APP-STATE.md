@@ -1,5 +1,31 @@
 # TMV Master App — State Checkpoint (read this first)
 
+## 2026-09-04 — Combined dispatch and compact fleet cards
+
+- `index.html`, `dispatch.css`, and `dispatch.js` implement the approved top
+  controls and compact original-style TMV cards with technician selectors.
+  Existing unit names, configuration, logo, background, and colors are retained.
+- Selecting a technician is a draft. Select a district/date and press
+  **Assign Technician and Generate Report** to save the selected unit.
+- `POST /api/work-orders` validates against the database configuration and saves
+  the assignment (including report text) plus a `work_order_logs` event in one
+  SQLite transaction. A request ID makes retries idempotent; changed content with
+  the same ID returns 409. Work starts as `assigned`, not completed maintenance.
+- Reports remain in Tracker and can be downloaded after creation. Technician
+  links preserve HTTPS and checklist input types/options are retained.
+- No email or SMS is sent automatically by this action. Existing technician
+  work-order and contact flows are retained.
+- Startup JSON imports now seed each empty table separately and never replace
+  an existing saved configuration just because there are no assignments.
+- Test command: `node --test test/work-orders.test.js` (tested on Node 22).
+  Tests use a temporary database; `TMV_DB_PATH` and `PORT` are optional test/runtime
+  overrides. Normal production defaults remain `tmv.db` and port 9240.
+- Deployment requires pulling these files and restarting `tmvapp-node.service`
+  on the actual host because the backend changed. GitHub is not an automatic
+  deployment. Preserve local modifications and back up the database first.
+
+The earlier checkpoint below describes the previous implementation.
+
 > Cheap context for the PM app. Read this instead of the whole codebase when you
 > start a PM-app task. The full README.md is STALE (describes the old assets.json
 > checklist era) — ignore it.

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const { buildWorkOrder } = require('./work-orders');
 const { DB_PATH } = db;
 
 // Load .env (git-ignored) for local secrets — dependency-free.
@@ -17,7 +18,7 @@ const { DB_PATH } = db;
   }catch(e){ /* ignore missing/invalid .env */ }
 })();
 
-const PORT = 9240;
+const PORT = Number(process.env.PORT || 9240);
 const DATA_FILE = path.join(__dirname, 'assets.json');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
@@ -699,6 +700,29 @@ http.createServer((req, res) => {
   }
 
   // ── Assignments API (admin assigns work → technician mobile completes) ──
+
+  // Combined workflow: one transaction, retry-safe, no automatic messages.
+  // Same access policy as the existing assignment creation route.
+  if (url.pathname === '/api/work-orders' && req.method === 'POST') {
+    let body = '', tooLarge = false;
+    req.on('data', chunk => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 256 * 1024) { tooLarge = true; body = ''; }
+    });
+    req.on('end', () => {
+      if (tooLarge) return sendJson(res, 413, { error: 'Request too large' });
+      try {
+        const work = buildWorkOrder(JSON.parse(body), mergeTechPhones(loadConfig()));
+        const saved = db.createWorkOrder(work);
+        sendJson(res, saved.replayed ? 200 : 201, { ok: true, ...saved, ticket: saved.assignment.report.text });
+      } catch (error) {
+        sendJson(res, error.status || (error instanceof SyntaxError ? 400 : 500),
+          { error: error.status || error instanceof SyntaxError ? error.message : 'Unable to save work order' });
+      }
+    });
+    return;
+  }
 
   // POST /api/assignments — create a work assignment (public; desktop admin)
   // Body: { tmv, vanType, location, technician, date, sections:[{title,items:[{label,type}]}] }
