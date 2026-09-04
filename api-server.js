@@ -1,3 +1,4 @@
+const smsConsent = require('./sms-consent-server');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -398,7 +399,7 @@ http.createServer((req, res) => {
     const full = path.join(__dirname, safe);
     if (full.startsWith(__dirname)) {
       // app.js and index.html never cached; other static assets can cache.
-      if (safe === 'app.js' || safe === 'index.html') {
+      if (['app.js','index.html','privacy.html','terms.html','sms-consent.html','sms-consent.js'].includes(safe)) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         res.setHeader('Pragma', 'no-cache');
       }
@@ -417,6 +418,8 @@ http.createServer((req, res) => {
     const ext = path.extname(filename).toLowerCase();
     return serveFile(res, filepath, MIME[ext] || 'application/octet-stream');
   }
+
+  if (smsConsent.handle(req, res, url, db, () => mergeTechPhones(loadConfig()))) return;
 
   // ── GET /api/config — public config (no auth needed) ────
   // Real technician phones live in the git-ignored TECH_PHONES env var
@@ -511,11 +514,13 @@ http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const d = JSON.parse(body);
-        const to = (d.to || '').replace(/\D/g, '');
+        const to = smsConsent.normalizePhone(d.to);
         const message = (d.message || '').toString().slice(0, 1600);
         if (!to) return sendJson(res, 400, { ok: false, error: 'Recipient phone required' });
         if (!message.trim()) return sendJson(res, 400, { ok: false, error: 'Message required' });
 
+        const blocked = smsConsent.sendBlockReason(to, db, process.env);
+        if (blocked) return sendJson(res, 403, { ok: false, error: blocked });
         const provider = (process.env.SMS_PROVIDER || 'textbelt').toLowerCase();
         let p;
         if (provider === 'twilio') p = sendViaTwilio(to, message);

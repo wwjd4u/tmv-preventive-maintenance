@@ -24,6 +24,12 @@ db.exec(`
     key TEXT PRIMARY KEY,
     data TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS sms_consent_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    data TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS sms_consent_phone ON sms_consent_events(phone, id);
   CREATE TABLE IF NOT EXISTS work_order_logs (
     assignment_id TEXT PRIMARY KEY,
     data TEXT NOT NULL
@@ -146,7 +152,16 @@ function getAllAssets() {
   return db.prepare('SELECT data FROM assets').all().map(r => JSON.parse(r.data));
 }
 
+function recordSmsConsent(event) {
+  db.prepare('INSERT INTO sms_consent_events (phone, data) VALUES (?, ?)').run(event.phone, JSON.stringify(event));
+}
+function hasSmsConsent(phone) {
+  const row = db.prepare('SELECT data FROM sms_consent_events WHERE phone = ? ORDER BY id DESC LIMIT 1').get(phone);
+  return !!row && JSON.parse(row.data).action === 'subscribe';
+}
+
 module.exports = {
+  recordSmsConsent, hasSmsConsent,
   createWorkOrder,
   loadAssignments, saveAssignments, purgeAssignments,
   loadAssets, saveAssets,

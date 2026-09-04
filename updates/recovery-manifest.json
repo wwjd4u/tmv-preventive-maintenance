@@ -2,43 +2,121 @@
   "files": {
     "index.html": {
       "before": "db976c20ba1afa6319f21e351487a57635c2197da2ee015b561c4f11779996d8",
-      "after": "f82ecf628cf01397d0d401d16c61983c4a5ef17e41aa1a789a647f623eb82cc1"
+      "after": "5d7f0e17aba348782e24f49d8a31ef3f3fb774129c2dd175fce53e831c8dcbd0",
+      "accepted_before": [
+        "db976c20ba1afa6319f21e351487a57635c2197da2ee015b561c4f11779996d8",
+        "f82ecf628cf01397d0d401d16c61983c4a5ef17e41aa1a789a647f623eb82cc1"
+      ]
     },
     "app.js": {
       "before": "d6ad963cb1c0f1c1514dfbbe74d7e73bd04b08f4274559c0ad9f626d53580eec",
-      "after": "d6ad963cb1c0f1c1514dfbbe74d7e73bd04b08f4274559c0ad9f626d53580eec"
+      "after": "d6ad963cb1c0f1c1514dfbbe74d7e73bd04b08f4274559c0ad9f626d53580eec",
+      "accepted_before": [
+        "d6ad963cb1c0f1c1514dfbbe74d7e73bd04b08f4274559c0ad9f626d53580eec"
+      ]
     },
     "api-server.js": {
       "before": "463f195dc1df29adedafc28945cd12c583cde3dbdcfb4a55737db33b89830965",
-      "after": "bbde85b06eccda064173eead530d8c07b2ec4d689dbaf6dcd9ca4b2d7de09a4a"
+      "after": "33ec7afd24cca9df9a32978b94491f37623913f606da74534bbaaf2a8339c23d",
+      "accepted_before": [
+        "463f195dc1df29adedafc28945cd12c583cde3dbdcfb4a55737db33b89830965",
+        "bbde85b06eccda064173eead530d8c07b2ec4d689dbaf6dcd9ca4b2d7de09a4a"
+      ]
     },
     "db.js": {
       "before": "27a44fc8b23c981b2fff8877b608294c50e65db02547c722691ef97877f96729",
-      "after": "27a44fc8b23c981b2fff8877b608294c50e65db02547c722691ef97877f96729"
+      "after": "34a15cb1e039d96fa18e116b2bb8608b593eea7414e77524af0a94353d1bc126",
+      "accepted_before": [
+        "27a44fc8b23c981b2fff8877b608294c50e65db02547c722691ef97877f96729"
+      ]
     },
     "assign.html": {
       "before": "7bf21242b7776ae6a86975cfdfaade8656add6439f9d091361a9a616b631de44",
-      "after": "7bf21242b7776ae6a86975cfdfaade8656add6439f9d091361a9a616b631de44"
+      "after": "7bf21242b7776ae6a86975cfdfaade8656add6439f9d091361a9a616b631de44",
+      "accepted_before": [
+        "7bf21242b7776ae6a86975cfdfaade8656add6439f9d091361a9a616b631de44"
+      ]
     },
     "dispatch.css": {
       "before": "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9",
-      "after": "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9"
+      "after": "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9",
+      "accepted_before": [
+        "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9"
+      ]
     },
     "dispatch.js": {
       "before": "ace7274b008e956dfd4f508196b13ac622fbaf0b6d8825f647761abd78f18963",
-      "after": "2455742768a969988dcd1975adc1ff56f21789d920b61bbf281ce7dcc1263f76"
+      "after": "2455742768a969988dcd1975adc1ff56f21789d920b61bbf281ce7dcc1263f76",
+      "accepted_before": [
+        "ace7274b008e956dfd4f508196b13ac622fbaf0b6d8825f647761abd78f18963",
+        "2455742768a969988dcd1975adc1ff56f21789d920b61bbf281ce7dcc1263f76"
+      ]
     },
     "work-orders.js": {
       "before": "926c25255089656a040cf9d6ae5664c0ff857bbec1153169e21be426d37a137f",
-      "after": "f689e3b11c47e7f22410739f40dde15f9e182fe19a1049d00288be7d4876bed8"
+      "after": "f689e3b11c47e7f22410739f40dde15f9e182fe19a1049d00288be7d4876bed8",
+      "accepted_before": [
+        "926c25255089656a040cf9d6ae5664c0ff857bbec1153169e21be426d37a137f",
+        "f689e3b11c47e7f22410739f40dde15f9e182fe19a1049d00288be7d4876bed8"
+      ]
     },
     "work-order-builder.html": {
       "before": null,
-      "after": "7af32b18f8fee5d9f62b3be9a4a55b31690ee24cea1fc417772d0b4c3c5fbdf5"
+      "after": "7af32b18f8fee5d9f62b3be9a4a55b31690ee24cea1fc417772d0b4c3c5fbdf5",
+      "accepted_before": [
+        null,
+        "7af32b18f8fee5d9f62b3be9a4a55b31690ee24cea1fc417772d0b4c3c5fbdf5"
+      ]
     },
     "work-order-builder.js": {
       "before": null,
-      "after": "5232aa08d1b396016f10c2ca74d6ee2188724decdb27893d5d195eb6ce02e563"
+      "after": "5232aa08d1b396016f10c2ca74d6ee2188724decdb27893d5d195eb6ce02e563",
+      "accepted_before": [
+        null,
+        "5232aa08d1b396016f10c2ca74d6ee2188724decdb27893d5d195eb6ce02e563"
+      ]
+    },
+    "privacy.html": {
+      "before": "8645052e53ec42ce371544c1085e38da31650c765bbdc88399b97bff13ab0b9e",
+      "accepted_before": [
+        "8645052e53ec42ce371544c1085e38da31650c765bbdc88399b97bff13ab0b9e"
+      ],
+      "after": "d1b3c90e2a928881e5aced9cbf17228bb2c6043b14ab9437da263910f0c986bb"
+    },
+    "terms.html": {
+      "before": "ff5b25acb8c39d9ac591642dd80d6d3457f2bb89ea0f23aca01f413eb3279a6a",
+      "accepted_before": [
+        "ff5b25acb8c39d9ac591642dd80d6d3457f2bb89ea0f23aca01f413eb3279a6a"
+      ],
+      "after": "64a0e3f630dfe4e6ab9ec133f5180e387949df6292ed1e1eb18eb67c2e4efc18"
+    },
+    "sms-consent.html": {
+      "before": null,
+      "accepted_before": [
+        null
+      ],
+      "after": "de6afd4551879216fbbfdb3c6d7532a660a4e688d8fbaef161927e80071cd5d8"
+    },
+    "sms-consent.js": {
+      "before": null,
+      "accepted_before": [
+        null
+      ],
+      "after": "f8da2094855b325b851fc87479c91aef7b2179910eb363e8d0be0411940dbe0c"
+    },
+    "sms-consent.css": {
+      "before": null,
+      "accepted_before": [
+        null
+      ],
+      "after": "ffef0b965b46ff953319238999b8a1c4095f347e40a20210d16598f0326ca6f0"
+    },
+    "sms-consent-server.js": {
+      "before": null,
+      "accepted_before": [
+        null
+      ],
+      "after": "9d01d67ec442282e6cffd90d19d256cd1e439eb12c22d214a06d704f3d8db77a"
     }
   }
 }

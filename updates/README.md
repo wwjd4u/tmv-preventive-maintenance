@@ -46,3 +46,7 @@ host-only startup/watchdog changes that were not included in the upload.
 
 R3 validation also covers empty/invalid section selections, selected-only report and
 API persistence, Select All/Clear All, draft persistence, and retries after uncertain responses.
+
+## SMS consent and policy update (S1)
+
+Privacy and terms now link to a public, optional SMS Preferences form with support at jguynes@rpc.net. SMS consent starts unchecked and is stored with the disclosure/version and timestamp. Withdrawal appends a record; server-sent SMS is blocked without consent and until campaign approval/provider configuration is explicitly confirmed. No messages are sent by enrollment or deployment. See A2P-RESUBMISSION.md for public-access checks, proposed campaign fields, and remaining Twilio settings. This update deploys sixteen reviewed source files and accepts known R2/R3 revisions. Tests cover consent validation, withdrawal, restart persistence, send blocking, and the unchanged work-order transaction flow.

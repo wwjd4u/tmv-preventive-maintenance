@@ -30,7 +30,7 @@ def validate_files(app, entries, payloads):
         if target.is_symlink():
             raise RuntimeError('Stopped at symbolic link: ' + name)
         actual = digest(target.read_bytes()) if target.exists() else None
-        if actual not in (info['before'], info['after']):
+        if actual not in info.get('accepted_before', [info['before']]) + [info['after']]:
             raise RuntimeError('Local file differs from the uploaded source: ' + name + '. No files changed; upload the latest source for review.')
 
 def install_file(target, data):
@@ -50,7 +50,11 @@ def verify():
                 config = json.load(response)
             with urllib.request.urlopen('http://127.0.0.1:9240/work-order-builder.html', timeout=3) as response:
                 builder = response.read().decode()
-            if 'dispatch.js?v=20260904R3' in page and 'work-order-builder.js?v=20260904R3' in builder and config.get('tmvVanMap'):
+            with urllib.request.urlopen('http://127.0.0.1:9240/privacy.html', timeout=3) as response:
+                privacy = response.read().decode()
+            with urllib.request.urlopen('http://127.0.0.1:9240/api/sms-consent', timeout=3) as response:
+                consent = json.load(response)
+            if 'jguynes@rpc.net' in privacy and consent.get('version') == '2026-09-04-v1' and 'dispatch.js?v=20260904R3' in page and 'work-order-builder.js?v=20260904R3' in builder and config.get('tmvVanMap'):
                 return
         except Exception:
             pass
