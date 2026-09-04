@@ -40,6 +40,18 @@
   .muted{color:#888;font-size:13px}
   .err{color:var(--red);font-weight:600}
 </style>
+
+<style id="tmv-footer-black-override">
+footer,
+footer a,
+footer a:link,
+footer a:visited,
+footer a:hover,
+footer a:active {
+    color: #000 !important;
+}
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -153,6 +165,7 @@ async function sendSms(btn){
     if(cnt) h+='<div class="muted" style="margin:6px 0">'+cnt+' items · '+(a.sections?a.sections.length:0)+' sections</div>';
     h+='<div class="section"><h3>Work Order Checklist</h3>'+mergeSheet(a)+'</div>';
     if((a.photos||[]).length) h+='<div class="section"><h3>Photos</h3>'+photoGrid(a.photos)+'</div>';
+    if(a.report) h+='<div class="section"><h3>Generated Report</h3><pre style="white-space:pre-wrap">'+esc(a.report.text)+'</pre><div class="muted">Assignment logged: '+esc(new Date(a.report.createdAt).toLocaleString())+'</div></div>';
     h+='</div>';
     root.innerHTML=h;
   }catch(e){ root.innerHTML='<p class="err">Error: '+(e.message||e)+'</p>'; }

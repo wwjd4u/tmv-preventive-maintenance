@@ -1,0 +1,36 @@
+{
+  "files": {
+    "index.html": {
+      "before": "8a1026ec6ce3db4130ef697eb94caa01088f4bd82d0aafef040c8abb5c44e026",
+      "after": "b8922f56f42175b032bc524e0fefc3cf20a388aad8adb66497c6394b9c07051b"
+    },
+    "app.js": {
+      "before": "7bfa0dc1d1f1bd065a26185822f9e79940b443d0e9535b31ccb2113876e60520",
+      "after": "d6ad963cb1c0f1c1514dfbbe74d7e73bd04b08f4274559c0ad9f626d53580eec"
+    },
+    "api-server.js": {
+      "before": "39cfb9ade886687371208a13fa92e8bdb964cd2c950cd9dc139ce4ba522b8270",
+      "after": "463f195dc1df29adedafc28945cd12c583cde3dbdcfb4a55737db33b89830965"
+    },
+    "db.js": {
+      "before": "ad1bb50c4f12ab66b89381bd5723fe9c85243010a086b750c1eba12966a97080",
+      "after": "27a44fc8b23c981b2fff8877b608294c50e65db02547c722691ef97877f96729"
+    },
+    "assign.html": {
+      "before": "afcc11473bd6b3bd60a67aa3a4b5b8e04ee6976706be3ef795a913b1d7d445ef",
+      "after": "7bf21242b7776ae6a86975cfdfaade8656add6439f9d091361a9a616b631de44"
+    },
+    "dispatch.css": {
+      "before": null,
+      "after": "fe3f2c2a21e8202f429f2eec186139aaccaab3d2341808fecf6d24877b794ca9"
+    },
+    "dispatch.js": {
+      "before": null,
+      "after": "8e1b708eeac0401167556b76f415ad5b0552917dfc5a0c45e05a7474ec049f59"
+    },
+    "work-orders.js": {
+      "before": null,
+      "after": "926c25255089656a040cf9d6ae5664c0ff857bbec1153169e21be426d37a137f"
+    }
+  }
+}

@@ -24,20 +24,20 @@ var selectedVan = null;
 // DevIoT feed is configured, so the Location column shows real coordinates.
 // Keyed by TMV id (Asset ID with the TMV prefix). radius (m) defines the yard.
 var __staticPositions = {
-  'TMV57449B': { lat: 31.848381, lng: -102.311371, radius: 500 },
-  'TMV57454B': { lat: 31.511389, lng: -103.874504, radius: 500 },
-  'TMV57560B': { lat: 34.620010, lng: -97.532722,  radius: 500 },
-  'TMV57566B': { lat: 33.132057, lng: -103.088966, radius: 500 },
-  'TMV57738B': { lat: 36.438873, lng: -100.884888, radius: 500 },
-  'TMV57744B': { lat: 31.848450, lng: -102.311790, radius: 500 },
-  'TMV57757B': { lat: 32.743927, lng: -100.928505, radius: 500 },
-  'TMV57763B': { lat: 32.406593, lng: -94.901443,  radius: 500 },
-  'TMV57879B': { lat: 31.934536, lng: -101.768799, radius: 500 },
-  'TMV57903B': { lat: 31.577999, lng: -102.260796, radius: 500 },
-  'TMV57909B': { lat: 32.406410, lng: -94.901428,  radius: 500 },
-  'TMV87455B': { lat: 31.295650, lng: -103.184677, radius: 500 },
-  'TMV87461B': { lat: 31.848188, lng: -102.311272, radius: 500 },
-  'TMV97776B': { lat: 34.619308, lng: -97.533730,  radius: 500 }
+  'TMV57449B': { lat: 31.23, lng: -103.16, radius: 500 },
+  'TMV57454B': { lat: 32.74, lng: -103.68, radius: 500 },
+  'TMV57560B': { lat: 34.99, lng: -97.40,  radius: 500 },
+  'TMV57566B': { lat: 32.74, lng: -100.93, radius: 500 },
+  'TMV57738B': { lat: 36.26, lng: -100.89, radius: 500 },
+  'TMV57744B': { lat: 31.85, lng: -102.31, radius: 500 },
+  'TMV57757B': { lat: 31.44, lng: -102.64, radius: 500 },
+  'TMV57763B': { lat: 32.41, lng: -94.90,  radius: 500 },
+  'TMV57879B': { lat: 32.51, lng: -101.45, radius: 500 },
+  'TMV57903B': { lat: 31.58, lng: -102.27, radius: 500 },
+  'TMV57909B': { lat: 32.41, lng: -94.90,  radius: 500 },
+  'TMV87455B': { lat: 31.85, lng: -102.31, radius: 500 },
+  'TMV87461B': { lat: 31.85, lng: -102.31, radius: 500 },
+  'TMV97776B': { lat: 34.99, lng: -97.42,  radius: 500 }
 };
 // Asset 27616B had N/A coordinates → intentionally omitted (shows "Location set").
 var ROLE = localStorage.getItem('tmv_role') || 'admin';
@@ -111,9 +111,12 @@ var SC={ok:'b-ok',warn:'b-warn',due:'b-due',none:'b-none'};
 var SL2={assigned:'Assigned',in_progress:'In Progress',completed:'Completed',rejected:'Rejected'};
 function buildTechFilter(){
   var sel=document.getElementById('filterTech');
+  var selected=sel.value;
+  sel.replaceChildren(new Option('All technicians','all'));
   var names=[];
   assignments.forEach(function(a){ if(a.technician&&a.technician.name&&names.indexOf(a.technician.name)<0) names.push(a.technician.name); });
   names.sort().forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
+  sel.value=names.includes(selected)?selected:'all';
 }
 function tStatusBadge(s){
   var cls='b-'+(s||'assigned');
@@ -360,16 +363,6 @@ function fullChecklistFor(vanType) {
   });
 }
 
-function buildTmvGrid() {
-  var grid=document.getElementById('tmvGrid');
-  var map=configData.tmvVanMap||{}, keys=Object.keys(map);
-  if(!keys.length){ grid.innerHTML='<p style="color:#888">No TMV units configured.</p>'; return; }
-  grid.innerHTML=keys.map(function(k){
-    return '<button class="tmv-btn" onclick="openTmv(\''+escAttr(k)+'\')">'
-      +'<div class="id">'+escapeHtml(k)+'</div>'
-      +'<div class="vt">'+escapeHtml(map[k].join(' + '))+'</div></button>';
-  }).join('');
-}
 
 function openTmv(k){
   selectedTmv=k;
@@ -493,48 +486,9 @@ function buildTechSelect(){
 }
 ['dLoc','dDate'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', updateGen); });
 
-function updateGen(){
-  var loc=document.getElementById('dLoc').value;
-  var tech=document.getElementById('dTech').value;
-  var filled=collectSections().length>0;
-  document.getElementById('genBtn').disabled = !(selectedTmv && loc && tech && filled);
-  document.getElementById('assignBtn').disabled = !(selectedTmv && loc && tech && filled);
-}
+function updateGen(){ if(typeof updateDispatchButtons==='function') updateDispatchButtons(); }
+async function submitInspection(){return assignAndGenerateReport();}
 
-async function submitInspection(){
-  var techName=document.getElementById('dTech').value;
-  var loc=document.getElementById('dLoc').value;
-  var date=document.getElementById('dDate').value;
-  var tech=(configData.technicians||[]).filter(function(t){return t.name===techName;})[0]||{name:techName};
-  var sections=collectSections();
-  // Ticket + inspection log should reflect the FULL checklist, not just the
-  // items the admin typed into. Build a complete section list for the ticket.
-  var full=fullChecklistFor(selectedVan);
-  var btn=document.getElementById('genBtn');
-  btn.disabled=true; btn.textContent='Working…';
-  try{
-    // 1) ticket
-    var r=await fetch('/api/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, functions:full.map(function(s){return s.title+': '+s.items.map(function(i){return i.label+'=';}).join(', ');}), technician:tech})});
-    var d=await r.json(); if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
-    // 2) log inspection
-    var r2=await fetch('/api/inspection',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:tech, sections:full})});
-    var d2=await r2.json(); if(!r2.ok) throw new Error(d2.error||('log HTTP '+r2.status));
-    await loadAssets(); buildTracker();
-    var out=document.getElementById('ticketOut'); out.classList.remove('hidden');
-    out.innerHTML='<div class="ticket"><h3>Ticket — '+escapeHtml(tech.name)+'</h3>'
-      +'<pre>'+escapeHtml(d.ticket)+'</pre>'
-      +'<div class="links">'
-      +(d.hasEmail?'<a class="em" href="'+d.mailto+'" onclick="return mailtoFallback(event)" title="Opens your mail app">Send via Email</a>':'')
-      +(d.hasEmail?'<button class="btn ghost" onclick="copyMailTo()">Copy Email Text</button>':'')
-      +(d.smsDigits?'<button class="btn sms" data-sms="'+escAttr(d.smsDigits)+'" data-ticket="'+encodeURIComponent(d.ticket)+'" onclick="sendDispatchSms(this)">Send via SMS</button>':'')
-      +'<button class="btn ghost" onclick="copyTicket()">Copy Ticket</button></div>'
-      +'<div class="ok-note">✓ Inspection logged for '+escapeHtml(selectedTmv)+' ('+escapeHtml(loc)+', '+escapeHtml(date)+')</div></div>';
-    window.__lastTicket=d.ticket;
-  }catch(e){ showErr('submit failed: '+((e&&(e.message))||e)); }
-  finally{ btn.disabled=false; btn.textContent='Generate Ticket & Log'; updateGen(); }
-}
 function copyTicket(){ if(navigator.clipboard&&window.__lastTicket){ navigator.clipboard.writeText(window.__lastTicket).then(function(){alert('Copied');},function(){alert('Copy failed');}); } }
 // Send an SMS via the server (which calls the SMS provider). Works from any browser.
 function appBaseUrl(){ return (configData && configData.appUrl) || (window.location && window.location.origin) || ''; }
@@ -597,32 +551,8 @@ function copyMailTo(){
 }
 
 // ── Assign to Technician (handoff to mobile) ─────────────
-async function assignToTech(){
-  var techName=document.getElementById('dTech').value;
-  var loc=document.getElementById('dLoc').value;
-  var date=document.getElementById('dDate').value;
-  // Emit the FULL checklist (single source of truth) for this van type,
-  // not just the items the admin happened to type into before assigning.
-  var sections=fullChecklistFor(selectedVan);
-  var tech=(configData.technicians||[]).filter(function(t){return t.name===techName;})[0]||{name:techName};
-  var btn=document.getElementById('assignBtn');
-  btn.disabled=true; btn.textContent='Working…';
-  try{
-    var r=await fetch('/api/assignments',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tmv:selectedTmv, vanType:selectedVan, location:loc, date:date, technician:tech, sections:sections})});
-    var d=await r.json();
-    if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
-    var link='http://'+location.host+'/tech/'+d.assignment.id;
-    var out=document.getElementById('assignOut'); out.classList.remove('hidden');
-    out.innerHTML='<div class="ok-note">✓ Assigned to '+escHtml(techName)+'</div>'
-      +'<div class="assign-link"><b>Technician link:</b><br><a href="'+link+'" target="_blank">'+escHtml(link)+'</a>'
-      +'<br><button class="btn ghost" style="margin-top:8px" id="copyLinkBtn">Copy Link</button></div>'
-      +'<div class="meta" style="margin-top:6px">Open on the tech\'s phone (text/email it). They complete the checklist with photos, then it returns here.</div>';
-    var cb=document.getElementById('copyLinkBtn');
-    if(cb) cb.addEventListener('click', function(){ copyLink(link); });
-  }catch(e){ showErr('assign failed: '+((e&&(e.message))||e)); }
-  finally{ btn.disabled=false; btn.textContent='📲 Assign to Technician'; updateGen(); }
-}
+async function assignToTech(){return assignAndGenerateReport();}
+
 async function loadDemo(){
   var btn=document.getElementById('demoBtn');
   btn.disabled=true; btn.textContent='Working…';
@@ -651,5 +581,4 @@ function goDb(){
 
 // ── Auth removed: app opens directly to the TMV grid ─────
 
-boot();
-
+window.addEventListener('DOMContentLoaded', boot);

@@ -1,0 +1,24 @@
+main{max-width:1100px}
+.picker-title{margin:0 0 16px}
+.dispatch-toolbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 16px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px}
+.dispatch-toolbar label{display:flex;flex-direction:column;gap:5px;font-size:14px;color:#555;min-width:0}
+.dispatch-toolbar input,.dispatch-toolbar select{width:100%;min-width:0;font-size:14px;min-height:40px}
+.sidebar-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;padding-top:2px}
+.sidebar-actions .btn{font-size:14px;padding:10px 14px}
+.tmv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:14px}
+.fleet-card{display:flex;flex-direction:column;min-width:0;border:2px solid var(--cudd);background:#fff;border-radius:12px;padding:16px;overflow:hidden;transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
+.fleet-card::before{content:"";display:block;height:4px;background:var(--cudd);margin:-16px -16px 12px}
+.fleet-card:hover{border-color:var(--cudd-dk);box-shadow:0 6px 18px rgba(129,47,47,.22);transform:translateY(-2px)}
+.fleet-card .tmv-btn{display:block;flex:1;width:100%;min-width:0;min-height:54px;border:0;border-radius:0;padding:0 0 12px;background:transparent}
+.fleet-card .tmv-btn::before{display:none}
+.fleet-card .tmv-btn:hover{background:transparent;box-shadow:none;transform:none}
+.fleet-card .vt{font-size:13px;margin-top:4px;line-height:1.4}
+.card-tech{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line);padding-top:10px;font-size:13px;color:#555}
+.card-tech select{width:100%;min-width:0;font-size:14px;min-height:40px}
+#dispatchFeedback{background:#fff;border-radius:8px;padding:10px 14px;color:var(--cudd)}
+#dispatchFeedback:empty{display:none}
+@media(min-width:1000px){.dispatch-toolbar{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(max-width:760px){header{flex-wrap:wrap}nav{margin-left:0;flex-wrap:wrap}.dispatch-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}.meta-bar{position:static}}
+@media(max-width:520px){.tmv-grid{grid-template-columns:1fr}header h1{font-size:19px}.dispatch-toolbar{padding:12px;gap:12px}.dispatch-toolbar input,.dispatch-toolbar select,.card-tech select{font-size:16px}.sidebar-actions{flex-direction:column}.sidebar-actions .btn{width:100%;text-align:left}}
+
+.fleet-card.is-selected{box-shadow:0 0 0 3px var(--cudd-dk)}
