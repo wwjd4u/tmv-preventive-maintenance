@@ -3,7 +3,7 @@
 //  * HTML navigation -> network-first, then exact cached page, then index shell
 //  * static assets -> cache-first, then network and populate cache
 //  * API requests -> always network (never cache live maintenance data)
-const CACHE = 'tmv-pwa-v9';
+const CACHE = 'tmv-pwa-v10';
 const APP_SHELL = [
   '/',
   '/index.html',
