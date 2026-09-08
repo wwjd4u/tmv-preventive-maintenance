@@ -35,8 +35,10 @@ function handle(req,res,url,db,getConfig) {
       if(!['subscribe','unsubscribe'].includes(input.action))return reply(400,{error:'Choose subscribe or unsubscribe.'});
       if(input.action==='subscribe'&&(input.consent!==true||input.version!==VERSION))return reply(400,{error:'Read the current disclosure and actively check the SMS consent box.'});
       if(input.action==='subscribe'){
-        const tech=(getConfig().technicians||[]).find(t=>t.name?.trim().toLowerCase()===name.toLowerCase()&&normalizePhone(t.phone)===phone);
-        if(!tech)return reply(400,{error:'Your details must match the technician roster. Contact jguynes@rpc.net for assistance.'});
+        const cfg=getConfig()||{};
+        const roster=[...(cfg.technicians||[]),...(cfg.managers||[])];
+        const person=roster.find(t=>typeof t!=='string'&&(t.name||t.username||'').trim().toLowerCase()===name.toLowerCase()&&normalizePhone(t.phone||'')===phone);
+        if(!person)return reply(400,{error:'Your details must match the technician or manager roster. Contact jguynes@rpc.net for assistance.'});
       }
       db.recordSmsConsent({phone,name,action:input.action,at:new Date().toISOString(),source:'/sms-consent.html',version:VERSION,disclosure:input.action==='subscribe'?DISCLOSURE:'Withdraw SMS consent',privacy:'/privacy.html',terms:'/terms.html'});
       reply(200,{ok:true,message:input.action==='subscribe'?'Your SMS consent has been recorded. No text was sent. Alerts begin only after the program is approved and enabled. If you previously replied STOP, contact support before re-enrolling.':'Your SMS consent has been withdrawn. The app will not send further SMS alerts to this number.'});

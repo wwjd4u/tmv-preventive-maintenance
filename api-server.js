@@ -791,12 +791,13 @@ http.createServer((req, res) => {
           if (m.password && !m.password.startsWith('scrypt$')) {
             password = hashPassword(m.password);
           }
-          return { name, username, password, role: 'manager' };
+          const phone = (m.phone || (existing && existing.phone) || '').trim();
+          return { name, username, phone, password, role: 'manager' };
         });
         const config = loadConfig() || {};
         const merged = { ...config, managers: out };
         saveConfig(merged);
-        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username })) });
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, phone: m.phone })) });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;

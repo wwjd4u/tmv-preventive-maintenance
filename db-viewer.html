@@ -285,7 +285,7 @@ footer a:active {
           <input id="techEmail" class="minput" placeholder="Email (name@co.com)">
           <input id="techPhone" class="minput" placeholder="Phone (+1…)">
         </div>
-        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button><span id="techStatus" class="saved-ok"></span>
+        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button> <button class="btn sm ghost" onclick="openSmsPreferences('technician')">SMS Preferences</button><span id="techStatus" class="saved-ok"></span>
         <div class="mrow addrow">
           <input id="newTech" class="minput" placeholder="Jason Guynes">
           <button class="btn sm" onclick="addTech()">+ Add Technician</button>
@@ -302,9 +302,10 @@ footer a:active {
         <div class="contact-grid">
           <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
           <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
+          <input id="mgrPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
           <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
         </div>
-        <button class="btn sm" onclick="saveMgr()">Save Manager</button>
+        <button class="btn sm" onclick="saveMgr()">Save Manager</button> <button class="btn sm ghost" onclick="openSmsPreferences('manager')">SMS Preferences</button>
         <div class="mrow addrow">
           <input id="newMgr" class="minput" placeholder="Add by name…">
           <button class="btn sm" onclick="addMgr()">+ Add Manager</button>
@@ -845,6 +846,22 @@ function renameTech(){
     saveConfigArray('technicians', cfg.technicians);
   }
 }
+function openSmsPreferences(kind){
+  var item = null;
+  if(kind==='technician'){
+    var ti = parseInt(document.getElementById('selTech').value,10);
+    if(!isNaN(ti)) item = techObj(ti);
+  } else {
+    var mi = parseInt(document.getElementById('selMgr').value,10);
+    if(!isNaN(mi)) item = mgrObj(mi);
+  }
+  if(!item){ alert('Select a '+(kind==='technician'?'technician':'manager')+' first'); return; }
+  var name = item.name || item.username || '';
+  var phone = item.phone || '';
+  if(!phone){ alert('Save a mobile phone number first'); return; }
+  window.open('/sms-consent.html?name='+encodeURIComponent(name)+'&phone='+encodeURIComponent(phone), '_blank');
+}
+
 function deleteTech(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selTech').value, 10);
@@ -875,6 +892,7 @@ function fillMgr(){
   if(!m) return;
   document.getElementById('mgrName').value = m.name || '';
   document.getElementById('mgrUser').value = m.username || '';
+  document.getElementById('mgrPhone').value = m.phone || '';
   document.getElementById('mgrPass').value = ''; // never echo the stored hash
 }
 function addMgr(){
@@ -899,13 +917,14 @@ function saveMgr(){
   if(!un){ alert('Login username required'); return; }
   m.name = nm || un;
   m.username = un;
+  m.phone = document.getElementById('mgrPhone').value.trim();
   if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
   // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
   fetch('/api/managers', {
     method:'PUT',
     headers:{ ...authHdr(), 'Content-Type':'application/json' },
     body: JSON.stringify({ managers: cfg.managers.map(function(x){
-      return { name:x.name, username:x.username, password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
+      return { name:x.name, username:x.username, phone:x.phone||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
     }) })
   })
   .then(function(){ loadData(); })

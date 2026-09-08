@@ -3,6 +3,11 @@ const byId=id=>document.getElementById(id);
 let version='',busy=false;
 function update(){byId('subscribe').disabled=busy||!version||!byId('consent').checked;byId('unsubscribe').disabled=busy;}
 byId('consent').onchange=update;
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('name')) byId('name').value=q.get('name');
+  if(q.get('phone')) byId('phone').value=q.get('phone');
+})();
 async function save(action){
   if(busy||!byId('preferences').reportValidity())return;
   if(action==='subscribe'&&(!version||!byId('consent').checked))return;

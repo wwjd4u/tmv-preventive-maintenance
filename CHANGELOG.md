@@ -1,3 +1,10 @@
+
+## 2026-09-08 — SMS Preferences exposed in Setup
+- Added SMS Preferences controls to Technician and Manager Setup cards.
+- Selected name/phone are prefilled on the existing consent page.
+- Added Manager mobile phone storage for SMS enrollment.
+- SMS consent roster validation now accepts Technicians or Managers.
+
 # TMV Preventive Maintenance App — Change Log
 
 This file explains application changes in plain language. It is intended to be updated with every future application change.
