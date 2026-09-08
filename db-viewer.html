@@ -176,6 +176,42 @@ footer a:active {
 }
 </style>
 
+
+<style id="setup-admin-layout-cleanup">
+  /* Superuser admin controls get the full page width instead of skinny grid cards. */
+  #superuserSecurityBlock,
+  #userRolesBlock{grid-column:1/-1;width:100%;}
+
+  #superuserSecurityBlock .contact-grid{
+    grid-template-columns:repeat(4,minmax(180px,1fr));
+  }
+
+  #userRolesList{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px;}
+  .user-role-row{
+    display:grid;
+    grid-template-columns:minmax(240px,1fr) minmax(160px,190px) 120px;
+    gap:14px;
+    align-items:center;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px 14px;
+    background:#fff;
+  }
+  .user-role-row .msel{width:100%;min-width:0;}
+  .user-role-action{width:100%;white-space:nowrap;}
+
+  @media (max-width:900px){
+    #superuserSecurityBlock .contact-grid{grid-template-columns:1fr 1fr;}
+    .user-role-row{grid-template-columns:minmax(200px,1fr) 160px 112px;gap:10px;}
+  }
+  @media (max-width:640px){
+    main{padding:12px;}
+    #superuserSecurityBlock .contact-grid{grid-template-columns:1fr;}
+    .user-role-row{grid-template-columns:1fr;gap:8px;}
+    .user-role-row .msel,.user-role-action{width:100%;}
+  }
+</style>
+
 </head>
 <body>
 
@@ -478,14 +514,14 @@ function renderUserRoles(users){
     var label = u.name || u.username || 'Unnamed user';
     var login = u.username ? '<div style="font-size:12px;color:#777">'+esc(u.username)+'</div>' : '<div style="font-size:12px;color:#a16207">No login username</div>';
     var note = locked ? '<div style="font-size:11px;color:#777;margin-top:3px">Emergency recovery account — role locked</div>' : (!u.loginReady && u.role!=='technician' ? '<div style="font-size:11px;color:#b45309;margin-top:3px">Login password still needs to be set</div>' : '');
-    return '<div style="display:grid;grid-template-columns:minmax(160px,1fr) 150px auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:10px;margin:8px 0;background:#fff">'+
+    return '<div class="user-role-row">'+
       '<div><b>'+esc(label)+'</b>'+login+note+'</div>'+
       '<select class="msel" id="roleSel_'+encodeURIComponent(u.role+'|'+u.key)+'" '+(locked?'disabled':'')+'>'+
         '<option value="technician" '+(u.role==='technician'?'selected':'')+'>Technician</option>'+
         '<option value="manager" '+(u.role==='manager'?'selected':'')+'>Manager</option>'+
         '<option value="superuser" '+(u.role==='superuser'?'selected':'')+'>Superuser</option>'+
       '</select>'+
-      '<button class="btn sm" '+(locked?'disabled':'')+' onclick="changeUserRole('+JSON.stringify(u.key)+','+JSON.stringify(u.role)+')">Change Role</button>'+
+      '<button class="btn sm user-role-action" '+(locked?'disabled':'')+' onclick="changeUserRole('+JSON.stringify(u.key)+','+JSON.stringify(u.role)+')">Change Role</button>'+
     '</div>';
   }).join('');
 }
@@ -545,15 +581,6 @@ function applyRoleUi(){
     document.querySelectorAll('[onclick="'+call+'"]').forEach(function(el){ el.style.display = manager ? 'none' : ''; });
   });
   // Technician delete remains available to Managers by design.
-  var label = document.getElementById('roleLabel');
-  if(!label){
-    label = document.createElement('span');
-    label.id = 'roleLabel';
-    label.style.cssText = 'margin-left:10px;font-size:12px;opacity:.85';
-    var nav = document.querySelector('header nav');
-    if(nav) nav.appendChild(label);
-  }
-  if(label) label.textContent = currentRole ? (currentRole === 'superuser' ? 'Superuser' : 'Manager') + (currentUserName ? ' — ' + currentUserName : '') : '';
 }
 
 /* LOAD DATA */
