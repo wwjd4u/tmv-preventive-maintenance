@@ -1,0 +1,45 @@
+name: Apply TMV Ticket Link SMS
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'updates/add-ticket-link-sms.py'
+      - '.github/workflows/tmv-ticket-link-sms.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-ticket-link-sms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check out patch script
+        run: |
+          git show origin/master:updates/add-ticket-link-sms.py > /tmp/add-ticket-link-sms.py
+
+      - name: Apply ticket/SMS patch
+        run: python3 /tmp/add-ticket-link-sms.py
+
+      - name: Verify patch
+        run: |
+          grep -n "ticketNumber = 'PM-'" work-orders.js
+          grep -n "function ticketNumber\|function technicianWorkOrderUrl\|Open work order:\|Reply STOP to opt out" assign.html
+          node --check work-orders.js
+          git diff --check
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "assign.html work-orders.js "
+
+      - name: Commit and push production branch
+        run: |
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add assign.html work-orders.js
+          git commit -m "Add ticket number and direct SMS work order link"
+          git push origin HEAD:ms02-live-sync-20260908-085804
