@@ -33,9 +33,12 @@ process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err && err.message);
 });
 
-// ── Admin credentials (username / password) ──────────────
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = 'admin123';
+// ── Superuser credentials — private environment only ─────
+const ADMIN_USER = String(process.env.ADMIN_USER || '').trim();
+const ADMIN_PASS = String(process.env.ADMIN_PASS || '');
+if (!ADMIN_USER || !ADMIN_PASS) {
+  console.warn('[auth] ADMIN_USER / ADMIN_PASS are not configured; Superuser login is disabled.');
+}
 
 // ── Default config ─────────────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -303,13 +306,25 @@ function serveFile(res, p, contentType) {
 // Built-in admin is the Superuser. Saved manager accounts receive Manager
 // sessions. Tokens are random server-side session IDs, not reusable admin creds.
 const authSessions = new Map();
+const AUTH_IDLE_MINUTES = Math.max(1, Number(process.env.AUTH_IDLE_MINUTES || 15));
+const AUTH_IDLE_MS = AUTH_IDLE_MINUTES * 60 * 1000;
 function newAuthSession(role, username, name) {
   const token = crypto.randomBytes(32).toString('hex');
-  authSessions.set(token, { role, username, name: name || username, createdAt: Date.now() });
+  const now = Date.now();
+  authSessions.set(token, { role, username, name: name || username, createdAt: now, lastActivity: now });
   return token;
 }
 function getAuthSession(token) {
-  return token ? (authSessions.get(token) || null) : null;
+  if (!token) return null;
+  const session = authSessions.get(token) || null;
+  if (!session) return null;
+  const last = session.lastActivity || session.createdAt || 0;
+  if (Date.now() - last >= AUTH_IDLE_MS) {
+    authSessions.delete(token);
+    return null;
+  }
+  session.lastActivity = Date.now();
+  return session;
 }
 function isAdmin(token) {
   const s = getAuthSession(token);
@@ -637,7 +652,7 @@ http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const d = JSON.parse(body);
-        if (d.username === ADMIN_USER && d.password === ADMIN_PASS) {
+        if (ADMIN_USER && ADMIN_PASS && d.username === ADMIN_USER && d.password === ADMIN_PASS) {
           const token = newAuthSession('superuser', ADMIN_USER, 'Superuser');
           return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser' });
         }

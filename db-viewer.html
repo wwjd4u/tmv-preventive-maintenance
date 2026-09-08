@@ -371,7 +371,7 @@ function doLogin(){
   fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
     .then(r => r.json())
     .then(d => {
-      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
+      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; dbAuthLastActivity=Date.now(); sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
       else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
     })
     .catch(() => document.getElementById('loginErr').textContent = 'Server error');
@@ -384,7 +384,7 @@ function doLogin(){
   fetch('/api/session', { headers:{'Authorization':'Bearer '+shared} })
     .then(function(r){ if(!r.ok) throw new Error('expired'); return r.json(); })
     .then(function(d){
-      token = shared; currentRole = d.role || ''; currentUserName = d.name || '';
+      token = shared; currentRole = d.role || ''; currentUserName = d.name || ''; dbAuthLastActivity=Date.now();
       document.getElementById('loginOverlay').style.display='none';
       applyRoleUi(); loadData();
     })
@@ -405,6 +405,29 @@ function dbLogout(){
 }
 
 function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
+var DB_AUTH_IDLE_MS = 15 * 60 * 1000;
+var dbAuthLastActivity = Date.now();
+var dbAuthLastHeartbeat = 0;
+var dbAuthIdleTimer = setInterval(function(){
+  if(token && Date.now() - dbAuthLastActivity >= DB_AUTH_IDLE_MS){
+    var old = token;
+    token=null; currentRole=''; currentUserName='';
+    sessionStorage.removeItem('tmv_auth_token');
+    sessionStorage.removeItem('tmv_auth_role');
+    sessionStorage.removeItem('tmv_auth_name');
+    fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+old}}).catch(function(){});
+    document.getElementById('loginErr').textContent='Signed out after 15 minutes of inactivity.';
+    document.getElementById('loginOverlay').style.display='flex';
+  }
+},15000);
+function noteDbAuthActivity(){
+  if(!token) return;
+  dbAuthLastActivity=Date.now();
+  if(Date.now()-dbAuthLastHeartbeat < 60000) return;
+  dbAuthLastHeartbeat=Date.now();
+  fetch('/api/session',{headers:authHdr()}).then(function(r){ if(r.status===401) dbAuthLastActivity=0; }).catch(function(){});
+}
+['pointerdown','keydown','touchstart','scroll'].forEach(function(evt){ window.addEventListener(evt,noteDbAuthActivity,{passive:true}); });
 function isSuperuser(){ return currentRole === 'superuser'; }
 function applyRoleUi(){
   var manager = currentRole === 'manager';

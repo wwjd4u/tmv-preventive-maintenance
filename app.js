@@ -45,6 +45,41 @@ var APP_ROLE = sessionStorage.getItem('tmv_auth_role') || '';
 var APP_USER = sessionStorage.getItem('tmv_auth_name') || '';
 function isAdmin(){ return APP_ROLE === 'superuser' || APP_ROLE === 'manager'; }
 
+// Authentication idle policy: sign out after 15 minutes with no user activity.
+// Real activity also refreshes the rolling server-side session at most once/minute.
+var AUTH_IDLE_MS = 15 * 60 * 1000;
+var AUTH_HEARTBEAT_MS = 60 * 1000;
+var authLastActivity = Date.now();
+var authLastHeartbeat = 0;
+var authIdleTimer = null;
+function expireAppForIdle(){
+  if(!APP_TOKEN) return;
+  var oldToken = APP_TOKEN;
+  clearAppSession();
+  try{ fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+oldToken}}); }catch(_e){}
+  showAppLogin('Signed out after 15 minutes of inactivity.');
+}
+function checkAppIdle(){
+  if(APP_TOKEN && Date.now() - authLastActivity >= AUTH_IDLE_MS) expireAppForIdle();
+}
+function noteAppActivity(){
+  if(!APP_TOKEN) return;
+  authLastActivity = Date.now();
+  if(Date.now() - authLastHeartbeat < AUTH_HEARTBEAT_MS) return;
+  authLastHeartbeat = Date.now();
+  fetch('/api/session',{headers:appAuthHeaders()}).then(function(r){
+    if(r.status===401) expireAppForIdle();
+  }).catch(function(){});
+}
+function startAppIdleWatch(){
+  authLastActivity = Date.now();
+  if(authIdleTimer) clearInterval(authIdleTimer);
+  authIdleTimer = setInterval(checkAppIdle, 15000);
+}
+['pointerdown','keydown','touchstart','scroll'].forEach(function(evt){
+  window.addEventListener(evt, noteAppActivity, {passive:true});
+});
+
 function appAuthHeaders(extra){
   var h = Object.assign({}, extra || {});
   if(APP_TOKEN) h.Authorization = 'Bearer ' + APP_TOKEN;
@@ -80,6 +115,7 @@ async function doAppLogin(){
     sessionStorage.setItem('tmv_auth_role',APP_ROLE);
     sessionStorage.setItem('tmv_auth_name',APP_USER);
     document.getElementById('appLoginPass').value='';
+    startAppIdleWatch();
     await boot();
   }catch(e){ showAppLogin(e.message||'Login failed'); }
 }
@@ -98,7 +134,7 @@ async function boot(){
     APP_ROLE=sd.role||APP_ROLE; APP_USER=sd.name||APP_USER;
     sessionStorage.setItem('tmv_auth_role',APP_ROLE);
     sessionStorage.setItem('tmv_auth_name',APP_USER);
-    hideAppLogin(); updateAppAuthUi();
+    hideAppLogin(); updateAppAuthUi(); startAppIdleWatch();
     await loadConfig();
     loadPositions();
     await loadAssets();
