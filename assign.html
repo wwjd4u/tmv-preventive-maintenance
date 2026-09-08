@@ -60,14 +60,23 @@ footer a:active {
 <script>
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function statusLabel(s){ return (s||'assigned').replace('_',' '); }
+function ticketNumber(a){
+  if(a && a.ticketNumber) return a.ticketNumber;
+  var date=String((a&&a.date)||'').replace(/-/g,'');
+  var short=String((a&&a.id)||'').slice(0,6).toUpperCase();
+  return 'PM-'+(date||'WORK')+'-'+(short||'ORDER');
+}
+function technicianWorkOrderUrl(a){
+  return location.origin+'/tech/'+encodeURIComponent(a.id);
+}
 
 function workOrderEmail(a, technicianName){
   var subject='CUDD PM Work Order — '+(a.tmv||'TMV');
   var lines=['CUDD Energy Services — Maintenance Work Order',
-    'Work order: '+a.id, 'TMV: '+(a.tmv||''),
+    'Ticket: '+ticketNumber(a), 'Assignment ID: '+a.id, 'TMV: '+(a.tmv||''),
     'Technician: '+technicianName, 'District: '+(a.location||''),
     'Scheduled date: '+(a.date||''), 'Status: '+statusLabel(a.status), '',
-    'Open your work order: '+location.origin+'/tech/'+encodeURIComponent(a.id), '',
+    'Open your work order: '+technicianWorkOrderUrl(a), '',
     'Work Order Checklist'];
   (a.sections||[]).forEach(function(section){
     lines.push('',section.title||'Section');
@@ -150,7 +159,16 @@ function photoGrid(photos){
 async function sendSms(btn){
   var num=btn.getAttribute('data-sms')||'';
   if(!num){ alert('No phone number on file for this technician.'); return; }
-  var msg='CUDD PM: work order '+ (window.__tmv||'') +' — open the PM app to view details.';
+  var a=window.__assignment||{};
+  var msg=[
+    'CUDD PM Work Order',
+    'Ticket: '+ticketNumber(a),
+    'TMV: '+(a.tmv||''),
+    'District: '+(a.location||''),
+    'Scheduled: '+(a.date||''),
+    'Open work order: '+technicianWorkOrderUrl(a),
+    'Reply STOP to opt out.'
+  ].join('\n');
   var prev=btn.textContent; btn.disabled=true; btn.textContent='Sending…';
   try{
     var r=await fetch('/api/sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:num,message:msg})});
@@ -174,11 +192,13 @@ async function sendSms(btn){
     var d=await r.json();
     var a=d.assignment; if(!a){ root.innerHTML='<p class="err">Empty work order.</p>'; return; }
     window.__tmv=a.tmv||'';
+    window.__assignment=a;
     var t=a.technician||{};
     var cnt=0; (a.sections||[]).forEach(function(s){ cnt+=(s.items||[]).length; });
     var sub=[a.vanType,a.location,a.date].filter(Boolean).map(esc).join(' · ');
     var h='<div class="card">';
     h+='<div class="top"><h1>'+esc(a.tmv||'Untitled')+'</h1><span class="st st-'+(a.status||'assigned')+'">'+statusLabel(a.status)+'</span></div>';
+    h+='<div class="sub"><b>Ticket:</b> '+esc(ticketNumber(a))+'</div>';
     if(sub) h+='<div class="sub">'+sub+'</div>';
     var techName=(typeof t==='string')?t:(t.name||'');
     if(techName) h+='<div class="tech">👷 '+esc(techName)+'</div>';

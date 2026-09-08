@@ -42,13 +42,14 @@ function buildWorkOrder(input, config) {
   const requestHash = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
   const id = crypto.createHash('sha256').update(requestId).digest('hex').slice(0, 24);
   const createdAt = Date.now();
-  const ticket = ['CUDD Energy Services — Maintenance Report', 'Report / Assignment: ' + id,
+  const ticketNumber = 'PM-' + date.replace(/-/g, '') + '-' + id.slice(0, 6).toUpperCase();
+  const ticket = ['CUDD Energy Services — Maintenance Report', 'Ticket: ' + ticketNumber, 'Report / Assignment ID: ' + id,
     'TMV Unit: ' + tmv, 'Van Type: ' + types.join(' + '), 'District: ' + location,
     'Technician: ' + name, 'Scheduled date: ' + date, 'Status: Assigned — awaiting technician completion', '',
     ...sections.flatMap(s => [s.title, ...s.items.map(i => '• ' + i.label + (i.value ? ': ' + i.value : ''))]),
     '', 'Assignment and report creation logged. Maintenance is not marked completed.'].join('\n');
   const log = { selectedSectionTitles: sections.map(s => s.title), id, assignmentId: id, event: 'assignment_report_created', createdAt, tmv, technician: name, location, date };
-  return { id, tmv, vanType: types.join(' + '), location, technician: { ...technician }, date,
+  return { id, ticketNumber, tmv, vanType: types.join(' + '), location, technician: { ...technician }, date,
     createdAt, status: 'assigned', sections, results: null, completedAt: null, photos: [],
     ...(selectedTitles !== undefined ? { selectedSectionTitles: sections.map(s => s.title) } : {}),
     requestHash, report: { id, createdAt, text: ticket }, dispatchLog: log };
