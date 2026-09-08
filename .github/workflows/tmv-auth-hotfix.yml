@@ -1,0 +1,81 @@
+name: Apply TMV Auth Boot Hotfix
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/tmv-auth-hotfix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out synchronized live branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+
+      - name: Fix authenticated role helper and remove dead legacy listener
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('app.js')
+          text = p.read_text()
+
+          anchor = "var APP_USER = sessionStorage.getItem('tmv_auth_name') || '';\n"
+          helper = "var APP_USER = sessionStorage.getItem('tmv_auth_name') || '';\nfunction isAdmin(){ return APP_ROLE === 'superuser' || APP_ROLE === 'manager'; }\n"
+          if 'function isAdmin(){ return APP_ROLE' not in text:
+              if anchor not in text:
+                  raise SystemExit('authenticated role insertion point not found')
+              text = text.replace(anchor, helper, 1)
+
+          dead = "var _rs=document.getElementById('roleSel');\nif(_rs) _rs.addEventListener('change', function(){ ROLE=_rs.value; localStorage.setItem('tmv_role', ROLE); applyRole(); buildTracker(); });\n"
+          if dead in text:
+              text = text.replace(dead, '', 1)
+
+          p.write_text(text)
+
+          p = Path('index.html')
+          text = p.read_text()
+          text = text.replace('app.js?v=20260908AUTH1', 'app.js?v=20260908AUTH2')
+          p.write_text(text)
+
+          p = Path('CHANGELOG.md')
+          text = p.read_text()
+          marker = '## 2026-09-08\n'
+          entry = '''## 2026-09-08\n\n### Login boot hotfix\n- Fixed a post-login boot error caused by a leftover `isAdmin()` reference from the retired fake Admin/Tech role selector.\n- `isAdmin()` now uses the real authenticated role and treats both Superuser and Manager as operational admin roles for Tracker controls.\n- Removed the dead legacy role-dropdown listener.\n- Bumped the main app JavaScript cache version so browsers load the corrected file immediately.\n- Deployment status: **GitHub implementation pending MS-02 deployment verification.**\n\n'''
+          if '### Login boot hotfix' not in text:
+              if marker not in text:
+                  raise SystemExit('changelog date marker not found')
+              text = text.replace(marker, entry, 1)
+          p.write_text(text)
+          PY
+
+      - name: Verify hotfix
+        shell: bash
+        run: |
+          grep -q "function isAdmin(){ return APP_ROLE === 'superuser' || APP_ROLE === 'manager'; }" app.js
+          ! grep -q "ROLE=_rs.value" app.js
+          grep -q 'app.js?v=20260908AUTH2' index.html
+          node --check app.js
+          grep -q '### Login boot hotfix' CHANGELOG.md
+
+      - name: Commit hotfix to synchronized production branch
+        shell: bash
+        run: |
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add app.js index.html CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "No source change required."
+          else
+            git commit -m "Fix authenticated app boot"
+            git push origin HEAD:ms02-live-sync-20260908-085804
+          fi
