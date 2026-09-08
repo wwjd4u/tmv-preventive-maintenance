@@ -43,6 +43,7 @@ var __staticPositions = {
 var APP_TOKEN = sessionStorage.getItem('tmv_auth_token') || '';
 var APP_ROLE = sessionStorage.getItem('tmv_auth_role') || '';
 var APP_USER = sessionStorage.getItem('tmv_auth_name') || '';
+function isAdmin(){ return APP_ROLE === 'superuser' || APP_ROLE === 'manager'; }
 
 function appAuthHeaders(extra){
   var h = Object.assign({}, extra || {});
@@ -373,8 +374,6 @@ function buildTracker(){
 }
 ['filter','filterTech','filterGeo'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', buildTracker); });
 var _ft=document.getElementById('filterText'); if(_ft) _ft.addEventListener('input', buildTracker);
-var _rs=document.getElementById('roleSel');
-if(_rs) _rs.addEventListener('change', function(){ ROLE=_rs.value; localStorage.setItem('tmv_role', ROLE); applyRole(); buildTracker(); });
 
 // ── Drag & drop for the Assignments board (admin-only) ──
 // Tracker is the read-only assignments TABLE above. Drag/reassign lives on the

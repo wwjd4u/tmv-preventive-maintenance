@@ -17,6 +17,14 @@ Historical entries below are based on the Git repository history. Older entries 
 
 ## 2026-09-08
 
+### Login boot hotfix
+- Fixed a post-login boot error caused by a leftover `isAdmin()` reference from the retired fake Admin/Tech role selector.
+- `isAdmin()` now uses the real authenticated role and treats both Superuser and Manager as operational admin roles for Tracker controls.
+- Removed the dead legacy role-dropdown listener.
+- Bumped the main app JavaScript cache version so browsers load the corrected file immediately.
+- Deployment status: **GitHub implementation pending MS-02 deployment verification.**
+
+
 ### Completed application login and logout flow
 - Removed the legacy browser code that automatically stored and reused the built-in admin credentials.
 - Removed the fake Admin/Tech role selector from the desktop application.
