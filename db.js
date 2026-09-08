@@ -34,6 +34,18 @@ db.exec(`
     assignment_id TEXT PRIMARY KEY,
     data TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at INTEGER NOT NULL,
+    actor TEXT,
+    actor_role TEXT,
+    action TEXT NOT NULL,
+    target TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    details TEXT
+  );
+  CREATE INDEX IF NOT EXISTS audit_log_at ON audit_log(at DESC);
 `);
 
 // ---- migration: seed from existing JSON files on first run only ----
@@ -125,6 +137,43 @@ function saveConfig(c) {
   db.prepare('INSERT OR REPLACE INTO config (key, data) VALUES (?, ?)').run('app', JSON.stringify(c));
 }
 
+// ---- permanent administrative/system audit log ----
+function auditJson(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') return value;
+  try { return JSON.stringify(value); } catch (_) { return String(value); }
+}
+function recordAudit(event) {
+  const e = event || {};
+  db.prepare(`INSERT INTO audit_log (at, actor, actor_role, action, target, old_value, new_value, details)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    Number(e.at || Date.now()),
+    e.actor || '', e.actorRole || '', e.action || 'unknown', e.target || '',
+    auditJson(e.oldValue), auditJson(e.newValue), auditJson(e.details)
+  );
+}
+function parseAuditJson(value) {
+  if (value == null || value === '') return null;
+  try { return JSON.parse(value); } catch (_) { return value; }
+}
+function getAuditLog(limit) {
+  const n = Math.min(1000, Math.max(1, Number(limit || 200)));
+  return db.prepare(`SELECT id, at, actor, actor_role AS actorRole, action, target, old_value AS oldValue, new_value AS newValue, details
+                     FROM audit_log ORDER BY id DESC LIMIT ?`).all(n).map(r => ({
+    ...r, oldValue: parseAuditJson(r.oldValue), newValue: parseAuditJson(r.newValue), details: parseAuditJson(r.details)
+  }));
+}
+function recordDeployment(commit, branch) {
+  const c = String(commit || '').trim();
+  if (!c) return;
+  const last = db.prepare(`SELECT details FROM audit_log WHERE action = 'deployment' ORDER BY id DESC LIMIT 1`).get();
+  if (last) {
+    const d = parseAuditJson(last.details);
+    if (d && d.commit === c) return;
+  }
+  recordAudit({ actor: 'system', actorRole: 'system', action: 'deployment', target: 'TMV Maintenance App', details: { commit: c, branch: branch || '' } });
+}
+
 // ---- full DB dump for admin viewer ----
 function getAdminDump() {
   const assignments = db.prepare('SELECT id, status, technician, completedAt, data FROM assignments ORDER BY completedAt DESC, rowid DESC').all();
@@ -161,6 +210,7 @@ function hasSmsConsent(phone) {
 }
 
 module.exports = {
+  recordAudit, getAuditLog, recordDeployment,
   recordSmsConsent, hasSmsConsent,
   createWorkOrder,
   loadAssignments, saveAssignments, purgeAssignments,

@@ -166,6 +166,55 @@ function saveConfig(c) {
   db.saveConfig(c);
 }
 
+function auditEvent(session, action, target, oldValue, newValue, details) {
+  try {
+    db.recordAudit({
+      actor: session ? (session.username || session.name || 'unknown') : 'system',
+      actorRole: session ? (session.role || '') : 'system',
+      action, target, oldValue, newValue, details
+    });
+  } catch (e) { console.error('[audit]', e.message); }
+}
+function auditConfigSummary(cfg) {
+  const c = cfg || {};
+  const names = arr => (Array.isArray(arr) ? arr : []).map(x => typeof x === 'string' ? x : (x && (x.name || x.username)) || '').filter(Boolean);
+  const accounts = arr => (Array.isArray(arr) ? arr : []).map(x => ({ name: (x && x.name) || '', username: (x && x.username) || '' }));
+  return {
+    locations: Array.isArray(c.locations) ? c.locations : [],
+    districts: Array.isArray(c.districts) ? c.districts : [],
+    technicians: names(c.technicians),
+    managers: accounts(c.managers),
+    superusers: accounts(c.superusers),
+    intervals: Array.isArray(c.intervals) ? c.intervals : [],
+    unitOptions: Array.isArray(c.unitOptions) ? c.unitOptions : [],
+    tmvUnits: Object.keys(c.tmvVanMap || {}).sort(),
+    geofences: Object.keys(c.geofences || {}).sort(),
+    checklist: (Array.isArray(c.checklist) ? c.checklist : []).map(x => typeof x === 'string' ? x : (x && x.title) || '').filter(Boolean)
+  };
+}
+function currentGitDeployment() {
+  try {
+    const gitDir = path.join(__dirname, '.git');
+    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
+    if (head.startsWith('ref: ')) {
+      const ref = head.slice(5).trim();
+      let commit = '';
+      try { commit = fs.readFileSync(path.join(gitDir, ref), 'utf8').trim(); } catch (_) {}
+      if (!commit) {
+        try {
+          const packed = fs.readFileSync(path.join(gitDir, 'packed-refs'), 'utf8').split(/\r?\n/);
+          const hit = packed.find(line => line && !line.startsWith('#') && line.endsWith(' ' + ref));
+          if (hit) commit = hit.split(' ')[0];
+        } catch (_) {}
+      }
+      return { commit, branch: ref.replace(/^refs\/heads\//, '') };
+    }
+    return { commit: head, branch: 'detached' };
+  } catch (_) { return { commit: '', branch: '' }; }
+}
+const _deployment = currentGitDeployment();
+if (_deployment.commit) { try { db.recordDeployment(_deployment.commit, _deployment.branch); } catch (e) { console.error('[audit deployment]', e.message); } }
+
 // ── Assignments (admin → technician handoff) ───────────────
 function loadAssignments() {
   return db.loadAssignments();
@@ -737,6 +786,7 @@ http.createServer((req, res) => {
         if (nextPass && !validAdminPassword(nextPass)) {
           return sendJson(res, 400, { error: 'Password must be at least 10 characters with an uppercase letter, number, and special character' });
         }
+        const oldUser = ADMIN_USER;
         const finalUser = nextUser || ADMIN_USER;
         const finalPass = nextPass || ADMIN_PASS;
         updatePrivateEnv({ ADMIN_USER: finalUser, ADMIN_PASS: finalPass });
@@ -744,6 +794,9 @@ http.createServer((req, res) => {
         ADMIN_PASS = finalPass;
         process.env.ADMIN_USER = finalUser;
         process.env.ADMIN_PASS = finalPass;
+        auditEvent(session, 'superuser_credentials_updated', 'Recovery Superuser',
+          { username: oldUser }, { username: finalUser },
+          { usernameChanged: oldUser !== finalUser, passwordChanged: !!nextPass });
         authSessions.clear();
         return sendJson(res, 200, { ok: true, message: 'Superuser credentials updated. Sign in again.' });
       } catch (e) {
@@ -777,6 +830,13 @@ http.createServer((req, res) => {
   const isSuperuserReq = !!authSession && authSession.role === 'superuser';
   const isManagerReq = !!authSession && authSession.role === 'manager';
   const isAdminReq = isSuperuserReq || isManagerReq; // operational admin access
+
+  // ── Superuser-only permanent audit log ─────────────────
+  if (url.pathname === '/api/audit-log' && req.method === 'GET') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit') || 200)));
+    return sendJson(res, 200, { ok: true, entries: db.getAuditLog(limit) });
+  }
 
   // ── Superuser-only User Roles management ────────────────
   if (url.pathname === '/api/user-roles' && req.method === 'GET') {
@@ -855,6 +915,8 @@ http.createServer((req, res) => {
         });
         if (cfg.roleAudit.length > 200) cfg.roleAudit = cfg.roleAudit.slice(-200);
         saveConfig(cfg);
+        auditEvent(authSession, 'user_role_changed', rec.name || rec.username || key,
+          { role: sourceRole }, { role: nextRole }, { username: rec.username || '' });
 
         // Any live session for the changed account is invalidated immediately.
         for (const [tok, s] of authSessions.entries()) {
@@ -879,7 +941,9 @@ http.createServer((req, res) => {
   // ── GET /api/admin/purge — wipe all temp records before production ──
   if (url.pathname === '/api/admin/purge' && req.method === 'POST') {
     if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    const purgeCount = loadAssignments().length;
     db.purgeAssignments();
+    auditEvent(authSession, 'assignments_purged', 'All assignment records', { count: purgeCount }, { count: 0 }, null);
     return sendJson(res, 200, { ok: true, message: 'All assignment records purged.' });
   }
 
@@ -902,6 +966,7 @@ http.createServer((req, res) => {
       updated++;
     });
     saveAssignments(assignments);
+    auditEvent(authSession, 'assignments_backfilled', 'Assignment checklists', null, null, { updated, missingVan });
     return sendJson(res, 200, { ok: true, updated, missingVan, message: `Reconciled ${updated} assignment(s) to the full checklist.` });
   }
 
@@ -946,7 +1011,11 @@ http.createServer((req, res) => {
           // Technicians are the one Setup list Managers may add/edit/delete.
           if (Array.isArray(incoming.technicians)) merged.technicians = incoming.technicians;
         }
+        const beforeAudit = auditConfigSummary(config);
+        const afterAudit = auditConfigSummary(merged);
+        const changedKeys = Object.keys(afterAudit).filter(k => JSON.stringify(beforeAudit[k]) !== JSON.stringify(afterAudit[k]));
         saveConfig(merged);
+        auditEvent(authSession, 'setup_config_updated', 'Setup', beforeAudit, afterAudit, { changedKeys });
         sendJson(res, 200, { ok: true, config: merged });
       } catch(e) { sendJson(res, 400, { error: e.message }); }
     });
@@ -985,6 +1054,10 @@ http.createServer((req, res) => {
         const config = loadConfig() || {};
         const merged = { ...config, managers: out };
         saveConfig(merged);
+        auditEvent(authSession, 'managers_updated', 'Managers',
+          current.map(m => ({ name: m.name || '', username: m.username || '' })),
+          out.map(m => ({ name: m.name || '', username: m.username || '' })),
+          { passwordUpdatedFor: incoming.filter(m => m.password && !String(m.password).startsWith('scrypt$')).map(m => m.username || m.name || '').filter(Boolean) });
         sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, phone: m.phone })) });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
@@ -1011,6 +1084,8 @@ http.createServer((req, res) => {
         a.lastMaint = a.lastMaint !== undefined ? a.lastMaint : null;
         assets.push(a);
         saveAssets(assets);
+        auditEvent(authSession, 'asset_added', a.tmvId || a.name || String(a.id), null,
+          { id: a.id, tmvId: a.tmvId || '', name: a.name || '', type: a.type || '', location: a.location || '' }, null);
         sendJson(res, 200, { ok: true, asset: a });
       } catch(e) { sendJson(res, 400, { error: e.message }); }
     });
@@ -1051,6 +1126,8 @@ http.createServer((req, res) => {
       });
     }
     saveAssets(assets.filter(a => a.id !== id));
+    auditEvent(authSession, 'asset_deleted', target ? (target.tmvId || target.name || String(id)) : String(id),
+      target ? { id: target.id, tmvId: target.tmvId || '', name: target.name || '', type: target.type || '', location: target.location || '' } : null, null, null);
     return sendJson(res, 200, { ok: true });
   }
 

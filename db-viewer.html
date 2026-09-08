@@ -271,6 +271,20 @@ footer a:active {
         <div id="userRolesStatus" class="saved-ok" style="display:block;margin:10px 0 0"></div>
       </section>
 
+      <section class="mblock" id="auditLogBlock" style="display:none;grid-column:1/-1">
+        <h3>Audit Log</h3>
+        <div class="bar" style="margin-bottom:10px">
+          <span class="muted" style="margin-left:0">Permanent SQLite record of administrative and deployment changes. Passwords are never stored in the audit log.</span>
+          <button class="btn ghost sm" onclick="loadAuditLog()" style="margin-left:auto">↻ Refresh Audit</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Date / Time</th><th>User</th><th>Role</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+            <tbody id="auditLogBody"><tr><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
     </div>
   </div>
 
@@ -517,6 +531,26 @@ function renderUserRoles(users){
     '</div>';
   }).join('');
 }
+function auditDisplayValue(v){
+  if(v == null || v === '') return '';
+  if(typeof v === 'string') return v;
+  try { return JSON.stringify(v); } catch(e) { return String(v); }
+}
+function loadAuditLog(){
+  if(currentRole !== 'superuser') return;
+  fetch('/api/audit-log?limit=250',{headers:authHdr()})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok) throw new Error((x.d&&x.d.error)||'Could not load audit log');
+      var body=document.getElementById('auditLogBody'); if(!body) return;
+      var rows=x.d.entries||[];
+      body.innerHTML=rows.length?rows.map(function(e){
+        var detail=e.details!=null?e.details:(e.newValue!=null?e.newValue:e.oldValue);
+        return '<tr><td>'+esc(new Date(e.at).toLocaleString())+'</td><td>'+esc(e.actor||'')+'</td><td>'+esc(e.actorRole||'')+'</td><td>'+esc(e.action||'')+'</td><td>'+esc(e.target||'')+'</td><td style="max-width:420px;white-space:normal">'+esc(auditDisplayValue(detail))+'</td></tr>';
+      }).join(''):'<tr><td colspan="6" class="empty">No audit records yet.</td></tr>';
+    }).catch(function(e){ var body=document.getElementById('auditLogBody'); if(body) body.innerHTML='<tr><td colspan="6">'+esc(e.message||'Could not load audit log')+'</td></tr>'; });
+}
+
 function changeUserRole(key,currentRoleValue){
   var id='roleSel_'+encodeURIComponent(currentRoleValue+'|'+key);
   var sel=document.getElementById(id);
@@ -569,6 +603,8 @@ function applyRoleUi(){
   if(suSecurity) suSecurity.style.display = currentRole === 'superuser' ? '' : 'none';
   var userRoles = document.getElementById('userRolesBlock');
   if(userRoles) userRoles.style.display = currentRole === 'superuser' ? '' : 'none';
+  var auditLog = document.getElementById('auditLogBlock');
+  if(auditLog) auditLog.style.display = currentRole === 'superuser' ? '' : 'none';
   var securityTab = document.getElementById('tabSecurity');
   if(securityTab) securityTab.style.display = currentRole === 'superuser' ? '' : 'none';
   if(currentRole !== 'superuser'){
@@ -594,7 +630,10 @@ function loadData(){
       try { renderAssignments(); } catch(e){ console.error('renderAssignments', e); }
       try { renderAssetManager(); } catch(e){ console.error('renderAssetManager', e); }
       try { populateConfig(); } catch(e){ console.error('populateConfig', e); }
-      if(currentRole === 'superuser') { try { loadUserRoles(); } catch(e){ console.error('loadUserRoles', e); } }
+      if(currentRole === 'superuser') {
+        try { loadUserRoles(); } catch(e){ console.error('loadUserRoles', e); }
+        try { loadAuditLog(); } catch(e){ console.error('loadAuditLog', e); }
+      }
     })
     .catch(() => alert('Failed to load DB data'));
 }
