@@ -40,28 +40,73 @@ var __staticPositions = {
   'TMV97776B': { lat: 34.99, lng: -97.42,  radius: 500 }
 };
 // Asset 27616B had N/A coordinates → intentionally omitted (shows "Location set").
-var ROLE = localStorage.getItem('tmv_role') || 'admin';
-function isAdmin(){ return ROLE === 'admin'; }
-function applyRole(){
-  var sel = document.getElementById('roleSel');
-  if(sel) sel.value = ROLE;
-  var db = document.getElementById('tabDb');
-  if(db) db.style.display = isAdmin() ? '' : 'none';
+var APP_TOKEN = sessionStorage.getItem('tmv_auth_token') || '';
+var APP_ROLE = sessionStorage.getItem('tmv_auth_role') || '';
+var APP_USER = sessionStorage.getItem('tmv_auth_name') || '';
+
+function appAuthHeaders(extra){
+  var h = Object.assign({}, extra || {});
+  if(APP_TOKEN) h.Authorization = 'Bearer ' + APP_TOKEN;
+  return h;
+}
+function updateAppAuthUi(){
+  var label = document.getElementById('appAuthUser');
+  if(label) label.textContent = APP_ROLE ? ((APP_ROLE === 'superuser' ? 'Superuser' : 'Manager') + (APP_USER ? ' — ' + APP_USER : '')) : '';
+}
+function showAppLogin(message){
+  var overlay = document.getElementById('appLoginOverlay');
+  if(overlay) overlay.style.display = 'flex';
+  var err = document.getElementById('appLoginErr');
+  if(err) err.textContent = message || '';
+}
+function hideAppLogin(){ var overlay=document.getElementById('appLoginOverlay'); if(overlay) overlay.style.display='none'; }
+function clearAppSession(){
+  APP_TOKEN=''; APP_ROLE=''; APP_USER='';
+  sessionStorage.removeItem('tmv_auth_token');
+  sessionStorage.removeItem('tmv_auth_role');
+  sessionStorage.removeItem('tmv_auth_name');
+}
+async function doAppLogin(){
+  var u=(document.getElementById('appLoginUser').value||'').trim();
+  var p=document.getElementById('appLoginPass').value||'';
+  var err=document.getElementById('appLoginErr'); if(err) err.textContent='';
+  try{
+    var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json();
+    if(!r.ok || !d.token) throw new Error(d.error||'Invalid credentials');
+    APP_TOKEN=d.token; APP_ROLE=d.role||''; APP_USER=d.name||u;
+    sessionStorage.setItem('tmv_auth_token',APP_TOKEN);
+    sessionStorage.setItem('tmv_auth_role',APP_ROLE);
+    sessionStorage.setItem('tmv_auth_name',APP_USER);
+    document.getElementById('appLoginPass').value='';
+    await boot();
+  }catch(e){ showAppLogin(e.message||'Login failed'); }
+}
+async function appLogout(){
+  try{ if(APP_TOKEN) await fetch('/api/logout',{method:'POST',headers:appAuthHeaders()}); }catch(_e){}
+  clearAppSession();
+  location.reload();
 }
 
 async function boot(){
   try{
+    if(!APP_TOKEN){ showAppLogin(); return; }
+    var sr=await fetch('/api/session',{headers:appAuthHeaders()});
+    if(!sr.ok){ clearAppSession(); showAppLogin('Please sign in.'); return; }
+    var sd=await sr.json();
+    APP_ROLE=sd.role||APP_ROLE; APP_USER=sd.name||APP_USER;
+    sessionStorage.setItem('tmv_auth_role',APP_ROLE);
+    sessionStorage.setItem('tmv_auth_name',APP_USER);
+    hideAppLogin(); updateAppAuthUi();
     await loadConfig();
-    loadPositions();              // fire-and-forget: proxied DevIoT feed; never blocks boot
+    loadPositions();
     await loadAssets();
     await loadAssignments();
     buildTracker();
     buildTechFilter();
     buildTmvGrid();
     buildTechSelect();
-    applyRole();
     if (__geoDemoMode) { var db = document.getElementById('demoBanner'); if (db) db.classList.remove('hidden'); }
-    // Honor #tracker / #tmv deep links (e.g. "Back to Tracker" from assign.html)
     showViewFromHash();
     window.addEventListener('hashchange', showViewFromHash);
   }catch(e){ showErr('boot failed: '+((e&&(e.stack||e.message))||e)); }
@@ -137,9 +182,7 @@ async function loadPositions() {
   if (__positionsLoading) return;
   __positionsLoading = true;
   try {
-    var user = sessionStorage.getItem('tmv_db_user'), pass = sessionStorage.getItem('tmv_db_pass');
-    var hdr = user && pass ? { 'Authorization': 'Basic ' + btoa(user + ':' + pass) } : {};
-    var r = await fetch('/api/positions', { headers: hdr });
+    var r = await fetch('/api/positions', { headers: appAuthHeaders() });
     if (r.ok) { var d = await r.json(); __positions = (d && d.positions) || {}; }
   } catch (e) { /* feed unavailable — leave Fence set */ }
   // Imported real positions: when no live feed is configured, fall back to the
@@ -574,11 +617,10 @@ async function loadDemo(){
 function escHtml(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 function goDb(){
-  sessionStorage.setItem("tmv_db_user", "admin");
-  sessionStorage.setItem("tmv_db_pass", "admin123");
-  window.open("/db?autologin=1", "_blank");
+  if(!APP_TOKEN){ showAppLogin('Please sign in first.'); return; }
+  window.open('/db?session=1', '_blank');
 }
 
-// ── Auth removed: app opens directly to the TMV grid ─────
+// Main desktop app requires a Superuser or Manager session.
 
 window.addEventListener('DOMContentLoaded', boot);

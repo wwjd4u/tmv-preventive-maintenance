@@ -34,6 +34,14 @@
   header img{height:52px}
   header h1{font-size:22px;margin:0;font-weight:700;letter-spacing:.4px}
   .header-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .auth-user{font-size:12px;background:rgba(255,255,255,.14);padding:6px 10px;border-radius:999px;white-space:nowrap}
+  .auth-logout{background:#fff;color:var(--cudd);border:0;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer}
+  #appLoginOverlay{position:fixed;inset:0;z-index:5000;background:rgba(35,24,24,.72);display:flex;align-items:center;justify-content:center;padding:20px}
+  #appLoginBox{width:min(390px,100%);background:#fff;border-radius:14px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  #appLoginBox h2{margin:0 0 6px;color:var(--cudd)}
+  #appLoginBox p{margin:0 0 16px;color:#666;font-size:13px}
+  #appLoginBox input{display:block;width:100%;margin:9px 0;padding:11px 12px}
+  #appLoginErr{min-height:20px;color:#b91c1c;font-size:13px;margin:4px 0 8px}
   nav{display:flex;gap:8px}
   nav button{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer}
   nav button.active{background:#fff;color:var(--cudd);font-weight:600}
@@ -238,6 +246,16 @@ footer a:active {
 <link rel="stylesheet" href="dispatch.css?v=20260904R3">
 </head>
 <body>
+<div id="appLoginOverlay">
+  <div id="appLoginBox">
+    <h2>TMV Preventive Maintenance</h2>
+    <p>Sign in as a Superuser or Manager.</p>
+    <input id="appLoginUser" type="text" placeholder="Username" autocomplete="username">
+    <input id="appLoginPass" type="password" placeholder="Password" autocomplete="current-password">
+    <div id="appLoginErr"></div>
+    <button class="btn" onclick="doAppLogin()" style="width:100%">Log In</button>
+  </div>
+</div>
 <header>
   <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
   <h1>TMV Preventive Maintenance</h1>
@@ -248,12 +266,8 @@ footer a:active {
       <button id="tabTech" onclick="showView('tech')">Tech</button>
       <button id="tabDb" onclick="goDb()">Task.db</button>
     </nav>
-    <label class="role-toggle">Role:
-      <select id="roleSel">
-        <option value="admin">Admin</option>
-        <option value="tech">Tech</option>
-      </select>
-    </label>
+    <span id="appAuthUser" class="auth-user"></span>
+    <button id="appLogoutBtn" class="auth-logout" onclick="appLogout()">Log Out</button>
   </div>
 </header>
 
@@ -326,7 +340,7 @@ footer a:active {
   CUDD Energy Services · Preventive Maintenance
 </footer>
 
-<script src="app.js?v=20260904R3"></script>
+<script src="app.js?v=20260908AUTH1"></script>
 <script src="dispatch.js?v=20260904R3"></script>
 <script>
   // Register PWA service worker (installable + offline support)

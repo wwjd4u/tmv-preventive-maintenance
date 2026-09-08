@@ -656,6 +656,22 @@ http.createServer((req, res) => {
     return;
   }
 
+  // ── Auth session inspection / logout ─────────────────────
+  if (url.pathname === '/api/session' && req.method === 'GET') {
+    const auth = req.headers['authorization'] || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    const session = getAuthSession(tok);
+    if (!session) return sendJson(res, 401, { error: 'Login required' });
+    return sendJson(res, 200, { ok: true, role: session.role, name: session.name, username: session.username });
+  }
+
+  if (url.pathname === '/api/logout' && req.method === 'POST') {
+    const auth = req.headers['authorization'] || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (tok) authSessions.delete(tok);
+    return sendJson(res, 200, { ok: true });
+  }
+
   // ── Admin-only endpoints below ───────────────────────────
   // Check for Authorization header
   const authHeader = req.headers['authorization'] || '';

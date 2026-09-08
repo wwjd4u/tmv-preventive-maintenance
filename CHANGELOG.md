@@ -17,6 +17,18 @@ Historical entries below are based on the Git repository history. Older entries 
 
 ## 2026-09-08
 
+### Completed application login and logout flow
+- Removed the legacy browser code that automatically stored and reused the built-in admin credentials.
+- Removed the fake Admin/Tech role selector from the desktop application.
+- Added a real Superuser / Manager login screen to the main desktop application.
+- Added a signed-in role/name indicator and **Log Out** button.
+- Added server-side session validation and logout endpoints.
+- Task.db now reuses the active authenticated session token instead of storing a username/password in session storage.
+- Task.db also has its own **Log Out** button and blank credential fields when no session exists.
+- Technician work-order links remain separate from Superuser/Manager login.
+- Deployment status: **GitHub implementation pending MS-02 deployment verification.**
+
+
 ### Superuser and Manager role separation
 - Changed the built-in admin account into the **Superuser** role with full read/write/delete control.
 - Added true Manager login sessions with separate credentials stored in the existing Managers Setup section.

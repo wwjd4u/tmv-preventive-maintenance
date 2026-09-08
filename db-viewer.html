@@ -182,8 +182,8 @@ footer a:active {
 <div id="loginOverlay">
   <div id="loginBox">
     <h2>Superuser / Manager Login</h2>
-    <input id="user" type="text" placeholder="Username" value="admin" autocomplete="username" name="login_user">
-    <input id="pass" type="password" placeholder="Password" value="admin123" autocomplete="current-password" name="login_pass">
+    <input id="user" type="text" placeholder="Username" autocomplete="username" name="login_user">
+    <input id="pass" type="password" placeholder="Password" autocomplete="current-password" name="login_pass">
     <div id="loginErr"></div>
     <button class="btn" onclick="doLogin()" style="width:100%">Log In</button>
   </div>
@@ -196,6 +196,7 @@ footer a:active {
     <button id="tabAssign" class="active" onclick="switchTab('assign')">Assignments</button>
     <button id="tabAssets" onclick="switchTab('assets')">Setup</button>
     <a class="backbtn" href="/" title="Back to main app">← Main App</a>
+    <button class="btn sm ghost" onclick="dbLogout()">Log Out</button>
   </nav>
 </header>
 
@@ -369,24 +370,38 @@ function doLogin(){
   fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
     .then(r => r.json())
     .then(d => {
-      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
+      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
       else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
     })
     .catch(() => document.getElementById('loginErr').textContent = 'Server error');
 }
 
-// Auto-login from Task.db button (?autologin=1)
+// Reuse the current authenticated app session when Task.db is opened.
 (function(){
-  if(location.search.includes('autologin=1')){
-    var u = sessionStorage.getItem('tmv_db_user');
-    var p = sessionStorage.getItem('tmv_db_pass');
-    if(u && p){
-      document.getElementById('user').value = u;
-      document.getElementById('pass').value = p;
-      setTimeout(doLogin, 100);
-    }
-  }
+  var shared = sessionStorage.getItem('tmv_auth_token');
+  if(!shared) return;
+  fetch('/api/session', { headers:{'Authorization':'Bearer '+shared} })
+    .then(function(r){ if(!r.ok) throw new Error('expired'); return r.json(); })
+    .then(function(d){
+      token = shared; currentRole = d.role || ''; currentUserName = d.name || '';
+      document.getElementById('loginOverlay').style.display='none';
+      applyRoleUi(); loadData();
+    })
+    .catch(function(){ sessionStorage.removeItem('tmv_auth_token'); sessionStorage.removeItem('tmv_auth_role'); sessionStorage.removeItem('tmv_auth_name'); });
 })();
+
+function dbLogout(){
+  var headers = token ? {'Authorization':'Bearer '+token} : {};
+  fetch('/api/logout', {method:'POST', headers:headers}).catch(function(){}).finally(function(){
+    token=null; currentRole=''; currentUserName='';
+    sessionStorage.removeItem('tmv_auth_token');
+    sessionStorage.removeItem('tmv_auth_role');
+    sessionStorage.removeItem('tmv_auth_name');
+    document.getElementById('user').value='';
+    document.getElementById('pass').value='';
+    document.getElementById('loginOverlay').style.display='flex';
+  });
+}
 
 function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
 function isSuperuser(){ return currentRole === 'superuser'; }
