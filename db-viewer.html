@@ -309,17 +309,23 @@ footer a:active {
         </div>
       </section>
 
-      <!-- LOCATIONS -->
+      <!-- MANAGERS -->
       <section class="mblock">
-        <h3>Districts <span class="cnt" id="cntLoc"></span></h3>
+        <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
         <div class="mrow">
-          <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
-          <button class="btn sm ghost" onclick="renameLoc()">Rename</button>
-          <button class="btn sm danger" onclick="deleteLoc()">× Remove</button>
+          <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
+          <button class="btn sm danger" onclick="deleteMgr()">× Remove</button>
         </div>
+        <div class="contact-grid">
+          <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
+          <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
+          <input id="mgrPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
+          <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
+        </div>
+        <button class="btn sm" onclick="saveMgr()">Save Manager</button> <button class="btn sm ghost" onclick="openSmsPreferences('manager')">SMS Preferences</button>
         <div class="mrow addrow">
-          <input id="newLoc" class="minput" placeholder="Midland">
-          <button class="btn sm" onclick="addLoc()">+ Add District</button>
+          <input id="newMgr" class="minput" placeholder="Add by name…">
+          <button class="btn sm" onclick="addMgr()">+ Add Manager</button>
         </div>
       </section>
 
@@ -342,23 +348,17 @@ footer a:active {
         </div>
       </section>
 
-      <!-- MANAGERS -->
+      <!-- LOCATIONS -->
       <section class="mblock">
-        <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
+        <h3>Districts <span class="cnt" id="cntLoc"></span></h3>
         <div class="mrow">
-          <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
-          <button class="btn sm danger" onclick="deleteMgr()">× Remove</button>
+          <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
+          <button class="btn sm ghost" onclick="renameLoc()">Rename</button>
+          <button class="btn sm danger" onclick="deleteLoc()">× Remove</button>
         </div>
-        <div class="contact-grid">
-          <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
-          <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
-          <input id="mgrPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
-          <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
-        </div>
-        <button class="btn sm" onclick="saveMgr()">Save Manager</button> <button class="btn sm ghost" onclick="openSmsPreferences('manager')">SMS Preferences</button>
         <div class="mrow addrow">
-          <input id="newMgr" class="minput" placeholder="Add by name…">
-          <button class="btn sm" onclick="addMgr()">+ Add Manager</button>
+          <input id="newLoc" class="minput" placeholder="Midland">
+          <button class="btn sm" onclick="addLoc()">+ Add District</button>
         </div>
       </section>
 
