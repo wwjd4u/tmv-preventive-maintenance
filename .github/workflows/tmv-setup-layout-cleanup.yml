@@ -1,0 +1,53 @@
+name: Apply TMV Setup Layout Cleanup
+
+on:
+  push:
+    paths:
+      - 'updates/apply-setup-layout-cleanup.py'
+      - '.github/workflows/tmv-setup-layout-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-setup-layout-cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          fetch-depth: 0
+          path: prod
+
+      - name: Check out patch script
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: patch
+
+      - name: Apply Setup layout cleanup
+        run: |
+          cd prod
+          python3 ../patch/updates/apply-setup-layout-cleanup.py
+
+      - name: Verify Setup layout cleanup
+        run: |
+          cd prod
+          grep -q 'setup-admin-layout-cleanup' db-viewer.html
+          grep -q 'class="user-role-row"' db-viewer.html
+          grep -q 'user-role-action' db-viewer.html
+          ! grep -q "label.id = 'roleLabel'" db-viewer.html
+
+      - name: Commit and push production branch
+        run: |
+          cd prod
+          git config user.name 'TMV Maintenance Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add db-viewer.html
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+          else
+            git commit -m 'Clean up Setup security and role layout'
+            git push origin HEAD:ms02-live-sync-20260908-085804
+          fi
