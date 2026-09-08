@@ -653,7 +653,7 @@ function escHtml(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&a
 
 function goDb(){
   if(!APP_TOKEN){ showAppLogin('Please sign in first.'); return; }
-  window.open('/db?session=1', '_blank');
+  window.location.assign('/db?session=1');
 }
 
 // Main desktop app requires a Superuser or Manager session.
