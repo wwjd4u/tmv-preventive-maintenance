@@ -1,4 +1,4 @@
-name: Apply TMV SMS Preferences UI
+name: Apply TMV PWA Finish
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
       - master
     paths:
       - .github/workflows/tmv-expand-all.yml
-      - updates/apply-sms-preferences-ui.py
+      - updates/apply-pwa-finish.py
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  apply-sms-preferences:
+  apply-pwa-finish:
     runs-on: ubuntu-latest
     steps:
       - name: Check out production branch
@@ -28,15 +28,17 @@ jobs:
           ref: master
           path: control
 
-      - name: Apply patch
-        run: python3 control/updates/apply-sms-preferences-ui.py prod
+      - name: Apply PWA patch
+        run: python3 control/updates/apply-pwa-finish.py prod
 
-      - name: Verify patch
+      - name: Verify PWA patch
         working-directory: prod
         run: |
-          grep -n "openSmsPreferences\|mgrPhone" db-viewer.html
-          grep -n "URLSearchParams(location.search)" sms-consent.js
-          grep -n "technician or manager roster" sms-consent-server.js
+          grep -n "pwaInstallBtn\|pwaInstallModal\|pwa.js" index.html
+          grep -n "safe-area-inset" index.html
+          grep -n '"shortcuts"' manifest.webmanifest
+          grep -n "tmv-pwa-v9\|/pwa.js" sw.js
+          test -f pwa.js
           git diff --check
 
       - name: Commit and push production branch
@@ -44,6 +46,6 @@ jobs:
         run: |
           git config user.name "TMV Maintenance Automation"
           git config user.email "actions@users.noreply.github.com"
-          git add CHANGELOG.md api-server.js db-viewer.html sms-consent.html sms-consent.js sms-consent-server.js
-          git commit -m "Expose SMS preferences in setup"
+          git add CHANGELOG.md index.html
+          git commit -m "Finish mobile PWA install experience"
           git push origin HEAD:ms02-live-sync-20260908-085804
