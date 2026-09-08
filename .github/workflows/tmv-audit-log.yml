@@ -1,0 +1,53 @@
+name: Apply TMV Audit Log
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'updates/apply-audit-log.py'
+      - '.github/workflows/tmv-audit-log.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-audit-log:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check out patch script
+        run: git show origin/master:updates/apply-audit-log.py > /tmp/apply-audit-log.py
+
+      - name: Apply audit log patch
+        run: python3 /tmp/apply-audit-log.py
+
+      - name: Verify audit log patch
+        run: |
+          node --check api-server.js
+          node --check db.js
+          grep -q "CREATE TABLE IF NOT EXISTS audit_log" db.js
+          grep -q "function recordAudit" db.js
+          grep -q "/api/audit-log" api-server.js
+          grep -q "superuser_credentials_updated" api-server.js
+          grep -q "user_role_changed" api-server.js
+          grep -q "setup_config_updated" api-server.js
+          grep -q "id=\"auditLogBlock\"" db-viewer.html
+          grep -q "function loadAuditLog" db-viewer.html
+
+      - name: Commit and push production branch
+        run: |
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add db.js api-server.js db-viewer.html
+          if git diff --cached --quiet; then
+            echo "No production changes required"
+          else
+            git commit -m "Add permanent SQLite administrative audit log"
+            git push origin HEAD:ms02-live-sync-20260908-085804
+          fi
