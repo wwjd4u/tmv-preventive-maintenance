@@ -333,6 +333,7 @@ footer a:active {
         <div class="contact-grid">
           <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
           <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
+          <input id="mgrEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
           <input id="mgrPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
           <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
         </div>
@@ -352,10 +353,12 @@ footer a:active {
           <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
         </div>
         <div class="contact-grid">
-          <input id="techEmail" class="minput" placeholder="Email (name@co.com)">
-          <input id="techPhone" class="minput" placeholder="Phone (+1…)">
+          <input id="techUser" class="minput" placeholder="Login username (e.g. jguynes)" autocomplete="username">
+          <input id="techEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
+          <input id="techPhone" class="minput" placeholder="Phone (+1…)" autocomplete="tel">
+          <input id="techPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
         </div>
-        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button> <button class="btn sm ghost" onclick="openSmsPreferences('technician')">SMS Preferences</button><span id="techStatus" class="saved-ok"></span>
+        <button class="btn sm" onclick="saveTechContact()">Save Technician</button> <button class="btn sm ghost" onclick="openSmsPreferences('technician')">SMS Preferences</button><span id="techStatus" class="saved-ok"></span>
         <div class="mrow addrow">
           <input id="newTech" class="minput" placeholder="Jason Guynes">
           <button class="btn sm" onclick="addTech()">+ Add Technician</button>
@@ -1008,31 +1011,54 @@ function addTech(){
   if(!cfg.technicians) cfg.technicians = [];
   cfg.technicians.push({name:v, email:'', phone:''});
   document.getElementById('newTech').value = '';
-  saveConfigArray('technicians', cfg.technicians);
+  saveTechnicians();
 }
 function techObj(i){
   var cfg = dbData.config;
   var cur = cfg.technicians[i];
   if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, email:'', phone:''}; cur = cfg.technicians[i]; }
+  if(!cur.username) cur.username='';
   if(!cur.email)   cur.email='';
   if(!cur.phone)   cur.phone='';
+  if(typeof cur.password==='undefined') cur.password='';
   return cur;
 }
 function fillTechContact(){
   var i = parseInt(document.getElementById('selTech').value, 10);
   if(isNaN(i)) return;
   var t = techObj(i);
+  document.getElementById('techUser').value = t.username || '';
   document.getElementById('techEmail').value = t.email || '';
   document.getElementById('techPhone').value = t.phone || '';
+  document.getElementById('techPass').value = ''; // never echo the stored hash
+}
+function saveTechnicians(){
+  var cfg = dbData.config || {};
+  fetch('/api/technicians', {
+    method:'PUT',
+    headers:{ ...authHdr(), 'Content-Type':'application/json' },
+    body:JSON.stringify({ technicians:(cfg.technicians||[]).map(function(raw){
+      var t=typeof raw==='string'?{name:raw}:raw;
+      return { name:t.name||'', username:t.username||'', email:t.email||'', phone:t.phone||'', password:(t.password && !String(t.password).startsWith('scrypt$'))?t.password:'' };
+    }) })
+  }).then(function(r){ return r.json().then(function(d){return {ok:r.ok,d:d};}); })
+    .then(function(x){ if(!x.ok) throw new Error((x.d&&x.d.error)||'Technician save failed'); loadData(); showSaved('techStatus'); })
+    .catch(function(e){ alert(e.message||'Technician save failed'); });
 }
 function saveTechContact(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selTech').value, 10);
   if(isNaN(i)){ alert('Select a technician first'); return; }
   var t = techObj(i);
-  t.email    = document.getElementById('techEmail').value.trim();
-  t.phone    = document.getElementById('techPhone').value.trim();
-  saveConfigArray('technicians', cfg.technicians);
+  var username = document.getElementById('techUser').value.trim();
+  var pw = document.getElementById('techPass').value || '';
+  if(username && !/^[A-Za-z0-9._@-]{3,64}$/.test(username)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
+  t.username = username;
+  t.email = document.getElementById('techEmail').value.trim();
+  t.phone = document.getElementById('techPhone').value.trim();
+  if(pw) t.password = pw;
+  saveTechnicians();
 }
 function renameTech(){
   var cfg = dbData.config;
@@ -1045,7 +1071,7 @@ function renameTech(){
     if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), email:'', phone:''};
     else cur.name = v.trim();
     if(document.getElementById('selTech').value==String(i)) fillTechContact();
-    saveConfigArray('technicians', cfg.technicians);
+    saveTechnicians();
   }
 }
 function openSmsPreferences(kind){
@@ -1072,7 +1098,7 @@ function deleteTech(){
   var name = typeof cur==='string' ? cur : (cur.name||'');
   if(!confirm('Remove technician "' + name + '"?')) return;
   cfg.technicians.splice(i,1);
-  saveConfigArray('technicians', cfg.technicians);
+  saveTechnicians();
 }
 
 /* ---- Managers (full admin rights) ---- */
@@ -1094,6 +1120,7 @@ function fillMgr(){
   if(!m) return;
   document.getElementById('mgrName').value = m.name || '';
   document.getElementById('mgrUser').value = m.username || '';
+  document.getElementById('mgrEmail').value = m.email || '';
   document.getElementById('mgrPhone').value = m.phone || '';
   document.getElementById('mgrPass').value = ''; // never echo the stored hash
 }
@@ -1119,14 +1146,16 @@ function saveMgr(){
   if(!un){ alert('Login username required'); return; }
   m.name = nm || un;
   m.username = un;
+  m.email = document.getElementById('mgrEmail').value.trim();
   m.phone = document.getElementById('mgrPhone').value.trim();
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
   if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
   // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
   fetch('/api/managers', {
     method:'PUT',
     headers:{ ...authHdr(), 'Content-Type':'application/json' },
     body: JSON.stringify({ managers: cfg.managers.map(function(x){
-      return { name:x.name, username:x.username, phone:x.phone||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
+      return { name:x.name, username:x.username, email:x.email||'', phone:x.phone||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
     }) })
   })
   .then(function(){ loadData(); })
@@ -1365,7 +1394,8 @@ function showSaved(elId){
 function saveConfigArray(key, value){
   var cfg = dbData.config;
   cfg[key] = value;
-  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
+  var patch = {}; patch[key] = value;
+  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(patch) })
     .then(function(){ loadData(); showSaved('techStatus'); })
     .catch(function(){ alert('Update failed'); });
 }

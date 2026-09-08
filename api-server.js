@@ -757,6 +757,14 @@ http.createServer((req, res) => {
           const token = newAuthSession('manager', mgr.username || mgr.name, mgr.name || mgr.username);
           return sendJson(res, 200, { ok: true, token, role: 'manager', name: mgr.name || mgr.username });
         }
+        // Technician accounts use the same hashed-password storage as Managers.
+        const cfgTech = cfgAuth.technicians || [];
+        const tech = cfgTech.map(t => typeof t === 'string' ? { name: t } : t)
+          .find(t => t && t.username && t.username === d.username);
+        if (tech && verifyPassword(d.password || '', tech.password)) {
+          const token = newAuthSession('technician', tech.username, tech.name || tech.username);
+          return sendJson(res, 200, { ok: true, token, role: 'technician', name: tech.name || tech.username });
+        }
         return sendJson(res, 401, { error: 'Invalid credentials' });
       } catch (e) {
         sendJson(res, 400, { error: 'Invalid request: ' + e.message });
@@ -901,7 +909,20 @@ http.createServer((req, res) => {
           return sendJson(res, 400, { error: 'Set this person up as a Manager with a login password first, then promote to Superuser.' });
         }
 
-        src.splice(idx, 1);
+        // Remove this identity from every role list before inserting the new role.
+        // This makes the role change atomic and prevents stale duplicate records from
+        // making a user appear to revert on the next reload.
+        ['superuser','manager','technician'].forEach(function(roleName){
+          const list = lists[roleName];
+          for (let i = list.length - 1; i >= 0; i--) {
+            const raw = list[i];
+            const u = typeof raw === 'string' ? { name: raw } : raw;
+            const same = (u.username && rec.username && u.username === rec.username) ||
+                         (u.name && rec.name && u.name === rec.name) ||
+                         ((u.username || u.name) === key);
+            if (same) list.splice(i, 1);
+          }
+        });
         rec.role = nextRole;
         lists[nextRole].push(rec);
         cfg.roleAudit = Array.isArray(cfg.roleAudit) ? cfg.roleAudit : [];
@@ -922,8 +943,9 @@ http.createServer((req, res) => {
         for (const [tok, s] of authSessions.entries()) {
           if ((rec.username && s.username === rec.username) || (rec.name && s.name === rec.name)) authSessions.delete(tok);
         }
-        const needsPassword = nextRole === 'manager' && (!rec.password || !String(rec.password).startsWith('scrypt$'));
-        return sendJson(res, 200, { ok: true, message: needsPassword ? 'Role changed to Manager. Set a login password in the Managers section before this user can sign in.' : 'Role changed successfully.' });
+        const needsPassword = !rec.password || !String(rec.password).startsWith('scrypt$');
+        const roleLabel = nextRole.charAt(0).toUpperCase() + nextRole.slice(1);
+        return sendJson(res, 200, { ok: true, message: needsPassword ? 'Role changed to ' + roleLabel + '. Set a login username/password in Setup before this user can sign in.' : 'Role changed successfully.' });
       } catch (e) {
         return sendJson(res, 400, { error: 'Role change failed: ' + e.message });
       }
@@ -1011,6 +1033,11 @@ http.createServer((req, res) => {
           // Technicians are the one Setup list Managers may add/edit/delete.
           if (Array.isArray(incoming.technicians)) merged.technicians = incoming.technicians;
         }
+        // Account/role arrays are managed only by their dedicated endpoints.
+        // Never let a stale general Setup save overwrite a role change.
+        merged.superusers = Array.isArray(config.superusers) ? config.superusers : [];
+        merged.managers = Array.isArray(config.managers) ? config.managers : [];
+        merged.technicians = Array.isArray(config.technicians) ? config.technicians : [];
         const beforeAudit = auditConfigSummary(config);
         const afterAudit = auditConfigSummary(merged);
         const changedKeys = Object.keys(afterAudit).filter(k => JSON.stringify(beforeAudit[k]) !== JSON.stringify(afterAudit[k]));
@@ -1046,10 +1073,12 @@ http.createServer((req, res) => {
           // otherwise preserve the already-hashed value already stored.
           let password = existing ? existing.password : '';
           if (m.password && !m.password.startsWith('scrypt$')) {
+            if (!validAdminPassword(m.password)) throw new Error('Manager password must be at least 10 characters with an uppercase letter, number, and special character');
             password = hashPassword(m.password);
           }
+          const email = (m.email || (existing && existing.email) || '').trim();
           const phone = (m.phone || (existing && existing.phone) || '').trim();
-          return { name, username, phone, password, role: 'manager' };
+          return { name, username, email, phone, password, role: 'manager' };
         });
         const config = loadConfig() || {};
         const merged = { ...config, managers: out };
@@ -1058,7 +1087,49 @@ http.createServer((req, res) => {
           current.map(m => ({ name: m.name || '', username: m.username || '' })),
           out.map(m => ({ name: m.name || '', username: m.username || '' })),
           { passwordUpdatedFor: incoming.filter(m => m.password && !String(m.password).startsWith('scrypt$')).map(m => m.username || m.name || '').filter(Boolean) });
-        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, phone: m.phone })) });
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/technicians — account/contact save with hashed passwords ──
+  if (url.pathname === '/api/technicians' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).technicians || [];
+        const config = loadConfig() || {};
+        const current = Array.isArray(config.technicians) ? config.technicians : [];
+        const saved = {};
+        current.forEach(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          if (t.username) saved['u:' + t.username] = t;
+          if (t.name) saved['n:' + t.name] = t;
+        });
+        const out = incoming.map(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          const name = String(t.name || t.username || '').trim();
+          const username = String(t.username || '').trim();
+          const existing = (username && saved['u:' + username]) || (name && saved['n:' + name]) || null;
+          let password = existing ? (existing.password || '') : '';
+          if (t.password && !String(t.password).startsWith('scrypt$')) {
+            if (!validAdminPassword(t.password)) throw new Error('Technician password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(t.password);
+          }
+          const email = String(t.email || (existing && existing.email) || '').trim();
+          const phone = String(t.phone || (existing && existing.phone) || '').trim();
+          return { name, username, email, phone, password, role: 'technician' };
+        });
+        const merged = { ...config, technicians: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'technicians_updated', 'Technicians',
+          current.map(function(raw){ const t=typeof raw==='string'?{name:raw}:raw; return {name:t.name||'',username:t.username||'',email:t.email||'',phone:t.phone||''}; }),
+          out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone })),
+          { passwordUpdatedFor: incoming.filter(t => t && t.password && !String(t.password).startsWith('scrypt$')).map(t => t.username || t.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone })) });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
