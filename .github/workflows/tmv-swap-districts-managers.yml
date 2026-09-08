@@ -1,0 +1,60 @@
+name: Apply TMV Setup Districts Managers Swap
+
+on:
+  push:
+    paths:
+      - '.github/workflows/tmv-swap-districts-managers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-swap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          fetch-depth: 0
+          path: prod
+
+      - name: Check out patch script
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: patch
+
+      - name: Apply card swap
+        run: |
+          cp patch/updates/swap-districts-managers.py prod/updates-swap-districts-managers.py
+          cd prod
+          python3 updates-swap-districts-managers.py
+          rm updates-swap-districts-managers.py
+
+      - name: Verify only intended file changed
+        run: |
+          cd prod
+          test "$(git status --short | wc -l)" -eq 1
+          git status --short | grep -q '^ M db-viewer.html$'
+          python3 - <<'PY'
+          from pathlib import Path
+          t=Path('db-viewer.html').read_text()
+          s=t.index('<!-- TMV UNITS -->')
+          e=t.index('<!-- INSPECTION SETTINGS -->',s)
+          x=t[s:e]
+          names=['<!-- TMV UNITS -->','<!-- MANAGERS -->','<!-- TECHNICIANS -->','<!-- LOCATIONS -->']
+          pos=[x.index(n) for n in names]
+          assert pos==sorted(pos), pos
+          print('PASS - Setup order Equipment, Managers, Technicians, Districts')
+          PY
+
+      - name: Commit and push production branch
+        run: |
+          cd prod
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add db-viewer.html
+          git commit -m "Swap Districts and Managers Setup cards"
+          git push origin ms02-live-sync-20260908-085804
