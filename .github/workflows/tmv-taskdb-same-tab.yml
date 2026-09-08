@@ -1,0 +1,43 @@
+name: Apply TMV Task.db Same Tab
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'updates/taskdb-same-tab.py'
+      - '.github/workflows/tmv-taskdb-same-tab.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-taskdb-same-tab:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check out patch script
+        run: git show origin/master:updates/taskdb-same-tab.py > /tmp/taskdb-same-tab.py
+
+      - name: Apply patch
+        run: python3 /tmp/taskdb-same-tab.py
+
+      - name: Verify patch
+        run: |
+          grep -n "window.location.assign('/db?session=1')" app.js
+          if grep -n "window.open('/db?session=1', '_blank')" app.js; then exit 1; fi
+          git diff --check
+          test "$(git diff --name-only)" = "app.js"
+
+      - name: Commit and push production branch
+        run: |
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add app.js
+          git commit -m "Open Task.db in same browser tab"
+          git push origin HEAD:ms02-live-sync-20260908-085804
