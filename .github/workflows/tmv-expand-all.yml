@@ -1,4 +1,4 @@
-name: Apply TMV Task Reorder
+name: Apply TMV Setup UI Updates
 
 on:
   push:
@@ -12,43 +12,71 @@ permissions:
   contents: write
 
 jobs:
-  apply-task-reorder:
+  apply-setup-ui:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out TMV layout branch
+      - name: Check out synchronized live branch
         uses: actions/checkout@v4
         with:
-          ref: tmv-layout-recovery
+          ref: ms02-live-sync-20260908-085804
 
-      - name: Add task move up and down controls
+      - name: Apply Expand All and task reorder controls
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('db-viewer.html')
-          text=p.read_text()
-          old='''            '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +\n              taskTypeOptions(type) +\n            '</select>' +\n            '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +'''
-          new='''            '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +\n              taskTypeOptions(type) +\n            '</select>' +\n            '<button class="btn sm ghost" title="Move up" onclick="moveTask(' + ci + ',' + ii + ',-1)"' + (ii===0?' disabled':'') + '>↑</button>' +\n            '<button class="btn sm ghost" title="Move down" onclick="moveTask(' + ci + ',' + ii + ',1)"' + (ii===items.length-1?' disabled':'') + '>↓</button>' +\n            '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +'''
-          if old in text:
-              text=text.replace(old,new,1)
-          elif 'onclick="moveTask(' not in text:
-              raise SystemExit('task button insertion point not found')
 
-          old2='''function changeTaskType(ci, ii, val){\n  var cfg = dbData.config;\n  var cat = cfg.checklist[ci];\n  if(!cat || typeof cat==='string') return;\n  if(!cat.items[ii]) return;\n  cat.items[ii].type = val;\n  saveConfigArray('checklist', cfg.checklist);\n}\n'''
-          new2=old2+'''function moveTask(ci, ii, dir){\n  var cfg = dbData.config;\n  var cat = cfg.checklist && cfg.checklist[ci];\n  if(!cat || typeof cat==='string' || !Array.isArray(cat.items)) return;\n  var ni = ii + dir;\n  if(ni < 0 || ni >= cat.items.length) return;\n  var tmp = cat.items[ii];\n  cat.items[ii] = cat.items[ni];\n  cat.items[ni] = tmp;\n  _openCats[ci] = true;\n  saveConfigArray('checklist', cfg.checklist);\n}\n'''
-          if old2 in text and 'function moveTask(ci, ii, dir)' not in text:
-              text=text.replace(old2,new2,1)
+          p = Path('db-viewer.html')
+          text = p.read_text()
+
+          old_heading = '        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>'
+          new_heading = '        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span><button id="toggleAllCatsBtn" class="btn sm ghost" onclick="toggleAllCats()" style="float:right;margin-top:-4px">Expand All</button></h3>'
+          if 'id="toggleAllCatsBtn"' not in text:
+              if old_heading not in text:
+                  raise SystemExit('Maintenance Categories heading not found')
+              text = text.replace(old_heading, new_heading, 1)
+
+          old_render = "  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';\n  var wrap = document.getElementById('catCards');"
+          new_render = "  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';\n  var toggleAllBtn = document.getElementById('toggleAllCatsBtn');\n  if(toggleAllBtn){\n    var everyOpen = cfg.checklist.length > 0 && cfg.checklist.every(function(_, ci){ return isCatOpen(ci); });\n    toggleAllBtn.textContent = everyOpen ? 'Collapse All' : 'Expand All';\n  }\n  var wrap = document.getElementById('catCards');"
+          if "var toggleAllBtn = document.getElementById('toggleAllCatsBtn');" not in text:
+              if old_render not in text:
+                  raise SystemExit('renderCatCards insertion point not found')
+              text = text.replace(old_render, new_render, 1)
+
+          old_toggle = "function isCatOpen(ci){ return _openCats[ci] === true; }\nfunction toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }\nfunction toggleCatInclude(ci, val){"
+          new_toggle = "function isCatOpen(ci){ return _openCats[ci] === true; }\nfunction toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }\nfunction toggleAllCats(){\n  var cfg = dbData.config || {};\n  var cats = cfg.checklist || [];\n  var everyOpen = cats.length > 0 && cats.every(function(_, ci){ return isCatOpen(ci); });\n  cats.forEach(function(_, ci){ _openCats[ci] = !everyOpen; });\n  renderCatCards();\n}\nfunction toggleCatInclude(ci, val){"
+          if 'function toggleAllCats(){' not in text:
+              if old_toggle not in text:
+                  raise SystemExit('category toggle insertion point not found')
+              text = text.replace(old_toggle, new_toggle, 1)
+
+          old_buttons = '''            '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +\n              taskTypeOptions(type) +\n            '</select>' +\n            '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +'''
+          new_buttons = '''            '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +\n              taskTypeOptions(type) +\n            '</select>' +\n            '<button class="btn sm ghost" title="Move up" onclick="moveTask(' + ci + ',' + ii + ',-1)"' + (ii===0?' disabled':'') + '>↑</button>' +\n            '<button class="btn sm ghost" title="Move down" onclick="moveTask(' + ci + ',' + ii + ',1)"' + (ii===items.length-1?' disabled':'') + '>↓</button>' +\n            '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +'''
+          if 'onclick="moveTask(' not in text:
+              if old_buttons not in text:
+                  raise SystemExit('task button insertion point not found')
+              text = text.replace(old_buttons, new_buttons, 1)
+
+          old_change = """function changeTaskType(ci, ii, val){\n  var cfg = dbData.config;\n  var cat = cfg.checklist[ci];\n  if(!cat || typeof cat==='string') return;\n  if(!cat.items[ii]) return;\n  cat.items[ii].type = val;\n  saveConfigArray('checklist', cfg.checklist);\n}\n"""
+          new_change = old_change + """function moveTask(ci, ii, dir){\n  var cfg = dbData.config;\n  var cat = cfg.checklist && cfg.checklist[ci];\n  if(!cat || typeof cat==='string' || !Array.isArray(cat.items)) return;\n  var ni = ii + dir;\n  if(ni < 0 || ni >= cat.items.length) return;\n  var tmp = cat.items[ii];\n  cat.items[ii] = cat.items[ni];\n  cat.items[ni] = tmp;\n  _openCats[ci] = true;\n  saveConfigArray('checklist', cfg.checklist);\n}\n"""
+          if 'function moveTask(ci, ii, dir){' not in text:
+              if old_change not in text:
+                  raise SystemExit('changeTaskType insertion point not found')
+              text = text.replace(old_change, new_change, 1)
+
           p.write_text(text)
           PY
 
-      - name: Verify UI patch
+      - name: Verify exact UI features
         shell: bash
         run: |
-          grep -q 'function moveTask(ci, ii, dir)' db-viewer.html
+          grep -q 'id="toggleAllCatsBtn"' db-viewer.html
+          grep -q 'function toggleAllCats(){' db-viewer.html
           grep -q 'title="Move up"' db-viewer.html
           grep -q 'title="Move down"' db-viewer.html
+          grep -q 'function moveTask(ci, ii, dir){' db-viewer.html
 
-      - name: Commit patched admin page
+      - name: Commit only db-viewer update
         shell: bash
         run: |
           git config user.name "TMV Maintenance Automation"
@@ -56,7 +84,7 @@ jobs:
           git add db-viewer.html
           if git diff --cached --quiet; then
             echo "No source change required."
-            exit 0
+          else
+            git commit -m "Add setup expand and task reorder controls"
+            git push origin HEAD:ms02-live-sync-20260908-085804
           fi
-          git commit -m "Add task reorder controls"
-          git push origin HEAD:tmv-layout-recovery
