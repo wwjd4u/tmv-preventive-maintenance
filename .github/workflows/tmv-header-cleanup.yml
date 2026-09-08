@@ -1,0 +1,47 @@
+name: Apply TMV Header Cleanup
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/tmv-header-cleanup.yml
+      - updates/remove-header-role.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-header-cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          path: prod
+
+      - name: Check out patch script
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: control
+
+      - name: Apply patch
+        run: python3 control/updates/remove-header-role.py prod
+
+      - name: Verify patch
+        working-directory: prod
+        run: |
+          ! grep -n 'id="appAuthUser"' index.html
+          git diff --check
+
+      - name: Commit and push production branch
+        working-directory: prod
+        run: |
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "Remove role label from main header"
+          git push origin HEAD:ms02-live-sync-20260908-085804
