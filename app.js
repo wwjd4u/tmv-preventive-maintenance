@@ -111,6 +111,7 @@ async function doAppLogin(){
     var d=await r.json();
     if(!r.ok || !d.token) throw new Error(d.error||'Invalid credentials');
     APP_TOKEN=d.token; APP_ROLE=d.role||''; APP_USER=d.name||u;
+    if(d.idleMinutes) AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000;
     sessionStorage.setItem('tmv_auth_token',APP_TOKEN);
     sessionStorage.setItem('tmv_auth_role',APP_ROLE);
     sessionStorage.setItem('tmv_auth_name',APP_USER);
@@ -132,6 +133,7 @@ async function boot(){
     if(!sr.ok){ clearAppSession(); showAppLogin('Please sign in.'); return; }
     var sd=await sr.json();
     APP_ROLE=sd.role||APP_ROLE; APP_USER=sd.name||APP_USER;
+    if(sd.idleMinutes) AUTH_IDLE_MS=Math.max(15,Number(sd.idleMinutes))*60*1000;
     sessionStorage.setItem('tmv_auth_role',APP_ROLE);
     sessionStorage.setItem('tmv_auth_name',APP_USER);
     hideAppLogin(); updateAppAuthUi(); startAppIdleWatch();
@@ -555,14 +557,26 @@ function paintRadios(){
   });
 }
 
-function buildTechSelect(){
-  var sel=document.getElementById('dTech');
-  (configData.technicians||[]).forEach(function(t){
+function personnelForDistrict(list,district){
+  if(!district) return list||[];
+  return (list||[]).filter(function(p){ return p && String(p.district||'')===String(district); });
+}
+function rebuildDetailTechSelect(){
+  var sel=document.getElementById('dTech'); if(!sel) return;
+  var district=(document.getElementById('dLoc')||{}).value||'';
+  var prior=sel.value||'';
+  sel.innerHTML='<option value="">— choose technician —</option>';
+  personnelForDistrict(configData.technicians||[],district).forEach(function(t){
     var o=document.createElement('option'); o.value=t.name; o.textContent=t.name; sel.appendChild(o);
   });
+  if(Array.prototype.some.call(sel.options,function(o){return o.value===prior;})) sel.value=prior;
+}
+function buildTechSelect(){
+  rebuildDetailTechSelect();
+  var sel=document.getElementById('dTech');
   sel.addEventListener('change', updateGen);
 }
-['dLoc','dDate'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', updateGen); });
+['dLoc','dDate'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', function(){ if(id==='dLoc') rebuildDetailTechSelect(); updateGen(); }); });
 
 function updateGen(){ if(typeof updateDispatchButtons==='function') updateDispatchButtons(); }
 async function submitInspection(){return assignAndGenerateReport();}

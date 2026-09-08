@@ -355,7 +355,7 @@ function serveFile(res, p, contentType) {
 // Built-in admin is the Superuser. Saved manager accounts receive Manager
 // sessions. Tokens are random server-side session IDs, not reusable admin creds.
 const authSessions = new Map();
-const AUTH_IDLE_MINUTES = Math.max(1, Number(process.env.AUTH_IDLE_MINUTES || 15));
+const AUTH_IDLE_MINUTES = Math.max(15, Number(process.env.AUTH_IDLE_MINUTES || 15));
 const AUTH_IDLE_MS = AUTH_IDLE_MINUTES * 60 * 1000;
 function newAuthSession(role, username, name, authSource) {
   const token = crypto.randomBytes(32).toString('hex');
@@ -742,20 +742,20 @@ http.createServer((req, res) => {
         const d = JSON.parse(body);
         if (ADMIN_USER && ADMIN_PASS && d.username === ADMIN_USER && d.password === ADMIN_PASS) {
           const token = newAuthSession('superuser', ADMIN_USER, 'Superuser', 'recovery');
-          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser' });
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser', idleMinutes: AUTH_IDLE_MINUTES });
         }
         const cfgAuth = loadConfig() || {};
         const extraSu = (cfgAuth.superusers || []).find(s => (s.username || s.name) === d.username);
         if (extraSu && verifyPassword(d.password || '', extraSu.password)) {
           const token = newAuthSession('superuser', extraSu.username || extraSu.name, extraSu.name || extraSu.username, 'account');
-          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: extraSu.name || extraSu.username });
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: extraSu.name || extraSu.username, idleMinutes: AUTH_IDLE_MINUTES });
         }
         // Saved manager login receives a Manager session with restricted Setup rights.
         const cfgMgr = cfgAuth.managers || [];
         const mgr = cfgMgr.find(m => (m.username || m.name) === d.username);
         if (mgr && verifyPassword(d.password || '', mgr.password)) {
           const token = newAuthSession('manager', mgr.username || mgr.name, mgr.name || mgr.username);
-          return sendJson(res, 200, { ok: true, token, role: 'manager', name: mgr.name || mgr.username });
+          return sendJson(res, 200, { ok: true, token, role: 'manager', name: mgr.name || mgr.username, idleMinutes: AUTH_IDLE_MINUTES });
         }
         // Technician accounts use the same hashed-password storage as Managers.
         const cfgTech = cfgAuth.technicians || [];
@@ -763,7 +763,7 @@ http.createServer((req, res) => {
           .find(t => t && t.username && t.username === d.username);
         if (tech && verifyPassword(d.password || '', tech.password)) {
           const token = newAuthSession('technician', tech.username, tech.name || tech.username);
-          return sendJson(res, 200, { ok: true, token, role: 'technician', name: tech.name || tech.username });
+          return sendJson(res, 200, { ok: true, token, role: 'technician', name: tech.name || tech.username, idleMinutes: AUTH_IDLE_MINUTES });
         }
         return sendJson(res, 401, { error: 'Invalid credentials' });
       } catch (e) {
@@ -820,7 +820,7 @@ http.createServer((req, res) => {
     const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     const session = getAuthSession(tok);
     if (!session) return sendJson(res, 401, { error: 'Login required' });
-    return sendJson(res, 200, { ok: true, role: session.role, name: session.name, username: session.username });
+    return sendJson(res, 200, { ok: true, role: session.role, name: session.name, username: session.username, idleMinutes: AUTH_IDLE_MINUTES });
   }
 
   if (url.pathname === '/api/logout' && req.method === 'POST') {
@@ -1078,7 +1078,8 @@ http.createServer((req, res) => {
           }
           const email = (m.email || (existing && existing.email) || '').trim();
           const phone = (m.phone || (existing && existing.phone) || '').trim();
-          return { name, username, email, phone, password, role: 'manager' };
+          const district = String(m.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'manager' };
         });
         const config = loadConfig() || {};
         const merged = { ...config, managers: out };
@@ -1087,7 +1088,7 @@ http.createServer((req, res) => {
           current.map(m => ({ name: m.name || '', username: m.username || '' })),
           out.map(m => ({ name: m.name || '', username: m.username || '' })),
           { passwordUpdatedFor: incoming.filter(m => m.password && !String(m.password).startsWith('scrypt$')).map(m => m.username || m.name || '').filter(Boolean) });
-        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone })) });
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone, district: m.district })) });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
@@ -1121,15 +1122,16 @@ http.createServer((req, res) => {
           }
           const email = String(t.email || (existing && existing.email) || '').trim();
           const phone = String(t.phone || (existing && existing.phone) || '').trim();
-          return { name, username, email, phone, password, role: 'technician' };
+          const district = String(t.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'technician' };
         });
         const merged = { ...config, technicians: out };
         saveConfig(merged);
         auditEvent(authSession, 'technicians_updated', 'Technicians',
           current.map(function(raw){ const t=typeof raw==='string'?{name:raw}:raw; return {name:t.name||'',username:t.username||'',email:t.email||'',phone:t.phone||''}; }),
-          out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone })),
+          out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })),
           { passwordUpdatedFor: incoming.filter(t => t && t.password && !String(t.password).startsWith('scrypt$')).map(t => t.username || t.name || '').filter(Boolean) });
-        sendJson(res, 200, { ok: true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone })) });
+        sendJson(res, 200, { ok: true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })) });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;

@@ -335,6 +335,7 @@ footer a:active {
           <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
           <input id="mgrEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
           <input id="mgrPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
+          <select id="mgrDistrict" class="msel" aria-label="Manager district"></select>
           <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
         </div>
         <button class="btn sm" onclick="saveMgr()">Save Manager</button> <button class="btn sm ghost" onclick="openSmsPreferences('manager')">SMS Preferences</button>
@@ -356,6 +357,7 @@ footer a:active {
           <input id="techUser" class="minput" placeholder="Login username (e.g. jguynes)" autocomplete="username">
           <input id="techEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
           <input id="techPhone" class="minput" placeholder="Phone (+1…)" autocomplete="tel">
+          <select id="techDistrict" class="msel" aria-label="Technician district"></select>
           <input id="techPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
         </div>
         <button class="btn sm" onclick="saveTechContact()">Save Technician</button> <button class="btn sm ghost" onclick="openSmsPreferences('technician')">SMS Preferences</button><span id="techStatus" class="saved-ok"></span>
@@ -438,7 +440,7 @@ function doLogin(){
   fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
     .then(r => r.json())
     .then(d => {
-      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; dbAuthLastActivity=Date.now(); sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
+      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now(); sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
       else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
     })
     .catch(() => document.getElementById('loginErr').textContent = 'Server error');
@@ -451,7 +453,7 @@ function doLogin(){
   fetch('/api/session', { headers:{'Authorization':'Bearer '+shared} })
     .then(function(r){ if(!r.ok) throw new Error('expired'); return r.json(); })
     .then(function(d){
-      token = shared; currentRole = d.role || ''; currentUserName = d.name || ''; dbAuthLastActivity=Date.now();
+      token = shared; currentRole = d.role || ''; currentUserName = d.name || ''; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now();
       document.getElementById('loginOverlay').style.display='none';
       applyRoleUi(); loadData();
     })
@@ -883,6 +885,11 @@ function renderAssetManager(){
   _fill('selLoc', cfg.locations.map(function(l,i){ return {value:String(i), label:l}; }));
   document.getElementById('cntLoc').textContent = '(' + cfg.locations.length + ')';
 
+  // --- Personnel district dropdowns ---
+  var districtOpts=[{value:'',label:'— Select district —'}].concat(cfg.locations.map(function(l){return {value:l,label:l};}));
+  _fill('techDistrict',districtOpts);
+  _fill('mgrDistrict',districtOpts);
+
   // --- Technicians ---
   var prevTechName = (function(){ var s=document.getElementById('selTech'); return (s && s.selectedIndex>=0) ? s.options[s.selectedIndex].text : null; })();
   _fill('selTech', cfg.technicians.map(function(t,i){
@@ -1009,7 +1016,7 @@ function addTech(){
   var v = document.getElementById('newTech').value.trim();
   if(!v){ alert('Technician name required'); return; }
   if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:v, email:'', phone:''});
+  cfg.technicians.push({name:v, username:'', email:'', phone:'', district:'', password:''});
   document.getElementById('newTech').value = '';
   saveTechnicians();
 }
@@ -1020,6 +1027,7 @@ function techObj(i){
   if(!cur.username) cur.username='';
   if(!cur.email)   cur.email='';
   if(!cur.phone)   cur.phone='';
+  if(!cur.district) cur.district='';
   if(typeof cur.password==='undefined') cur.password='';
   return cur;
 }
@@ -1030,6 +1038,7 @@ function fillTechContact(){
   document.getElementById('techUser').value = t.username || '';
   document.getElementById('techEmail').value = t.email || '';
   document.getElementById('techPhone').value = t.phone || '';
+  document.getElementById('techDistrict').value = t.district || '';
   document.getElementById('techPass').value = ''; // never echo the stored hash
 }
 function saveTechnicians(){
@@ -1039,7 +1048,7 @@ function saveTechnicians(){
     headers:{ ...authHdr(), 'Content-Type':'application/json' },
     body:JSON.stringify({ technicians:(cfg.technicians||[]).map(function(raw){
       var t=typeof raw==='string'?{name:raw}:raw;
-      return { name:t.name||'', username:t.username||'', email:t.email||'', phone:t.phone||'', password:(t.password && !String(t.password).startsWith('scrypt$'))?t.password:'' };
+      return { name:t.name||'', username:t.username||'', email:t.email||'', phone:t.phone||'', district:t.district||'', password:(t.password && !String(t.password).startsWith('scrypt$'))?t.password:'' };
     }) })
   }).then(function(r){ return r.json().then(function(d){return {ok:r.ok,d:d};}); })
     .then(function(x){ if(!x.ok) throw new Error((x.d&&x.d.error)||'Technician save failed'); loadData(); showSaved('techStatus'); })
@@ -1057,6 +1066,7 @@ function saveTechContact(){
   t.username = username;
   t.email = document.getElementById('techEmail').value.trim();
   t.phone = document.getElementById('techPhone').value.trim();
+  t.district = document.getElementById('techDistrict').value || '';
   if(pw) t.password = pw;
   saveTechnicians();
 }
@@ -1110,6 +1120,7 @@ function mgrObj(i){
   if(typeof cur==='string'){ cfg.managers[i] = {name:cur, username:cur, password:''}; cur = cfg.managers[i]; }
   if(!cur.username) cur.username = cur.name || '';
   if(!cur.name) cur.name = cur.username || '';
+  if(!cur.district) cur.district = '';
   if(typeof cur.password==='undefined') cur.password = '';
   return cur;
 }
@@ -1122,6 +1133,7 @@ function fillMgr(){
   document.getElementById('mgrUser').value = m.username || '';
   document.getElementById('mgrEmail').value = m.email || '';
   document.getElementById('mgrPhone').value = m.phone || '';
+  document.getElementById('mgrDistrict').value = m.district || '';
   document.getElementById('mgrPass').value = ''; // never echo the stored hash
 }
 function addMgr(){
@@ -1129,7 +1141,7 @@ function addMgr(){
   if(!cfg.managers) cfg.managers = [];
   var v = document.getElementById('newMgr').value.trim();
   if(!v){ alert('Manager name required'); return; }
-  cfg.managers.push({name:v, username:v, password:''});
+  cfg.managers.push({name:v, username:v, email:'', phone:'', district:'', password:''});
   document.getElementById('newMgr').value = '';
   saveConfigArray('managers', cfg.managers);
 }
@@ -1148,6 +1160,7 @@ function saveMgr(){
   m.username = un;
   m.email = document.getElementById('mgrEmail').value.trim();
   m.phone = document.getElementById('mgrPhone').value.trim();
+  m.district = document.getElementById('mgrDistrict').value || '';
   if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
   if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
   // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
@@ -1155,7 +1168,7 @@ function saveMgr(){
     method:'PUT',
     headers:{ ...authHdr(), 'Content-Type':'application/json' },
     body: JSON.stringify({ managers: cfg.managers.map(function(x){
-      return { name:x.name, username:x.username, email:x.email||'', phone:x.phone||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
+      return { name:x.name, username:x.username, email:x.email||'', phone:x.phone||'', district:x.district||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
     }) })
   })
   .then(function(){ loadData(); })

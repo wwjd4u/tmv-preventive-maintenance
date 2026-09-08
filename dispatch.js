@@ -24,18 +24,22 @@ function updateDispatchButtons() {
   });
 }
 function buildTmvGrid() {
-  const map=configData.tmvVanMap||{}, techs=configData.technicians||[];
+  const map=configData.tmvVanMap||{}, allTechs=configData.technicians||[];
   const type=document.getElementById('unitType'), district=document.getElementById('unitDistrict'), tech=document.getElementById('unitTech');
+  const techs=personnelForDistrict(allTechs,district.value||'');
   if (!type.dataset.loaded) {
     (configData.vanTypes||[]).forEach(v=>type.add(new Option(v,v)));
     (configData.locations||[]).forEach(v=>district.add(new Option(v,v)));
-    techs.forEach(t=>tech.add(new Option(t.name,t.name)));
     const today=new Date();
     type.dataset.loaded='true'; document.getElementById('unitDate').value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
     ['unitSearch','unitType','unitTech','unitStatus'].forEach(id=>document.getElementById(id).addEventListener('input',buildTmvGrid));
-    district.addEventListener('change',()=>{updateDispatchButtons();});
+    district.addEventListener('change',()=>{ dispatchUnit=null; buildTmvGrid(); updateDispatchButtons(); });
     document.getElementById('unitDate').addEventListener('input',updateDispatchButtons);
   }
+  const priorTech=tech.value||'';
+  tech.innerHTML='<option value="">All technicians</option>';
+  techs.forEach(t=>tech.add(new Option(t.name,t.name)));
+  if(techs.some(t=>t.name===priorTech)) tech.value=priorTech;
   const query=document.getElementById('unitSearch').value.toLowerCase(), status=document.getElementById('unitStatus').value;
   const keys=Object.keys(map).filter(k=>{
     const current=latestForUnit(k), name=dispatchDrafts[k]??current?.technician?.name??'';
@@ -65,6 +69,8 @@ openTmv = function(unit) {
   const latest=latestForUnit(unit);
   document.getElementById('dTech').value=dispatchDrafts[unit]??'';
   document.getElementById('dLoc').value=document.getElementById('unitDistrict').value||latest?.location||'';
+  if(typeof rebuildDetailTechSelect==='function') rebuildDetailTechSelect();
+  document.getElementById('dTech').value=dispatchDrafts[unit]??'';
   document.getElementById('dDate').value=document.getElementById('unitDate').value;
   updateDispatchButtons();
 };
