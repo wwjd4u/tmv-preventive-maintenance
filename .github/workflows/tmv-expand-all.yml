@@ -1,4 +1,4 @@
-name: Apply TMV Credential and SMS Preferences UI
+name: Apply TMV SMS Preferences UI
 
 on:
   push:
@@ -6,376 +6,44 @@ on:
       - master
     paths:
       - .github/workflows/tmv-expand-all.yml
+      - updates/apply-sms-preferences-ui.py
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  apply-credential-sms-ui:
+  apply-sms-preferences:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out synchronized live branch
+      - name: Check out production branch
         uses: actions/checkout@v4
         with:
           ref: ms02-live-sync-20260908-085804
+          path: prod
 
-      - name: Patch credential and SMS preference flow
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
+      - name: Check out patch script
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: control
 
-          # ---------- db-viewer.html ----------
-          p = Path('db-viewer.html')
-          text = p.read_text()
-
-          old_tech_html = '''      <!-- TECHNICIANS -->
-      <section class="mblock">
-        <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
-        <div class="mrow">
-          <select id="selTech" class="msel" onchange="fillTechContact()" autocomplete="off" name="setup_tech"></select>
-          <button class="btn sm ghost" onclick="renameTech()">Rename</button>
-          <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
-        </div>
-        <div class="contact-grid">
-          <input id="techEmail" class="minput" placeholder="Email (name@co.com)">
-          <input id="techPhone" class="minput" placeholder="Phone (+1…)">
-        </div>
-        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button><span id="techStatus" class="saved-ok"></span>
-        <div class="mrow addrow">
-          <input id="newTech" class="minput" placeholder="Jason Guynes">
-          <button class="btn sm" onclick="addTech()">+ Add Technician</button>
-        </div>
-      </section>
-'''
-          new_tech_html = '''      <!-- TECHNICIANS -->
-      <section class="mblock">
-        <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
-        <div class="mrow">
-          <select id="selTech" class="msel" onchange="fillTechContact()" autocomplete="off" name="setup_tech"></select>
-          <button class="btn sm ghost" onclick="renameTech()">Rename</button>
-          <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
-        </div>
-        <div class="contact-grid">
-          <input id="techUser" class="minput" placeholder="Login username" autocomplete="username" name="tech_username">
-          <input id="techEmail" class="minput" placeholder="Recovery email (name@co.com)" autocomplete="email">
-          <input id="techPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
-          <input id="techPass" class="minput" type="password" placeholder="Temporary password / leave blank to keep" autocomplete="new-password">
-        </div>
-        <div class="mrow" style="margin-top:10px">
-          <button class="btn sm" onclick="saveTechContact()">Save Technician</button>
-          <button class="btn sm ghost" onclick="openSmsPreferences('technician')">SMS Preferences</button>
-          <span id="techStatus" class="saved-ok"></span>
-        </div>
-        <div class="mrow addrow">
-          <input id="newTech" class="minput" placeholder="Jason Guynes">
-          <button class="btn sm" onclick="addTech()">+ Add Technician</button>
-        </div>
-      </section>
-'''
-          if old_tech_html not in text:
-              raise SystemExit('Technician HTML block not found')
-          text = text.replace(old_tech_html, new_tech_html, 1)
-
-          old_mgr_html = '''      <!-- MANAGERS -->
-      <section class="mblock">
-        <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
-        <div class="mrow">
-          <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
-          <button class="btn sm danger" onclick="deleteMgr()">× Remove</button>
-        </div>
-        <div class="contact-grid">
-          <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
-          <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
-          <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
-        </div>
-        <button class="btn sm" onclick="saveMgr()">Save Manager</button>
-        <div class="mrow addrow">
-          <input id="newMgr" class="minput" placeholder="Add by name…">
-          <button class="btn sm" onclick="addMgr()">+ Add Manager</button>
-        </div>
-      </section>
-'''
-          new_mgr_html = '''      <!-- MANAGERS -->
-      <section class="mblock">
-        <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
-        <div class="mrow">
-          <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
-          <button class="btn sm danger" onclick="deleteMgr()">× Remove</button>
-        </div>
-        <div class="contact-grid">
-          <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
-          <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
-          <input id="mgrEmail" class="minput" placeholder="Recovery email (name@co.com)" autocomplete="email">
-          <input id="mgrPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
-          <input id="mgrPass" class="minput" type="password" placeholder="Temporary password / leave blank to keep" autocomplete="new-password">
-        </div>
-        <div class="mrow" style="margin-top:10px">
-          <button class="btn sm" onclick="saveMgr()">Save Manager</button>
-          <button class="btn sm ghost" onclick="openSmsPreferences('manager')">SMS Preferences</button>
-        </div>
-        <div class="mrow addrow">
-          <input id="newMgr" class="minput" placeholder="Add by name…">
-          <button class="btn sm" onclick="addMgr()">+ Add Manager</button>
-        </div>
-      </section>
-'''
-          if old_mgr_html not in text:
-              raise SystemExit('Manager HTML block not found')
-          text = text.replace(old_mgr_html, new_mgr_html, 1)
-
-          old_tech_js = '''function addTech(){
-  var cfg = dbData.config;
-  var v = document.getElementById('newTech').value.trim();
-  if(!v){ alert('Technician name required'); return; }
-  if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:v, email:'', phone:''});
-  document.getElementById('newTech').value = '';
-  saveConfigArray('technicians', cfg.technicians);
-}
-function techObj(i){
-  var cfg = dbData.config;
-  var cur = cfg.technicians[i];
-  if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, email:'', phone:''}; cur = cfg.technicians[i]; }
-  if(!cur.email)   cur.email='';
-  if(!cur.phone)   cur.phone='';
-  return cur;
-}
-function fillTechContact(){
-  var i = parseInt(document.getElementById('selTech').value, 10);
-  if(isNaN(i)) return;
-  var t = techObj(i);
-  document.getElementById('techEmail').value = t.email || '';
-  document.getElementById('techPhone').value = t.phone || '';
-}
-function saveTechContact(){
-  var cfg = dbData.config;
-  var i = parseInt(document.getElementById('selTech').value, 10);
-  if(isNaN(i)){ alert('Select a technician first'); return; }
-  var t = techObj(i);
-  t.email    = document.getElementById('techEmail').value.trim();
-  t.phone    = document.getElementById('techPhone').value.trim();
-  saveConfigArray('technicians', cfg.technicians);
-}
-'''
-          new_tech_js = '''function passwordPolicyOk(pw){
-  return pw.length >= 10 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
-}
-function addTech(){
-  var cfg = dbData.config;
-  var v = document.getElementById('newTech').value.trim();
-  if(!v){ alert('Technician name required'); return; }
-  if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:v, username:'', email:'', phone:'', password:''});
-  document.getElementById('newTech').value = '';
-  saveConfigArray('technicians', cfg.technicians);
-}
-function techObj(i){
-  var cfg = dbData.config;
-  var cur = cfg.technicians[i];
-  if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, username:'', email:'', phone:'', password:''}; cur = cfg.technicians[i]; }
-  if(!cur.username) cur.username='';
-  if(!cur.email) cur.email='';
-  if(!cur.phone) cur.phone='';
-  if(typeof cur.password==='undefined') cur.password='';
-  return cur;
-}
-function fillTechContact(){
-  var i = parseInt(document.getElementById('selTech').value, 10);
-  if(isNaN(i)) return;
-  var t = techObj(i);
-  document.getElementById('techUser').value = t.username || '';
-  document.getElementById('techEmail').value = t.email || '';
-  document.getElementById('techPhone').value = t.phone || '';
-  document.getElementById('techPass').value = '';
-}
-function saveTechContact(){
-  var cfg = dbData.config;
-  var i = parseInt(document.getElementById('selTech').value, 10);
-  if(isNaN(i)){ alert('Select a technician first'); return; }
-  var t = techObj(i);
-  var pw = document.getElementById('techPass').value;
-  if(pw && !passwordPolicyOk(pw)){
-    alert('Password must be at least 10 characters and include 1 uppercase letter, 1 number, and 1 special character.');
-    return;
-  }
-  t.username = document.getElementById('techUser').value.trim();
-  t.email = document.getElementById('techEmail').value.trim();
-  t.phone = document.getElementById('techPhone').value.trim();
-  if(pw) t.password = pw;
-  fetch('/api/technicians', {
-    method:'PUT',
-    headers:{ ...authHdr(), 'Content-Type':'application/json' },
-    body: JSON.stringify({ technicians: cfg.technicians.map(function(x){
-      if(typeof x==='string') return {name:x,username:'',email:'',phone:'',password:''};
-      return { name:x.name||'', username:x.username||'', email:x.email||'', phone:x.phone||'', password:(x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
-    }) })
-  })
-  .then(function(r){ return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Technician save failed'); return d; }); })
-  .then(function(){ document.getElementById('techPass').value=''; loadData(); })
-  .catch(function(e){ alert(e.message||'Technician save failed'); });
-}
-function openSmsPreferences(kind){
-  var item = null;
-  if(kind==='technician'){
-    var ti = parseInt(document.getElementById('selTech').value,10);
-    if(!isNaN(ti)) item = techObj(ti);
-  } else {
-    var mi = parseInt(document.getElementById('selMgr').value,10);
-    if(!isNaN(mi)) item = mgrObj(mi);
-  }
-  if(!item){ alert('Select a '+(kind==='technician'?'technician':'manager')+' first'); return; }
-  var name = item.name || item.username || '';
-  var phone = item.phone || '';
-  if(!phone){ alert('Save a mobile phone number first'); return; }
-  window.open('/sms-consent.html?name='+encodeURIComponent(name)+'&phone='+encodeURIComponent(phone), '_blank');
-}
-'''
-          if old_tech_js not in text:
-              raise SystemExit('Technician JS block not found')
-          text = text.replace(old_tech_js, new_tech_js, 1)
-
-          text = text.replace("if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), email:'', phone:''};", "if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), username:'', email:'', phone:'', password:''};", 1)
-
-          old_mgr_obj = '''  if(typeof cur==='string'){ cfg.managers[i] = {name:cur, username:cur, password:''}; cur = cfg.managers[i]; }
-  if(!cur.username) cur.username = cur.name || '';
-  if(!cur.name) cur.name = cur.username || '';
-  if(typeof cur.password==='undefined') cur.password = '';
-  return cur;
-'''
-          new_mgr_obj = '''  if(typeof cur==='string'){ cfg.managers[i] = {name:cur, username:cur, email:'', phone:'', password:''}; cur = cfg.managers[i]; }
-  if(!cur.username) cur.username = cur.name || '';
-  if(!cur.name) cur.name = cur.username || '';
-  if(!cur.email) cur.email='';
-  if(!cur.phone) cur.phone='';
-  if(typeof cur.password==='undefined') cur.password = '';
-  return cur;
-'''
-          if old_mgr_obj not in text:
-              raise SystemExit('Manager object block not found')
-          text = text.replace(old_mgr_obj, new_mgr_obj, 1)
-
-          old_fill_mgr = '''  document.getElementById('mgrName').value = m.name || '';
-  document.getElementById('mgrUser').value = m.username || '';
-  document.getElementById('mgrPass').value = ''; // never echo the stored hash
-'''
-          new_fill_mgr = '''  document.getElementById('mgrName').value = m.name || '';
-  document.getElementById('mgrUser').value = m.username || '';
-  document.getElementById('mgrEmail').value = m.email || '';
-  document.getElementById('mgrPhone').value = m.phone || '';
-  document.getElementById('mgrPass').value = ''; // never echo the stored hash
-'''
-          if old_fill_mgr not in text:
-              raise SystemExit('Manager fill block not found')
-          text = text.replace(old_fill_mgr, new_fill_mgr, 1)
-
-          text = text.replace("cfg.managers.push({name:v, username:v, password:''});", "cfg.managers.push({name:v, username:v, email:'', phone:'', password:''});", 1)
-
-          old_mgr_save = '''  var pw = document.getElementById('mgrPass').value;
-  if(!un){ alert('Login username required'); return; }
-  m.name = nm || un;
-  m.username = un;
-  if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
-  // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
-  fetch('/api/managers', {
-    method:'PUT',
-    headers:{ ...authHdr(), 'Content-Type':'application/json' },
-    body: JSON.stringify({ managers: cfg.managers.map(function(x){
-      return { name:x.name, username:x.username, password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
-    }) })
-  })
-'''
-          new_mgr_save = '''  var pw = document.getElementById('mgrPass').value;
-  if(!un){ alert('Login username required'); return; }
-  if(pw && !passwordPolicyOk(pw)){
-    alert('Password must be at least 10 characters and include 1 uppercase letter, 1 number, and 1 special character.');
-    return;
-  }
-  m.name = nm || un;
-  m.username = un;
-  m.email = document.getElementById('mgrEmail').value.trim();
-  m.phone = document.getElementById('mgrPhone').value.trim();
-  if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
-  // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
-  fetch('/api/managers', {
-    method:'PUT',
-    headers:{ ...authHdr(), 'Content-Type':'application/json' },
-    body: JSON.stringify({ managers: cfg.managers.map(function(x){
-      return { name:x.name, username:x.username, email:x.email||'', phone:x.phone||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
-    }) })
-  })
-'''
-          if old_mgr_save not in text:
-              raise SystemExit('Manager save block not found')
-          text = text.replace(old_mgr_save, new_mgr_save, 1)
-          p.write_text(text)
-
-          # ---------- sms-consent.js ----------
-          p = Path('sms-consent.js')
-          text = p.read_text()
-          anchor = "byId('consent').onchange=update;\n"
-          prefill = """byId('consent').onchange=update;\n(function(){\n  const q=new URLSearchParams(location.search);\n  if(q.get('name')) byId('name').value=q.get('name');\n  if(q.get('phone')) byId('phone').value=q.get('phone');\n})();\n"""
-          if 'new URLSearchParams(location.search)' not in text:
-              if anchor not in text: raise SystemExit('SMS prefill anchor not found')
-              text = text.replace(anchor, prefill, 1)
-          p.write_text(text)
-
-          # ---------- sms-consent.html cache bump ----------
-          p = Path('sms-consent.html')
-          text = p.read_text().replace('/sms-consent.js?v=20260904S1', '/sms-consent.js?v=20260908S2')
-          p.write_text(text)
-
-          # ---------- sms-consent-server.js ----------
-          p = Path('sms-consent-server.js')
-          text = p.read_text()
-          old_roster = """        const tech=(getConfig().technicians||[]).find(t=>t.name?.trim().toLowerCase()===name.toLowerCase()&&normalizePhone(t.phone)===phone);\n        if(!tech)return reply(400,{error:'Your details must match the technician roster. Contact jguynes@rpc.net for assistance.'});\n"""
-          new_roster = """        const cfg=getConfig()||{};\n        const roster=[...(cfg.technicians||[]),...(cfg.managers||[])];\n        const person=roster.find(t=>{\n          if(typeof t==='string') return false;\n          return (t.name||t.username||'').trim().toLowerCase()===name.toLowerCase()&&normalizePhone(t.phone||'')===phone;\n        });\n        if(!person)return reply(400,{error:'Your details must match the technician or manager roster. Contact jguynes@rpc.net for assistance.'});\n"""
-          if old_roster not in text:
-              raise SystemExit('SMS roster validation block not found')
-          text = text.replace(old_roster, new_roster, 1)
-          p.write_text(text)
-
-          # ---------- api-server.js ----------
-          p = Path('api-server.js')
-          text = p.read_text()
-
-          mgr_return_old = """          return { name, username, password, role: 'manager' };\n"""
-          mgr_return_new = """          const email = (m.email || (existing && existing.email) || '').trim();\n          const phone = (m.phone || (existing && existing.phone) || '').trim();\n          return { name, username, email, phone, password, role: 'manager' };\n"""
-          if mgr_return_old not in text:
-              raise SystemExit('Manager return block not found')
-          text = text.replace(mgr_return_old, mgr_return_new, 1)
-          text = text.replace("managers: out.map(m => ({ name: m.name, username: m.username }))", "managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone }))", 1)
-
-          manager_end = """    return;\n  }\n\n  // ── GET /api/assets — list all assets (public) ──────────\n"""
-          tech_route = """    return;\n  }\n\n  // ── PUT /api/technicians — Manager/Superuser save; passwords hashed server-side ──\n  if (url.pathname === '/api/technicians' && req.method === 'PUT') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });\n    let body = '';\n    req.on('data', c => body += c);\n    req.on('end', () => {\n      try {\n        const incoming = JSON.parse(body).technicians || [];\n        const config = loadConfig() || {};\n        const current = config.technicians || [];\n        const existingByName = {};\n        current.forEach(t => {\n          if (typeof t === 'string') existingByName[t] = { name:t };\n          else if (t && t.name) existingByName[t.name] = t;\n        });\n        const out = incoming.map(t => {\n          if (typeof t === 'string') t = { name:t };\n          const name = (t.name || '').trim();\n          const existing = existingByName[name] || {};\n          let password = existing.password || '';\n          if (t.password && !t.password.startsWith('scrypt$')) {\n            password = hashPassword(t.password);\n          }\n          return {\n            name,\n            username: (t.username || existing.username || '').trim(),\n            email: (t.email || existing.email || '').trim(),\n            phone: (t.phone || existing.phone || '').trim(),\n            password,\n            role: 'technician'\n          };\n        });\n        const merged = { ...config, technicians: out };\n        saveConfig(merged);\n        sendJson(res, 200, { ok:true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone })) });\n      } catch (e) { sendJson(res, 400, { error: e.message }); }\n    });\n    return;\n  }\n\n  // ── GET /api/assets — list all assets (public) ──────────\n"""
-          if "url.pathname === '/api/technicians'" not in text:
-              if manager_end not in text: raise SystemExit('Technician endpoint insertion point not found')
-              text = text.replace(manager_end, tech_route, 1)
-          p.write_text(text)
-
-          # ---------- CHANGELOG.md ----------
-          p = Path('CHANGELOG.md')
-          text = p.read_text()
-          entry = """\n## 2026-09-08 — Technician/Manager credentials and SMS Preferences\n- Added login username, recovery email, mobile phone, and temporary-password fields to Technician setup.\n- Added recovery email, mobile phone, and SMS Preferences to Manager setup.\n- Added server-side hashing path for Technician passwords; plaintext passwords are not returned to the UI.\n- Added SMS Preferences buttons that prefill the selected person’s name and phone.\n- SMS enrollment now accepts roster matches for either Technicians or Managers.\n- Password-entry UI enforces the agreed minimum: 10 characters, 1 uppercase letter, 1 number, and 1 special character.\n- Technician login enforcement, first-login password change, and email password recovery remain the next account-system phase.\n\n"""
-          if 'Technician/Manager credentials and SMS Preferences' not in text:
-              p.write_text(entry + text)
-          PY
+      - name: Apply patch
+        run: python3 control/updates/apply-sms-preferences-ui.py prod
 
       - name: Verify patch
-        shell: bash
+        working-directory: prod
         run: |
-          grep -n "openSmsPreferences\|techUser\|techPass\|mgrEmail\|mgrPhone" db-viewer.html
+          grep -n "openSmsPreferences\|mgrPhone" db-viewer.html
           grep -n "URLSearchParams(location.search)" sms-consent.js
           grep -n "technician or manager roster" sms-consent-server.js
-          grep -n "api/technicians" api-server.js
           git diff --check
 
-      - name: Commit synchronized live branch
-        shell: bash
+      - name: Commit and push production branch
+        working-directory: prod
         run: |
           git config user.name "TMV Maintenance Automation"
           git config user.email "actions@users.noreply.github.com"
           git add CHANGELOG.md api-server.js db-viewer.html sms-consent.html sms-consent.js sms-consent-server.js
-          git commit -m "Add technician manager credentials and SMS preferences"
+          git commit -m "Expose SMS preferences in setup"
           git push origin HEAD:ms02-live-sync-20260908-085804
