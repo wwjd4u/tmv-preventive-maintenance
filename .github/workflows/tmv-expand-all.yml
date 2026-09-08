@@ -1,4 +1,4 @@
-name: Apply TMV Superuser Manager Permissions
+name: Apply TMV Login Logout Flow
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  apply-role-permissions:
+  apply-auth-flow:
     runs-on: ubuntu-latest
     steps:
       - name: Check out synchronized live branch
@@ -20,143 +20,142 @@ jobs:
         with:
           ref: ms02-live-sync-20260908-085804
 
-      - name: Apply role-aware backend and Setup permissions
+      - name: Apply real login logout flow
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          # ---------------- api-server.js ----------------
+          # ---------- api-server.js ----------
           p = Path('api-server.js')
           text = p.read_text()
 
-          old_auth = '''// ── Admin auth ────────────────────────────────────────────\n// Token is base64("<user>:<pass>"); sent in `Authorization: Bearer <token>`.\nfunction adminToken() {\n  return Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');\n}\nfunction isAdmin(token) {\n  return token === adminToken();\n}\n'''
-          new_auth = '''// ── Role-aware auth sessions ───────────────────────────────\n// Built-in admin is the Superuser. Saved manager accounts receive Manager\n// sessions. Tokens are random server-side session IDs, not reusable admin creds.\nconst authSessions = new Map();\nfunction newAuthSession(role, username, name) {\n  const token = crypto.randomBytes(32).toString('hex');\n  authSessions.set(token, { role, username, name: name || username, createdAt: Date.now() });\n  return token;\n}\nfunction getAuthSession(token) {\n  return token ? (authSessions.get(token) || null) : null;\n}\nfunction isAdmin(token) {\n  const s = getAuthSession(token);\n  return !!s && (s.role === 'superuser' || s.role === 'manager');\n}\n'''
-          if old_auth not in text:
-              raise SystemExit('admin auth block not found')
-          text = text.replace(old_auth, new_auth, 1)
+          login_end = """  // ── Admin-only endpoints below ───────────────────────────\n  // Check for Authorization header\n"""
+          session_routes = """  // ── Auth session inspection / logout ─────────────────────\n  if (url.pathname === '/api/session' && req.method === 'GET') {\n    const auth = req.headers['authorization'] || '';\n    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';\n    const session = getAuthSession(tok);\n    if (!session) return sendJson(res, 401, { error: 'Login required' });\n    return sendJson(res, 200, { ok: true, role: session.role, name: session.name, username: session.username });\n  }\n\n  if (url.pathname === '/api/logout' && req.method === 'POST') {\n    const auth = req.headers['authorization'] || '';\n    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';\n    if (tok) authSessions.delete(tok);\n    return sendJson(res, 200, { ok: true });\n  }\n\n  // ── Admin-only endpoints below ───────────────────────────\n  // Check for Authorization header\n"""
+          if "url.pathname === '/api/session'" not in text:
+              if login_end not in text:
+                  raise SystemExit('api session insertion point not found')
+              text = text.replace(login_end, session_routes, 1)
+          p.write_text(text)
 
-          old_login = '''        if (d.username === ADMIN_USER && d.password === ADMIN_PASS) {\n          return sendJson(res, 200, { ok: true, token: adminToken() });\n        }\n        // Manager login: a saved manager with a matching password gets full admin token.\n        const cfgMgr = (loadConfig() || {}).managers || [];\n        const mgr = cfgMgr.find(m => (m.username || m.name) === d.username);\n        if (mgr && verifyPassword(d.password || '', mgr.password)) {\n          return sendJson(res, 200, { ok: true, token: adminToken(), manager: mgr.name || mgr.username });\n        }\n'''
-          new_login = '''        if (d.username === ADMIN_USER && d.password === ADMIN_PASS) {\n          const token = newAuthSession('superuser', ADMIN_USER, 'Superuser');\n          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser' });\n        }\n        // Saved manager login receives a Manager session with restricted Setup rights.\n        const cfgMgr = (loadConfig() || {}).managers || [];\n        const mgr = cfgMgr.find(m => (m.username || m.name) === d.username);\n        if (mgr && verifyPassword(d.password || '', mgr.password)) {\n          const token = newAuthSession('manager', mgr.username || mgr.name, mgr.name || mgr.username);\n          return sendJson(res, 200, { ok: true, token, role: 'manager', name: mgr.name || mgr.username });\n        }\n'''
-          if old_login not in text:
-              raise SystemExit('login role block not found')
-          text = text.replace(old_login, new_login, 1)
+          # ---------- index.html ----------
+          p = Path('index.html')
+          text = p.read_text()
 
-          old_req = '''  const authHeader = req.headers['authorization'] || '';\n  const reqToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';\n  const isAdminReq = isAdmin(reqToken);\n'''
-          new_req = '''  const authHeader = req.headers['authorization'] || '';\n  const reqToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';\n  const authSession = getAuthSession(reqToken);\n  const isSuperuserReq = !!authSession && authSession.role === 'superuser';\n  const isManagerReq = !!authSession && authSession.role === 'manager';\n  const isAdminReq = isSuperuserReq || isManagerReq; // operational admin access\n'''
-          if old_req not in text:
-              raise SystemExit('request auth block not found')
-          text = text.replace(old_req, new_req, 1)
+          style_anchor = """  .header-right{margin-left:auto;display:flex;align-items:center;gap:12px}\n"""
+          auth_css = """  .header-right{margin-left:auto;display:flex;align-items:center;gap:12px}\n  .auth-user{font-size:12px;background:rgba(255,255,255,.14);padding:6px 10px;border-radius:999px;white-space:nowrap}\n  .auth-logout{background:#fff;color:var(--cudd);border:0;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer}\n  #appLoginOverlay{position:fixed;inset:0;z-index:5000;background:rgba(35,24,24,.72);display:flex;align-items:center;justify-content:center;padding:20px}\n  #appLoginBox{width:min(390px,100%);background:#fff;border-radius:14px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.35)}\n  #appLoginBox h2{margin:0 0 6px;color:var(--cudd)}\n  #appLoginBox p{margin:0 0 16px;color:#666;font-size:13px}\n  #appLoginBox input{display:block;width:100%;margin:9px 0;padding:11px 12px}\n  #appLoginErr{min-height:20px;color:#b91c1c;font-size:13px;margin:4px 0 8px}\n"""
+          if '#appLoginOverlay' not in text:
+              if style_anchor not in text:
+                  raise SystemExit('index auth css insertion point not found')
+              text = text.replace(style_anchor, auth_css, 1)
 
-          old_db = '''  if (url.pathname === '/api/admin/db' && req.method === 'GET') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });\n    const dump = db.getAdminDump();\n    return sendJson(res, 200, { ...dump, dbFile: DB_PATH });\n  }\n'''
-          new_db = '''  if (url.pathname === '/api/admin/db' && req.method === 'GET') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });\n    const dump = db.getAdminDump();\n    return sendJson(res, 200, { ...dump, dbFile: DB_PATH, auth: { role: authSession.role, name: authSession.name } });\n  }\n'''
-          if old_db not in text:
-              raise SystemExit('admin db block not found')
-          text = text.replace(old_db, new_db, 1)
+          body_anchor = """<body>\n<header>\n"""
+          login_html = """<body>\n<div id=\"appLoginOverlay\">\n  <div id=\"appLoginBox\">\n    <h2>TMV Preventive Maintenance</h2>\n    <p>Sign in as a Superuser or Manager.</p>\n    <input id=\"appLoginUser\" type=\"text\" placeholder=\"Username\" autocomplete=\"username\">\n    <input id=\"appLoginPass\" type=\"password\" placeholder=\"Password\" autocomplete=\"current-password\">\n    <div id=\"appLoginErr\"></div>\n    <button class=\"btn\" onclick=\"doAppLogin()\" style=\"width:100%\">Log In</button>\n  </div>\n</div>\n<header>\n"""
+          if 'id="appLoginOverlay"' not in text:
+              if body_anchor not in text:
+                  raise SystemExit('index login overlay insertion point not found')
+              text = text.replace(body_anchor, login_html, 1)
 
-          text = text.replace("if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });\n    db.purgeAssignments();", "if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });\n    db.purgeAssignments();", 1)
-          text = text.replace("if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });\n    const config = loadConfig();", "if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });\n    const config = loadConfig();", 1)
+          old_role = """    <label class=\"role-toggle\">Role:\n      <select id=\"roleSel\">\n        <option value=\"admin\">Admin</option>\n        <option value=\"tech\">Tech</option>\n      </select>\n    </label>\n"""
+          new_role = """    <span id=\"appAuthUser\" class=\"auth-user\"></span>\n    <button id=\"appLogoutBtn\" class=\"auth-logout\" onclick=\"appLogout()\">Log Out</button>\n"""
+          if old_role in text:
+              text = text.replace(old_role, new_role, 1)
+          elif 'id="appAuthUser"' not in text:
+              raise SystemExit('index role control not found')
 
-          old_config = '''  if (url.pathname === '/api/config' && req.method === 'PUT') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });\n    let body = '';\n    req.on('data', c => body += c);\n    req.on('end', () => {\n      try {\n        const incoming = JSON.parse(body);\n        const config = loadConfig() || {};\n        // Merge: keep any existing keys not present in the incoming payload,\n        // then overwrite with whatever the client sent (full-save model).\n        const merged = { ...config, ...incoming };\n        saveConfig(merged);\n        sendJson(res, 200, { ok: true, config: merged });\n      } catch(e) { sendJson(res, 400, { error: e.message }); }\n    });\n    return;\n  }\n'''
-          new_config = '''  if (url.pathname === '/api/config' && req.method === 'PUT') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });\n    let body = '';\n    req.on('data', c => body += c);\n    req.on('end', () => {\n      try {\n        const incoming = JSON.parse(body);\n        const config = loadConfig() || {};\n        let merged;\n        if (isSuperuserReq) {\n          merged = { ...config, ...incoming };\n        } else {\n          // Managers may operate Setup, but cannot modify Maintenance Categories\n          // and cannot delete Setup data other than Technicians.\n          merged = { ...config, ...incoming };\n          merged.checklist = config.checklist || [];\n\n          const oldLoc = Array.isArray(config.locations) ? config.locations : [];\n          const newLoc = Array.isArray(incoming.locations) ? incoming.locations : oldLoc;\n          merged.locations = oldLoc.concat(newLoc.filter(x => oldLoc.indexOf(x) < 0));\n\n          const oldDistricts = Array.isArray(config.districts) ? config.districts : [];\n          const newDistricts = Array.isArray(incoming.districts) ? incoming.districts : oldDistricts;\n          merged.districts = oldDistricts.concat(newDistricts.filter(x => oldDistricts.indexOf(x) < 0));\n\n          const oldIntervals = Array.isArray(config.intervals) ? config.intervals : [];\n          const newIntervals = Array.isArray(incoming.intervals) ? incoming.intervals : oldIntervals;\n          merged.intervals = oldIntervals.concat(newIntervals.filter(x => oldIntervals.indexOf(x) < 0));\n\n          const oldUnits = Array.isArray(config.unitOptions) ? config.unitOptions : [];\n          const newUnits = Array.isArray(incoming.unitOptions) ? incoming.unitOptions : oldUnits;\n          merged.unitOptions = oldUnits.concat(newUnits.filter(x => oldUnits.indexOf(x) < 0));\n\n          merged.tmvVanMap = { ...(config.tmvVanMap || {}), ...(incoming.tmvVanMap || {}) };\n          merged.geofences = { ...(config.geofences || {}), ...(incoming.geofences || {}) };\n          // Technicians are the one Setup list Managers may add/edit/delete.\n          if (Array.isArray(incoming.technicians)) merged.technicians = incoming.technicians;\n        }\n        saveConfig(merged);\n        sendJson(res, 200, { ok: true, config: merged });\n      } catch(e) { sendJson(res, 400, { error: e.message }); }\n    });\n    return;\n  }\n'''
-          if old_config not in text:
-              raise SystemExit('config PUT block not found')
-          text = text.replace(old_config, new_config, 1)
+          text = text.replace('app.js?v=20260904R3', 'app.js?v=20260908AUTH1')
+          p.write_text(text)
 
-          old_mgr_gate = "  // ── PUT /api/managers — save managers with hashed passwords (admin only) ──\n  if (url.pathname === '/api/managers' && req.method === 'PUT') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });"
-          new_mgr_gate = "  // ── PUT /api/managers — Superuser full control; Managers may add/update but not remove ──\n  if (url.pathname === '/api/managers' && req.method === 'PUT') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });"
-          if old_mgr_gate not in text:
-              raise SystemExit('manager route gate not found')
-          text = text.replace(old_mgr_gate, new_mgr_gate, 1)
+          # ---------- app.js ----------
+          p = Path('app.js')
+          text = p.read_text()
 
-          old_mgr_current = '''        const current = (loadConfig() || {}).managers || [];\n        const savedByName = {};\n'''
-          new_mgr_current = '''        const current = (loadConfig() || {}).managers || [];\n        if (isManagerReq) {\n          const incomingKeys = new Set(incoming.map(m => m.username || m.name));\n          const removed = current.some(m => !incomingKeys.has(m.username || m.name));\n          if (removed) return sendJson(res, 403, { error: 'Managers may add or update managers but cannot delete managers' });\n        }\n        const savedByName = {};\n'''
-          if old_mgr_current not in text:
-              raise SystemExit('manager current list block not found')
-          text = text.replace(old_mgr_current, new_mgr_current, 1)
+          old_role_block = """var ROLE = localStorage.getItem('tmv_role') || 'admin';\nfunction isAdmin(){ return ROLE === 'admin'; }\nfunction applyRole(){\n  var sel = document.getElementById('roleSel');\n  if(sel) sel.value = ROLE;\n  var db = document.getElementById('tabDb');\n  if(db) db.style.display = isAdmin() ? '' : 'none';\n}\n\nasync function boot(){\n  try{\n    await loadConfig();\n    loadPositions();              // fire-and-forget: proxied DevIoT feed; never blocks boot\n    await loadAssets();\n    await loadAssignments();\n    buildTracker();\n    buildTechFilter();\n    buildTmvGrid();\n    buildTechSelect();\n    applyRole();\n    if (__geoDemoMode) { var db = document.getElementById('demoBanner'); if (db) db.classList.remove('hidden'); }\n    // Honor #tracker / #tmv deep links (e.g. \"Back to Tracker\" from assign.html)\n    showViewFromHash();\n    window.addEventListener('hashchange', showViewFromHash);\n  }catch(e){ showErr('boot failed: '+((e&&(e.stack||e.message))||e)); }\n}\n"""
+          new_role_block = """var APP_TOKEN = sessionStorage.getItem('tmv_auth_token') || '';\nvar APP_ROLE = sessionStorage.getItem('tmv_auth_role') || '';\nvar APP_USER = sessionStorage.getItem('tmv_auth_name') || '';\n\nfunction appAuthHeaders(extra){\n  var h = Object.assign({}, extra || {});\n  if(APP_TOKEN) h.Authorization = 'Bearer ' + APP_TOKEN;\n  return h;\n}\nfunction updateAppAuthUi(){\n  var label = document.getElementById('appAuthUser');\n  if(label) label.textContent = APP_ROLE ? ((APP_ROLE === 'superuser' ? 'Superuser' : 'Manager') + (APP_USER ? ' — ' + APP_USER : '')) : '';\n}\nfunction showAppLogin(message){\n  var overlay = document.getElementById('appLoginOverlay');\n  if(overlay) overlay.style.display = 'flex';\n  var err = document.getElementById('appLoginErr');\n  if(err) err.textContent = message || '';\n}\nfunction hideAppLogin(){ var overlay=document.getElementById('appLoginOverlay'); if(overlay) overlay.style.display='none'; }\nfunction clearAppSession(){\n  APP_TOKEN=''; APP_ROLE=''; APP_USER='';\n  sessionStorage.removeItem('tmv_auth_token');\n  sessionStorage.removeItem('tmv_auth_role');\n  sessionStorage.removeItem('tmv_auth_name');\n}\nasync function doAppLogin(){\n  var u=(document.getElementById('appLoginUser').value||'').trim();\n  var p=document.getElementById('appLoginPass').value||'';\n  var err=document.getElementById('appLoginErr'); if(err) err.textContent='';\n  try{\n    var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});\n    var d=await r.json();\n    if(!r.ok || !d.token) throw new Error(d.error||'Invalid credentials');\n    APP_TOKEN=d.token; APP_ROLE=d.role||''; APP_USER=d.name||u;\n    sessionStorage.setItem('tmv_auth_token',APP_TOKEN);\n    sessionStorage.setItem('tmv_auth_role',APP_ROLE);\n    sessionStorage.setItem('tmv_auth_name',APP_USER);\n    document.getElementById('appLoginPass').value='';\n    await boot();\n  }catch(e){ showAppLogin(e.message||'Login failed'); }\n}\nasync function appLogout(){\n  try{ if(APP_TOKEN) await fetch('/api/logout',{method:'POST',headers:appAuthHeaders()}); }catch(_e){}\n  clearAppSession();\n  location.reload();\n}\n\nasync function boot(){\n  try{\n    if(!APP_TOKEN){ showAppLogin(); return; }\n    var sr=await fetch('/api/session',{headers:appAuthHeaders()});\n    if(!sr.ok){ clearAppSession(); showAppLogin('Please sign in.'); return; }\n    var sd=await sr.json();\n    APP_ROLE=sd.role||APP_ROLE; APP_USER=sd.name||APP_USER;\n    sessionStorage.setItem('tmv_auth_role',APP_ROLE);\n    sessionStorage.setItem('tmv_auth_name',APP_USER);\n    hideAppLogin(); updateAppAuthUi();\n    await loadConfig();\n    loadPositions();\n    await loadAssets();\n    await loadAssignments();\n    buildTracker();\n    buildTechFilter();\n    buildTmvGrid();\n    buildTechSelect();\n    if (__geoDemoMode) { var db = document.getElementById('demoBanner'); if (db) db.classList.remove('hidden'); }\n    showViewFromHash();\n    window.addEventListener('hashchange', showViewFromHash);\n  }catch(e){ showErr('boot failed: '+((e&&(e.stack||e.message))||e)); }\n}\n"""
+          if old_role_block not in text:
+              raise SystemExit('app legacy role/boot block not found')
+          text = text.replace(old_role_block, new_role_block, 1)
 
-          old_mgr_return = '''          return { name, username, password };\n'''
-          new_mgr_return = '''          return { name, username, password, role: 'manager' };\n'''
-          if old_mgr_return not in text:
-              raise SystemExit('manager object return not found')
-          text = text.replace(old_mgr_return, new_mgr_return, 1)
+          old_positions_auth = """    var user = sessionStorage.getItem('tmv_db_user'), pass = sessionStorage.getItem('tmv_db_pass');\n    var hdr = user && pass ? { 'Authorization': 'Basic ' + btoa(user + ':' + pass) } : {};\n    var r = await fetch('/api/positions', { headers: hdr });\n"""
+          new_positions_auth = """    var r = await fetch('/api/positions', { headers: appAuthHeaders() });\n"""
+          if old_positions_auth not in text:
+              raise SystemExit('app legacy positions auth block not found')
+          text = text.replace(old_positions_auth, new_positions_auth, 1)
 
-          text = text.replace("if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to add assets' });", "if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required to add assets' });", 1)
-          text = text.replace("  if (delMatch && req.method === 'DELETE') {\n    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assets' });", "  if (delMatch && req.method === 'DELETE') {\n    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required to delete assets' });", 1)
+          old_godb = """function goDb(){\n  sessionStorage.setItem(\"tmv_db_user\", \"admin\");\n  sessionStorage.setItem(\"tmv_db_pass\", \"admin123\");\n  window.open(\"/db?autologin=1\", \"_blank\");\n}\n\n// ── Auth removed: app opens directly to the TMV grid ─────\n"""
+          new_godb = """function goDb(){\n  if(!APP_TOKEN){ showAppLogin('Please sign in first.'); return; }\n  window.open('/db?session=1', '_blank');\n}\n\n// Main desktop app requires a Superuser or Manager session.\n"""
+          if old_godb not in text:
+              raise SystemExit('app legacy Task.db auth block not found')
+          text = text.replace(old_godb, new_godb, 1)
 
           p.write_text(text)
 
-          # ---------------- db-viewer.html ----------------
+          # ---------- db-viewer.html ----------
           p = Path('db-viewer.html')
           text = p.read_text()
 
-          text = text.replace('<h2>Admin Login</h2>', '<h2>Superuser / Manager Login</h2>', 1)
-          text = text.replace('<h1>TMV Preventive Maintenance Admin</h1>', '<h1>TMV Preventive Maintenance</h1>', 1)
-          text = text.replace('let token = null;\nlet dbData', "let token = null;\nlet currentRole = '';\nlet currentUserName = '';\nlet dbData", 1)
+          text = text.replace('placeholder="Username" value="admin"', 'placeholder="Username"', 1)
+          text = text.replace('placeholder="Password" value="admin123"', 'placeholder="Password"', 1)
 
-          old_login_ui = "      if(d.token){ token = d.token; document.getElementById('loginOverlay').style.display='none'; loadData(); }"
-          new_login_ui = "      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }"
-          if old_login_ui not in text:
-              raise SystemExit('db login success line not found')
-          text = text.replace(old_login_ui, new_login_ui, 1)
+          old_nav = """    <a class=\"backbtn\" href=\"/\" title=\"Back to main app\">← Main App</a>\n  </nav>\n"""
+          new_nav = """    <a class=\"backbtn\" href=\"/\" title=\"Back to main app\">← Main App</a>\n    <button class=\"btn sm ghost\" onclick=\"dbLogout()\">Log Out</button>\n  </nav>\n"""
+          if 'onclick="dbLogout()"' not in text:
+              if old_nav not in text:
+                  raise SystemExit('db logout nav insertion point not found')
+              text = text.replace(old_nav, new_nav, 1)
 
-          insert_after = "function authHdr(){ return { 'Authorization': 'Bearer ' + token } }\n"
-          role_ui = '''function authHdr(){ return { 'Authorization': 'Bearer ' + token } }\nfunction isSuperuser(){ return currentRole === 'superuser'; }\nfunction applyRoleUi(){\n  var manager = currentRole === 'manager';\n  var cat = document.querySelector('.catblock');\n  if(cat) cat.style.display = manager ? 'none' : '';\n  ['deleteTmv()','deleteLoc()','deleteMgr()','purgeData()'].forEach(function(call){\n    document.querySelectorAll('[onclick="'+call+'"]').forEach(function(el){ el.style.display = manager ? 'none' : ''; });\n  });\n  // Technician delete remains available to Managers by design.\n  var label = document.getElementById('roleLabel');\n  if(!label){\n    label = document.createElement('span');\n    label.id = 'roleLabel';\n    label.style.cssText = 'margin-left:10px;font-size:12px;opacity:.85';\n    var nav = document.querySelector('header nav');\n    if(nav) nav.appendChild(label);\n  }\n  if(label) label.textContent = currentRole ? (currentRole === 'superuser' ? 'Superuser' : 'Manager') + (currentUserName ? ' — ' + currentUserName : '') : '';\n}\n'''
-          if insert_after not in text:
-              raise SystemExit('authHdr insertion point not found')
-          text = text.replace(insert_after, role_ui, 1)
+          old_success = """      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }\n"""
+          new_success = """      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }\n"""
+          if old_success not in text:
+              raise SystemExit('db login success block not found')
+          text = text.replace(old_success, new_success, 1)
 
-          old_data_assign = '''      dbData = d;\n      try { renderStats(); } catch(e){ console.error('renderStats', e); }'''
-          new_data_assign = '''      dbData = d;\n      if(d.auth && d.auth.role){ currentRole = d.auth.role; currentUserName = d.auth.name || currentUserName; }\n      applyRoleUi();\n      try { renderStats(); } catch(e){ console.error('renderStats', e); }'''
-          if old_data_assign not in text:
-              raise SystemExit('loadData assignment block not found')
-          text = text.replace(old_data_assign, new_data_assign, 1)
-
-          # Managers can modify assignments operationally, including delete/reassign.
-          # Setup delete buttons except Technician are hidden in applyRoleUi.
+          old_auto = """// Auto-login from Task.db button (?autologin=1)\n(function(){\n  if(location.search.includes('autologin=1')){\n    var u = sessionStorage.getItem('tmv_db_user');\n    var p = sessionStorage.getItem('tmv_db_pass');\n    if(u && p){\n      document.getElementById('user').value = u;\n      document.getElementById('pass').value = p;\n      setTimeout(doLogin, 100);\n    }\n  }\n})();\n\n"""
+          new_auto = """// Reuse the current authenticated app session when Task.db is opened.\n(function(){\n  var shared = sessionStorage.getItem('tmv_auth_token');\n  if(!shared) return;\n  fetch('/api/session', { headers:{'Authorization':'Bearer '+shared} })\n    .then(function(r){ if(!r.ok) throw new Error('expired'); return r.json(); })\n    .then(function(d){\n      token = shared; currentRole = d.role || ''; currentUserName = d.name || '';\n      document.getElementById('loginOverlay').style.display='none';\n      applyRoleUi(); loadData();\n    })\n    .catch(function(){ sessionStorage.removeItem('tmv_auth_token'); sessionStorage.removeItem('tmv_auth_role'); sessionStorage.removeItem('tmv_auth_name'); });\n})();\n\nfunction dbLogout(){\n  var headers = token ? {'Authorization':'Bearer '+token} : {};\n  fetch('/api/logout', {method:'POST', headers:headers}).catch(function(){}).finally(function(){\n    token=null; currentRole=''; currentUserName='';\n    sessionStorage.removeItem('tmv_auth_token');\n    sessionStorage.removeItem('tmv_auth_role');\n    sessionStorage.removeItem('tmv_auth_name');\n    document.getElementById('user').value='';\n    document.getElementById('pass').value='';\n    document.getElementById('loginOverlay').style.display='flex';\n  });\n}\n\n"""
+          if old_auto not in text:
+              raise SystemExit('db legacy autologin block not found')
+          text = text.replace(old_auto, new_auto, 1)
           p.write_text(text)
 
-          # ---------------- CHANGELOG.md ----------------
+          # ---------- CHANGELOG.md ----------
           p = Path('CHANGELOG.md')
-          text = p.read_text() if p.exists() else '# TMV Preventive Maintenance App — Change Log\n\n'
+          text = p.read_text()
           marker = '## 2026-09-08\n'
-          entry = '''## 2026-09-08\n\n### Superuser and Manager role separation\n- Changed the built-in admin account into the **Superuser** role with full read/write/delete control.\n- Added true Manager login sessions with separate credentials stored in the existing Managers Setup section.\n- Managers can operate Assignments/Tracker/technician workflows.\n- In Setup, Managers can add/edit/delete Technicians; add/update Managers; add/edit Equipment; add/edit Districts; and add Inspection Settings.\n- Managers cannot delete Setup records other than Technicians.\n- Managers cannot access or modify Maintenance Categories.\n- Maintenance Categories and destructive Setup actions remain Superuser-only.\n- Backend API checks enforce these limits in addition to hiding restricted Setup controls in the UI.\n- Technician work-link behavior remains limited to the technician's assigned work and was not changed by this update.\n- Deployment status: **GitHub implementation pending MS-02 deployment verification.**\n\n'''
-          if '### Superuser and Manager role separation' not in text:
-              if marker in text:
-                  text = text.replace(marker, entry, 1)
-              else:
-                  text = entry + text
+          entry = """## 2026-09-08\n\n### Completed application login and logout flow\n- Removed the legacy browser code that automatically stored and reused the built-in admin credentials.\n- Removed the fake Admin/Tech role selector from the desktop application.\n- Added a real Superuser / Manager login screen to the main desktop application.\n- Added a signed-in role/name indicator and **Log Out** button.\n- Added server-side session validation and logout endpoints.\n- Task.db now reuses the active authenticated session token instead of storing a username/password in session storage.\n- Task.db also has its own **Log Out** button and blank credential fields when no session exists.\n- Technician work-order links remain separate from Superuser/Manager login.\n- Deployment status: **GitHub implementation pending MS-02 deployment verification.**\n\n"""
+          if '### Completed application login and logout flow' not in text:
+              if marker not in text:
+                  raise SystemExit('CHANGELOG date marker not found')
+              text = text.replace(marker, entry, 1)
           p.write_text(text)
           PY
 
-      - name: Validate role implementation
+      - name: Validate auth implementation
         shell: bash
         run: |
           node --check api-server.js
-          grep -q "newAuthSession('superuser'" api-server.js
-          grep -q "newAuthSession('manager'" api-server.js
-          grep -q "const isSuperuserReq" api-server.js
-          grep -q "Managers may add or update managers but cannot delete managers" api-server.js
-          grep -q "merged.checklist = config.checklist" api-server.js
-          grep -q "Superuser required to delete assets" api-server.js
-          grep -q "function applyRoleUi" db-viewer.html
-          grep -q "Superuser / Manager Login" db-viewer.html
-          grep -q "Technician delete remains available" db-viewer.html
-          grep -q "Superuser and Manager role separation" CHANGELOG.md
+          grep -q "url.pathname === '/api/session'" api-server.js
+          grep -q "url.pathname === '/api/logout'" api-server.js
+          grep -q 'id="appLoginOverlay"' index.html
+          grep -q 'onclick="appLogout()"' index.html
+          grep -q 'function doAppLogin' app.js
+          grep -q 'function appLogout' app.js
+          grep -q "sessionStorage.setItem('tmv_auth_token'" app.js
+          grep -q "window.open('/db?session=1'" app.js
+          grep -q 'onclick="dbLogout()"' db-viewer.html
+          grep -q 'function dbLogout' db-viewer.html
+          ! grep -q 'tmv_db_pass' app.js
+          ! grep -q 'value="admin123"' db-viewer.html
+          ! grep -q 'id="roleSel"' index.html
 
-      - name: Show changed files
-        shell: bash
-        run: git diff --name-status
-
-      - name: Commit role permissions and notes
+      - name: Commit application auth flow
         shell: bash
         run: |
           git config user.name "TMV Maintenance Automation"
           git config user.email "actions@users.noreply.github.com"
-          git add api-server.js db-viewer.html CHANGELOG.md
+          git add api-server.js index.html app.js db-viewer.html CHANGELOG.md
           if git diff --cached --quiet; then
             echo "No source change required."
           else
-            git commit -m "Add Superuser and Manager permissions"
+            git commit -m "Complete app login and logout flow"
             git push origin HEAD:ms02-live-sync-20260908-085804
           fi
