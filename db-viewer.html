@@ -929,13 +929,12 @@ function renderCatCards(){
         items.forEach(function(it, ii){
           var label = typeof it==='string' ? it : (it.label||'');
           var type  = typeof it==='object' ? (it.type||'text') : 'text';
-          html += '<div class="taskline">' +
+          html += '<div class="taskline" draggable="true" data-ci="' + ci + '" data-ii="' + ii + '" ondragstart="taskDragStart(event,' + ci + ',' + ii + ')" ondragover="taskDragOver(event,' + ci + ',' + ii + ')" ondragleave="taskDragLeave(event)" ondrop="taskDrop(event,' + ci + ',' + ii + ')" ondragend="taskDragEnd(event)">' +
+            '<span class="taskdrag" title="Drag to reorder" style="cursor:grab;font-size:18px;line-height:1;user-select:none;padding:0 6px">⋮⋮</span>' +
             '<span class="tlabel">' + esc(label) + '</span>' +
             '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +
               taskTypeOptions(type) +
             '</select>' +
-            '<button class="btn sm ghost" title="Move up" onclick="moveTask(' + ci + ',' + ii + ',-1)"' + (ii===0?' disabled':'') + '>↑</button>' +
-            '<button class="btn sm ghost" title="Move down" onclick="moveTask(' + ci + ',' + ii + ',1)"' + (ii===items.length-1?' disabled':'') + '>↓</button>' +
             '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +
           '</div>';
         });
@@ -1039,17 +1038,59 @@ function changeTaskType(ci, ii, val){
   cat.items[ii].type = val;
   saveConfigArray('checklist', cfg.checklist);
 }
-function moveTask(ci, ii, dir){
+var _taskDrag = null;
+function clearTaskDropLines(){
+  document.querySelectorAll('.taskline').forEach(function(el){
+    el.style.borderTop = '';
+    el.style.borderBottom = '';
+    el.style.opacity = '';
+  });
+}
+function taskDragStart(e, ci, ii){
+  _taskDrag = {ci:ci, ii:ii};
+  if(e.dataTransfer){
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', ci + ':' + ii); }catch(_e){}
+  }
+  e.currentTarget.style.opacity = '0.45';
+}
+function taskDragOver(e, ci, ii){
+  if(!_taskDrag || _taskDrag.ci !== ci) return;
+  e.preventDefault();
+  if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  clearTaskDropLines();
+  var r = e.currentTarget.getBoundingClientRect();
+  var after = e.clientY > (r.top + r.height / 2);
+  e.currentTarget.style.borderTop = after ? '' : '3px solid #812F2F';
+  e.currentTarget.style.borderBottom = after ? '3px solid #812F2F' : '';
+}
+function taskDragLeave(e){
+  e.currentTarget.style.borderTop = '';
+  e.currentTarget.style.borderBottom = '';
+}
+function taskDrop(e, ci, ii){
+  if(!_taskDrag || _taskDrag.ci !== ci) return;
+  e.preventDefault();
   var cfg = dbData.config;
   var cat = cfg.checklist && cfg.checklist[ci];
   if(!cat || typeof cat==='string' || !Array.isArray(cat.items)) return;
-  var ni = ii + dir;
-  if(ni < 0 || ni >= cat.items.length) return;
-  var tmp = cat.items[ii];
-  cat.items[ii] = cat.items[ni];
-  cat.items[ni] = tmp;
+  var r = e.currentTarget.getBoundingClientRect();
+  var after = e.clientY > (r.top + r.height / 2);
+  var from = _taskDrag.ii;
+  var insertAt = ii + (after ? 1 : 0);
+  var moved = cat.items.splice(from, 1)[0];
+  if(from < insertAt) insertAt--;
+  if(insertAt < 0) insertAt = 0;
+  if(insertAt > cat.items.length) insertAt = cat.items.length;
+  cat.items.splice(insertAt, 0, moved);
   _openCats[ci] = true;
+  _taskDrag = null;
+  clearTaskDropLines();
   saveConfigArray('checklist', cfg.checklist);
+}
+function taskDragEnd(){
+  _taskDrag = null;
+  clearTaskDropLines();
 }
 
 
