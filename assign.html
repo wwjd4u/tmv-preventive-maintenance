@@ -21,8 +21,7 @@
   .sub{color:#667;font-size:13px;margin:6px 0 2px}
   .tech{color:#334;font-size:14px;margin:4px 0 10px}
   .contact-bar{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 4px}
-  .cb-call,.cb-email,.cb-sms{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;font-size:14px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:#f8f9fb;cursor:pointer}
-  .cb-call{background:#e8f0ff;color:var(--blue);border-color:#cfe0ff}
+  .cb-email,.cb-sms{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;font-size:14px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:#f8f9fb;cursor:pointer}
   .cb-email{background:#eafaf0;color:var(--green);border-color:#cdeed7}
   .cb-sms{background:#fff2dd;color:var(--orange);border-color:#ffe0b0}
   .section{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0}
@@ -95,14 +94,13 @@ function contactBar(t, cfg, assignment){
   if(!name) return '<div class="muted">No technician assigned.</div>';
   var sms=String(phone).replace(/\D/g,'');
   var b='<div class="contact-bar">';
-  if(phone) b+='<a class="cb-call" href="tel:'+esc(phone)+'">📞 Call</a>';
   if(em){
     var email=workOrderEmail(assignment,name);
     var href='mailto:'+encodeURIComponent(em)+'?subject='+encodeURIComponent(email.subject)+'&body='+encodeURIComponent(email.body);
     b+='<a class="cb-email" href="'+esc(href)+'">✉️ Email</a>';
   }
   if(sms) b+='<button class="cb-sms" data-sms="'+esc(sms)+'" onclick="sendSms(this)">💬 Text / SMS</button>';
-  if(!phone && !em) b+='<span class="muted">No phone/email on file for '+esc(name)+' — add them in config to enable Call / Text / Email.</span>';
+  if(!phone && !em) b+='<span class="muted">No phone/email on file for '+esc(name)+' — add them in config to enable Text / Email.</span>';
   b+='</div>';
   return b;
 }
