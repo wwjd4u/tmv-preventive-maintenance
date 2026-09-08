@@ -1,17 +1,29 @@
-// TMV PM — Service Worker (installable PWA + offline support)
+// TMV PM — Service Worker (installable PWA + offline shell)
 // Strategy:
-//  * SPA navigation requests (Accept: text/html) -> network-first, fall back to cached index.html
-//  * static assets (.js/.css/.png/.json) -> cache-first
-//  * API requests (/api/*) -> always network (never cache live data)
-const CACHE = 'tmv-pwa-v8';
+//  * HTML navigation -> network-first, then exact cached page, then index shell
+//  * static assets -> cache-first, then network and populate cache
+//  * API requests -> always network (never cache live maintenance data)
+const CACHE = 'tmv-pwa-v9';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/app.js',
+  '/dispatch.js',
+  '/dispatch.css',
+  '/pwa.js',
+  '/techindex.html',
+  '/tech.html',
+  '/assign.html',
+  '/work-order-builder.html',
+  '/work-order-builder.js',
+  '/sms-consent.html',
+  '/sms-consent.js',
+  '/sms-consent.css',
   '/manifest.webmanifest',
   '/icon-192.png',
   '/icon-512.png',
-  '/apple-touch-icon.png'
+  '/apple-touch-icon.png',
+  '/cudd-logo-sm.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -33,17 +45,19 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return; // live data, never cache
+  if (url.pathname.startsWith('/api/')) return;
 
   if (req.headers.get('accept') && req.headers.get('accept').includes('text/html')) {
-    // SPA navigation: try network, fall back to shell
     event.respondWith(
-      fetch(req).catch(() => caches.match('/index.html').then((r) => r || caches.match('/')))
+      fetch(req).catch(async () => {
+        const exact = await caches.match(req, {ignoreSearch:true});
+        if (exact) return exact;
+        return (await caches.match('/index.html')) || (await caches.match('/'));
+      })
     );
     return;
   }
 
-  // static asset: cache-first, then network (and populate cache)
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
