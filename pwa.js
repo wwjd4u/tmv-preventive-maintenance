@@ -2,7 +2,7 @@
 
 // TMV PWA install / launch helper.
 // Android/Chromium: uses beforeinstallprompt when available.
-// iPhone/iPad: shows the Safari Share -> Add to Home Screen instructions.
+// iPhone/iPad: shows browser-specific Share -> Add to Home Screen guidance.
 (function(){
   let deferredInstallPrompt = null;
 
@@ -14,6 +14,24 @@
   function isIos(){
     return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function isChrome(){
+    const ua = navigator.userAgent || '';
+    return /CriOS/i.test(ua) || (/Chrome/i.test(ua) && !/Edg|OPR|SamsungBrowser/i.test(ua));
+  }
+  function isAndroid(){ return /Android/i.test(navigator.userAgent || ''); }
+
+  function installInstructions(){
+    if(isIos() && isChrome()){
+      return '<b>Add TMV PM to your iPhone Home Screen</b><br>1. Open this site in <b>Chrome</b>.<br>2. Tap <b>Share</b>.<br>3. Tap <b>Add to Home Screen</b>.<br>4. Tap <b>Add</b>.<br><br>The TMV icon will then open in its own app-style window.';
+    }
+    if(isIos()){
+      return '<b>Add TMV PM to your iPhone Home Screen</b><br>1. Open this site in <b>Safari</b>.<br>2. Tap the <b>Share</b> button.<br>3. Tap <b>Add to Home Screen</b>.<br>4. Tap <b>Add</b>.<br><br>The TMV icon will then open in its own app-style window.';
+    }
+    if(isAndroid() && isChrome()){
+      return '<b>Install TMV PM from Chrome</b><br>1. Tap the <b>Chrome menu</b> (⋮).<br>2. Tap <b>Install app</b> or <b>Add to Home screen</b>.<br>3. Confirm <b>Install</b> or <b>Add</b>.<br><br>The TMV icon will then launch the app from your Home screen.';
+    }
+    return '<b>Install TMV PM</b><br>Open your browser menu or Share menu and choose <b>Install app</b> or <b>Add to Home screen</b>.';
   }
 
   function updateInstallButton(){
@@ -27,8 +45,10 @@
     button.textContent = isIos() ? 'Add to Home Screen' : 'Install App';
   }
 
-  function showIosHelp(){
+  function showInstallHelp(){
     const modal = byId('pwaInstallModal');
+    const text = byId('pwaInstallInstructions');
+    if(text) text.innerHTML = installInstructions();
     if(modal) modal.classList.add('open');
   }
 
@@ -46,16 +66,7 @@
       updateInstallButton();
       return;
     }
-    if(isIos()){
-      showIosHelp();
-      return;
-    }
-    // Browsers that support installation but did not expose the prompt still
-    // get a simple browser-menu hint instead of a dead button.
-    const modal = byId('pwaInstallModal');
-    const text = byId('pwaInstallInstructions');
-    if(text) text.innerHTML = '<b>Install TMV PM</b><br>Open your browser menu and choose <b>Install app</b> or <b>Add to Home screen</b>.';
-    if(modal) modal.classList.add('open');
+    showInstallHelp();
   };
 
   window.addEventListener('beforeinstallprompt', function(event){
@@ -99,9 +110,7 @@
 
   document.addEventListener('DOMContentLoaded', function(){
     updateInstallButton();
-    if(isIos()){
-      const text = byId('pwaInstallInstructions');
-      if(text) text.innerHTML = '<b>Add TMV PM to your iPhone Home Screen</b><br>1. Open this site in <b>Safari</b>.<br>2. Tap the <b>Share</b> button.<br>3. Tap <b>Add to Home Screen</b>.<br>4. Tap <b>Add</b>.<br><br>The TMV icon will then open in its own app-style window.';
-    }
+    const text = byId('pwaInstallInstructions');
+    if(text) text.innerHTML = installInstructions();
   });
 })();
