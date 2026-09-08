@@ -17,6 +17,19 @@ Historical entries below are based on the Git repository history. Older entries 
 
 ## 2026-09-08
 
+### Superuser and Manager role separation
+- Changed the built-in admin account into the **Superuser** role with full read/write/delete control.
+- Added true Manager login sessions with separate credentials stored in the existing Managers Setup section.
+- Managers can operate Assignments/Tracker/technician workflows.
+- In Setup, Managers can add/edit/delete Technicians; add/update Managers; add/edit Equipment; add/edit Districts; and add Inspection Settings.
+- Managers cannot delete Setup records other than Technicians.
+- Managers cannot access or modify Maintenance Categories.
+- Maintenance Categories and destructive Setup actions remain Superuser-only.
+- Backend API checks enforce these limits in addition to hiding restricted Setup controls in the UI.
+- Technician work-link behavior remains limited to the technician's assigned work and was not changed by this update.
+- Deployment status: **GitHub implementation pending MS-02 deployment verification.**
+
+
 ### Maintenance Categories — drag-and-drop task ordering
 - Replaced the task Move Up / Move Down arrow buttons with drag-and-drop ordering.
 - Added a visible `⋮⋮` drag handle to each maintenance task.

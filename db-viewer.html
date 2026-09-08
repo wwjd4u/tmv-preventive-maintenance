@@ -181,7 +181,7 @@ footer a:active {
 
 <div id="loginOverlay">
   <div id="loginBox">
-    <h2>Admin Login</h2>
+    <h2>Superuser / Manager Login</h2>
     <input id="user" type="text" placeholder="Username" value="admin" autocomplete="username" name="login_user">
     <input id="pass" type="password" placeholder="Password" value="admin123" autocomplete="current-password" name="login_pass">
     <div id="loginErr"></div>
@@ -191,7 +191,7 @@ footer a:active {
 
 <header>
   <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
-  <h1>TMV Preventive Maintenance Admin</h1>
+  <h1>TMV Preventive Maintenance</h1>
   <nav>
     <button id="tabAssign" class="active" onclick="switchTab('assign')">Assignments</button>
     <button id="tabAssets" onclick="switchTab('assets')">Setup</button>
@@ -357,6 +357,8 @@ footer a:active {
 
 <script>
 let token = null;
+let currentRole = '';
+let currentUserName = '';
 let dbData = { assignments:[], assets:[], config:{} };
 
 /* AUTH - working bypass login */
@@ -367,7 +369,7 @@ function doLogin(){
   fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
     .then(r => r.json())
     .then(d => {
-      if(d.token){ token = d.token; document.getElementById('loginOverlay').style.display='none'; loadData(); }
+      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
       else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
     })
     .catch(() => document.getElementById('loginErr').textContent = 'Server error');
@@ -387,6 +389,25 @@ function doLogin(){
 })();
 
 function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
+function isSuperuser(){ return currentRole === 'superuser'; }
+function applyRoleUi(){
+  var manager = currentRole === 'manager';
+  var cat = document.querySelector('.catblock');
+  if(cat) cat.style.display = manager ? 'none' : '';
+  ['deleteTmv()','deleteLoc()','deleteMgr()','purgeData()'].forEach(function(call){
+    document.querySelectorAll('[onclick="'+call+'"]').forEach(function(el){ el.style.display = manager ? 'none' : ''; });
+  });
+  // Technician delete remains available to Managers by design.
+  var label = document.getElementById('roleLabel');
+  if(!label){
+    label = document.createElement('span');
+    label.id = 'roleLabel';
+    label.style.cssText = 'margin-left:10px;font-size:12px;opacity:.85';
+    var nav = document.querySelector('header nav');
+    if(nav) nav.appendChild(label);
+  }
+  if(label) label.textContent = currentRole ? (currentRole === 'superuser' ? 'Superuser' : 'Manager') + (currentUserName ? ' — ' + currentUserName : '') : '';
+}
 
 /* LOAD DATA */
 function loadData(){
@@ -395,6 +416,8 @@ function loadData(){
     .then(d => {
       if(d.error){ alert(d.error); return; }
       dbData = d;
+      if(d.auth && d.auth.role){ currentRole = d.auth.role; currentUserName = d.auth.name || currentUserName; }
+      applyRoleUi();
       try { renderStats(); } catch(e){ console.error('renderStats', e); }
       try { renderAssignments(); } catch(e){ console.error('renderAssignments', e); }
       try { renderAssetManager(); } catch(e){ console.error('renderAssetManager', e); }

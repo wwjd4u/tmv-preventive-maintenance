@@ -299,13 +299,21 @@ function serveFile(res, p, contentType) {
   });
 }
 
-// ── Admin auth ────────────────────────────────────────────
-// Token is base64("<user>:<pass>"); sent in `Authorization: Bearer <token>`.
-function adminToken() {
-  return Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');
+// ── Role-aware auth sessions ───────────────────────────────
+// Built-in admin is the Superuser. Saved manager accounts receive Manager
+// sessions. Tokens are random server-side session IDs, not reusable admin creds.
+const authSessions = new Map();
+function newAuthSession(role, username, name) {
+  const token = crypto.randomBytes(32).toString('hex');
+  authSessions.set(token, { role, username, name: name || username, createdAt: Date.now() });
+  return token;
+}
+function getAuthSession(token) {
+  return token ? (authSessions.get(token) || null) : null;
 }
 function isAdmin(token) {
-  return token === adminToken();
+  const s = getAuthSession(token);
+  return !!s && (s.role === 'superuser' || s.role === 'manager');
 }
 
 // ── Password hashing (scrypt + per-user salt, constant-time compare) ──
@@ -630,13 +638,15 @@ http.createServer((req, res) => {
       try {
         const d = JSON.parse(body);
         if (d.username === ADMIN_USER && d.password === ADMIN_PASS) {
-          return sendJson(res, 200, { ok: true, token: adminToken() });
+          const token = newAuthSession('superuser', ADMIN_USER, 'Superuser');
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser' });
         }
-        // Manager login: a saved manager with a matching password gets full admin token.
+        // Saved manager login receives a Manager session with restricted Setup rights.
         const cfgMgr = (loadConfig() || {}).managers || [];
         const mgr = cfgMgr.find(m => (m.username || m.name) === d.username);
         if (mgr && verifyPassword(d.password || '', mgr.password)) {
-          return sendJson(res, 200, { ok: true, token: adminToken(), manager: mgr.name || mgr.username });
+          const token = newAuthSession('manager', mgr.username || mgr.name, mgr.name || mgr.username);
+          return sendJson(res, 200, { ok: true, token, role: 'manager', name: mgr.name || mgr.username });
         }
         return sendJson(res, 401, { error: 'Invalid credentials' });
       } catch (e) {
@@ -650,18 +660,21 @@ http.createServer((req, res) => {
   // Check for Authorization header
   const authHeader = req.headers['authorization'] || '';
   const reqToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  const isAdminReq = isAdmin(reqToken);
+  const authSession = getAuthSession(reqToken);
+  const isSuperuserReq = !!authSession && authSession.role === 'superuser';
+  const isManagerReq = !!authSession && authSession.role === 'manager';
+  const isAdminReq = isSuperuserReq || isManagerReq; // operational admin access
 
   // ── GET /api/admin/db — full DB dump for admin viewer (admin only) ──
   if (url.pathname === '/api/admin/db' && req.method === 'GET') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
     const dump = db.getAdminDump();
-    return sendJson(res, 200, { ...dump, dbFile: DB_PATH });
+    return sendJson(res, 200, { ...dump, dbFile: DB_PATH, auth: { role: authSession.role, name: authSession.name } });
   }
 
   // ── GET /api/admin/purge — wipe all temp records before production ──
   if (url.pathname === '/api/admin/purge' && req.method === 'POST') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
     db.purgeAssignments();
     return sendJson(res, 200, { ok: true, message: 'All assignment records purged.' });
   }
@@ -671,7 +684,7 @@ http.createServer((req, res) => {
   // sections (main → tech → tracker → Task.db stay in sync). Values already
   // entered by techs are preserved. (admin only)
   if (url.pathname === '/api/admin/backfill' && req.method === 'POST') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
     const config = loadConfig();
     const assignments = loadAssignments();
     let updated = 0, missingVan = 0;
@@ -692,16 +705,43 @@ http.createServer((req, res) => {
   // Persists the entire config object so the admin viewer can manage
   // intervals, locations, unitOptions, technicians, districts, checklist, etc.
   if (url.pathname === '/api/config' && req.method === 'PUT') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
         const incoming = JSON.parse(body);
         const config = loadConfig() || {};
-        // Merge: keep any existing keys not present in the incoming payload,
-        // then overwrite with whatever the client sent (full-save model).
-        const merged = { ...config, ...incoming };
+        let merged;
+        if (isSuperuserReq) {
+          merged = { ...config, ...incoming };
+        } else {
+          // Managers may operate Setup, but cannot modify Maintenance Categories
+          // and cannot delete Setup data other than Technicians.
+          merged = { ...config, ...incoming };
+          merged.checklist = config.checklist || [];
+
+          const oldLoc = Array.isArray(config.locations) ? config.locations : [];
+          const newLoc = Array.isArray(incoming.locations) ? incoming.locations : oldLoc;
+          merged.locations = oldLoc.concat(newLoc.filter(x => oldLoc.indexOf(x) < 0));
+
+          const oldDistricts = Array.isArray(config.districts) ? config.districts : [];
+          const newDistricts = Array.isArray(incoming.districts) ? incoming.districts : oldDistricts;
+          merged.districts = oldDistricts.concat(newDistricts.filter(x => oldDistricts.indexOf(x) < 0));
+
+          const oldIntervals = Array.isArray(config.intervals) ? config.intervals : [];
+          const newIntervals = Array.isArray(incoming.intervals) ? incoming.intervals : oldIntervals;
+          merged.intervals = oldIntervals.concat(newIntervals.filter(x => oldIntervals.indexOf(x) < 0));
+
+          const oldUnits = Array.isArray(config.unitOptions) ? config.unitOptions : [];
+          const newUnits = Array.isArray(incoming.unitOptions) ? incoming.unitOptions : oldUnits;
+          merged.unitOptions = oldUnits.concat(newUnits.filter(x => oldUnits.indexOf(x) < 0));
+
+          merged.tmvVanMap = { ...(config.tmvVanMap || {}), ...(incoming.tmvVanMap || {}) };
+          merged.geofences = { ...(config.geofences || {}), ...(incoming.geofences || {}) };
+          // Technicians are the one Setup list Managers may add/edit/delete.
+          if (Array.isArray(incoming.technicians)) merged.technicians = incoming.technicians;
+        }
         saveConfig(merged);
         sendJson(res, 200, { ok: true, config: merged });
       } catch(e) { sendJson(res, 400, { error: e.message }); }
@@ -709,15 +749,20 @@ http.createServer((req, res) => {
     return;
   }
 
-  // ── PUT /api/managers — save managers with hashed passwords (admin only) ──
+  // ── PUT /api/managers — Superuser full control; Managers may add/update but not remove ──
   if (url.pathname === '/api/managers' && req.method === 'PUT') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
         const incoming = JSON.parse(body).managers || [];
         const current = (loadConfig() || {}).managers || [];
+        if (isManagerReq) {
+          const incomingKeys = new Set(incoming.map(m => m.username || m.name));
+          const removed = current.some(m => !incomingKeys.has(m.username || m.name));
+          if (removed) return sendJson(res, 403, { error: 'Managers may add or update managers but cannot delete managers' });
+        }
         const savedByName = {};
         current.forEach(m => { savedByName[m.username || m.name] = m; });
         const out = incoming.map(m => {
@@ -730,7 +775,7 @@ http.createServer((req, res) => {
           if (m.password && !m.password.startsWith('scrypt$')) {
             password = hashPassword(m.password);
           }
-          return { name, username, password };
+          return { name, username, password, role: 'manager' };
         });
         const config = loadConfig() || {};
         const merged = { ...config, managers: out };
@@ -747,7 +792,7 @@ http.createServer((req, res) => {
 
   // ── POST /api/assets — add new asset (admin only) ───────
   if (url.pathname === '/api/assets' && req.method === 'POST') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to add assets' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required to add assets' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
@@ -789,7 +834,7 @@ http.createServer((req, res) => {
   // ── DELETE /api/assets/:id — delete asset (admin only) ──
   const delMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
   if (delMatch && req.method === 'DELETE') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assets' });
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required to delete assets' });
     const id = parseInt(delMatch[1]);
     const assets = loadAssets();
     const target = assets.find(a => a.id === id);
