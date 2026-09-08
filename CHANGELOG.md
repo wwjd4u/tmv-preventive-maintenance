@@ -263,3 +263,13 @@ Historical entries below are based on the Git repository history. Older entries 
   - Superuser — manager abilities plus application Setup/configuration and user-role administration.
 - Existing authentication currently needs to be refactored before this is considered implemented.
 - **Status: Not implemented yet.**
+
+## 2026-09-08 — Finish installable mobile PWA
+- Area: Mobile / PWA
+- Added an Install App control with native install prompting where supported.
+- Added iPhone/iPad Safari instructions for Share → Add to Home Screen.
+- Added safe-area handling, larger phone tap targets, and a more compact mobile header.
+- Added remembered last tab behavior for installed-app launches.
+- Expanded the offline app shell while keeping all `/api/*` data network-only.
+- Added manifest shortcuts for Inspections, Tracker, and Tech.
+- Deployment/test status: GitHub patch prepared; live deployment pending.
