@@ -1,0 +1,51 @@
+name: Apply TMV District Personnel and Timeout Fix
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'updates/add-district-personnel-and-fix-timeout.py'
+      - '.github/workflows/tmv-district-personnel-timeout.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-district-personnel-timeout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check out patch script
+        run: git show origin/master:updates/add-district-personnel-and-fix-timeout.py > /tmp/tmv-patch.py
+
+      - name: Apply patch
+        run: python3 /tmp/tmv-patch.py
+
+      - name: Verify patch
+        run: |
+          grep -n "Math.max(15, Number(process.env.AUTH_IDLE_MINUTES" api-server.js
+          grep -n "district, password, role: 'manager'" api-server.js
+          grep -n "district, password, role: 'technician'" api-server.js
+          grep -n "mgrDistrict\|techDistrict" db-viewer.html
+          grep -n "personnelForDistrict\|rebuildDetailTechSelect" app.js
+          grep -n "allTechs\|personnelForDistrict" dispatch.js
+          grep -n "filterDistrict\|All districts" techindex.html
+          node --check api-server.js
+          node --check app.js
+          node --check dispatch.js
+          git diff --check
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "api-server.js app.js db-viewer.html dispatch.js techindex.html "
+
+      - name: Commit and push production branch
+        run: |
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add api-server.js app.js db-viewer.html dispatch.js techindex.html
+          git commit -m "Add district personnel filtering and fix 15 minute timeout"
+          git push origin HEAD:ms02-live-sync-20260908-085804
