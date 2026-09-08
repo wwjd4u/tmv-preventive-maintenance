@@ -1,0 +1,64 @@
+name: Apply TMV Security Tab
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'updates/apply-security-tab.py'
+      - '.github/workflows/tmv-security-tab.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-security-tab:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+        with:
+          ref: ms02-live-sync-20260908-085804
+          fetch-depth: 0
+          path: prod
+
+      - name: Check out patch script
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: patch
+
+      - name: Apply Security tab patch
+        run: |
+          cd prod
+          python3 ../patch/updates/apply-security-tab.py
+
+      - name: Verify Security tab patch
+        run: |
+          cd prod
+          grep -q 'id="tabSecurity"' db-viewer.html
+          grep -q 'id="viewSecurity"' db-viewer.html
+          grep -q "\['assign','assets','security'\]" db-viewer.html
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('db-viewer.html').read_text()
+          assets=s.index('id="viewAssets"')
+          sec=s.index('id="viewSecurity"')
+          su=s.index('id="superuserSecurityBlock"')
+          roles=s.index('id="userRolesBlock"')
+          assert sec < su < assets
+          assert sec < roles < assets
+          print('PASS - Security controls moved out of Setup')
+          PY
+
+      - name: Commit and push production branch
+        run: |
+          cd prod
+          git config user.name 'TMV Maintenance Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add db-viewer.html
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+          else
+            git commit -m 'Move Superuser controls to Security tab'
+            git push origin HEAD:ms02-live-sync-20260908-085804
+          fi
