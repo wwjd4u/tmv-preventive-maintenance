@@ -327,7 +327,7 @@ footer a:active {
 
       <!-- CATEGORIES (expandable cards) -->
       <section class="mblock catblock">
-        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>
+        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span><button id="toggleAllCatsBtn" class="btn sm ghost" onclick="toggleAllCats()" style="float:right;margin-top:-4px">Expand All</button></h3>
         <div class="mrow addrow">
           <input id="newCat" class="minput" placeholder="Air Conditioning">
           <button class="btn sm" onclick="addCat()">+ Add Category</button>
@@ -903,6 +903,11 @@ function renderCatCards(){
   var cfg = dbData.config || {};
   cfg.checklist = cfg.checklist || [];
   document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';
+  var toggleAllBtn = document.getElementById('toggleAllCatsBtn');
+  if(toggleAllBtn){
+    var everyOpen = cfg.checklist.length > 0 && cfg.checklist.every(function(_, ci){ return isCatOpen(ci); });
+    toggleAllBtn.textContent = everyOpen ? 'Collapse All' : 'Expand All';
+  }
   var wrap = document.getElementById('catCards');
   wrap.innerHTML = '';
   cfg.checklist.forEach(function(c, ci){
@@ -929,6 +934,8 @@ function renderCatCards(){
             '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +
               taskTypeOptions(type) +
             '</select>' +
+            '<button class="btn sm ghost" title="Move up" onclick="moveTask(' + ci + ',' + ii + ',-1)"' + (ii===0?' disabled':'') + '>↑</button>' +
+            '<button class="btn sm ghost" title="Move down" onclick="moveTask(' + ci + ',' + ii + ',1)"' + (ii===items.length-1?' disabled':'') + '>↓</button>' +
             '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +
           '</div>';
         });
@@ -957,6 +964,13 @@ function renderCatCards(){
 var _openCats = {};
 function isCatOpen(ci){ return _openCats[ci] === true; }
 function toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }
+function toggleAllCats(){
+  var cfg = dbData.config || {};
+  var cats = cfg.checklist || [];
+  var everyOpen = cats.length > 0 && cats.every(function(_, ci){ return isCatOpen(ci); });
+  cats.forEach(function(_, ci){ _openCats[ci] = !everyOpen; });
+  renderCatCards();
+}
 function toggleCatInclude(ci, val){
   var cfg = dbData.config;
   if(!cfg.checklist[ci]) return;
@@ -1023,6 +1037,18 @@ function changeTaskType(ci, ii, val){
   if(!cat || typeof cat==='string') return;
   if(!cat.items[ii]) return;
   cat.items[ii].type = val;
+  saveConfigArray('checklist', cfg.checklist);
+}
+function moveTask(ci, ii, dir){
+  var cfg = dbData.config;
+  var cat = cfg.checklist && cfg.checklist[ci];
+  if(!cat || typeof cat==='string' || !Array.isArray(cat.items)) return;
+  var ni = ii + dir;
+  if(ni < 0 || ni >= cat.items.length) return;
+  var tmp = cat.items[ii];
+  cat.items[ii] = cat.items[ni];
+  cat.items[ni] = tmp;
+  _openCats[ci] = true;
   saveConfigArray('checklist', cfg.checklist);
 }
 
