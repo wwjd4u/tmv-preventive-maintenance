@@ -279,3 +279,9 @@ Historical entries below are based on the Git repository history. Older entries 
 - Expanded the offline app shell while keeping all `/api/*` data network-only.
 - Added manifest shortcuts for Inspections, Tracker, and Tech.
 - Deployment/test status: GitHub patch prepared; live deployment pending.
+
+## 2026-09-08 — Superuser credential rotation
+- Added a Superuser-only Security section in Setup for changing the Superuser username and/or password.
+- Requires the current Superuser password and enforces the application password policy.
+- Updates the private `.env` file and invalidates all active admin sessions after a successful change.
+- Managers cannot view or call the Superuser credential-change function.

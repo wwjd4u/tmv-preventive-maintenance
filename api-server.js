@@ -34,8 +34,8 @@ process.on('uncaughtException', (err) => {
 });
 
 // ── Superuser credentials — private environment only ─────
-const ADMIN_USER = String(process.env.ADMIN_USER || '').trim();
-const ADMIN_PASS = String(process.env.ADMIN_PASS || '');
+let ADMIN_USER = String(process.env.ADMIN_USER || '').trim();
+let ADMIN_PASS = String(process.env.ADMIN_PASS || '');
 if (!ADMIN_USER || !ADMIN_PASS) {
   console.warn('[auth] ADMIN_USER / ADMIN_PASS are not configured; Superuser login is disabled.');
 }
@@ -346,6 +346,34 @@ function verifyPassword(pw, stored) {
   const a = Buffer.from(d), b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+function sameSecret(a, b) {
+  const aa = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+}
+function validAdminPassword(pw) {
+  return typeof pw === 'string' && pw.length >= 10 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+}
+function updatePrivateEnv(values) {
+  const ef = path.join(__dirname, '.env');
+  let lines = [];
+  try { if (fs.existsSync(ef)) lines = fs.readFileSync(ef, 'utf8').split(/\r?\n/); } catch (_) {}
+  Object.keys(values).forEach((key) => {
+    const value = String(values[key]);
+    let found = false;
+    lines = lines.map((line) => {
+      if (line.startsWith(key + '=')) { found = true; return key + '=' + value; }
+      return line;
+    });
+    if (!found) lines.push(key + '=' + value);
+  });
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  const tmp = ef + '.tmp-' + process.pid;
+  fs.writeFileSync(tmp, lines.join('\n') + '\n', { mode: 0o600 });
+  fs.renameSync(tmp, ef);
+  try { fs.chmodSync(ef, 0o600); } catch (_) {}
 }
 
 http.createServer((req, res) => {
@@ -666,6 +694,43 @@ http.createServer((req, res) => {
         return sendJson(res, 401, { error: 'Invalid credentials' });
       } catch (e) {
         sendJson(res, 400, { error: 'Invalid request: ' + e.message });
+      }
+    });
+    return;
+  }
+
+  // ── Superuser credential rotation ───────────────────────
+  if (url.pathname === '/api/superuser/credentials' && req.method === 'POST') {
+    const auth = req.headers['authorization'] || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    const session = getAuthSession(tok);
+    if (!session || session.role !== 'superuser') return sendJson(res, 403, { error: 'Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body || '{}');
+        if (!sameSecret(d.currentPassword, ADMIN_PASS)) return sendJson(res, 401, { error: 'Current password is incorrect' });
+        const nextUser = String(d.newUsername || '').trim();
+        const nextPass = String(d.newPassword || '');
+        if (!nextUser && !nextPass) return sendJson(res, 400, { error: 'Enter a new username and/or password' });
+        if (nextUser && !/^[A-Za-z0-9._@-]{3,64}$/.test(nextUser)) {
+          return sendJson(res, 400, { error: 'Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen' });
+        }
+        if (nextPass && !validAdminPassword(nextPass)) {
+          return sendJson(res, 400, { error: 'Password must be at least 10 characters with an uppercase letter, number, and special character' });
+        }
+        const finalUser = nextUser || ADMIN_USER;
+        const finalPass = nextPass || ADMIN_PASS;
+        updatePrivateEnv({ ADMIN_USER: finalUser, ADMIN_PASS: finalPass });
+        ADMIN_USER = finalUser;
+        ADMIN_PASS = finalPass;
+        process.env.ADMIN_USER = finalUser;
+        process.env.ADMIN_PASS = finalPass;
+        authSessions.clear();
+        return sendJson(res, 200, { ok: true, message: 'Superuser credentials updated. Sign in again.' });
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Credential update failed: ' + e.message });
       }
     });
     return;

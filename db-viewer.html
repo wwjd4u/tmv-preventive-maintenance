@@ -312,6 +312,20 @@ footer a:active {
         </div>
       </section>
 
+      <!-- SUPERUSER SECURITY -->
+      <section class="mblock" id="superuserSecurityBlock" style="display:none">
+        <h3>Superuser Security</h3>
+        <div style="font-size:13px;color:#666;margin-bottom:10px">Change the Superuser username and/or password. Current password is required. All active admin sessions will be signed out after a change.</div>
+        <div class="contact-grid">
+          <input id="suCurrentPass" class="minput" type="password" placeholder="Current password" autocomplete="current-password">
+          <input id="suNewUser" class="minput" placeholder="New username (optional)" autocomplete="off">
+          <input id="suNewPass" class="minput" type="password" placeholder="New password (optional)" autocomplete="new-password">
+          <input id="suConfirmPass" class="minput" type="password" placeholder="Confirm new password" autocomplete="new-password">
+        </div>
+        <div style="font-size:12px;color:#777;margin:9px 0">Password: 10+ characters, 1 uppercase, 1 number, and 1 special character.</div>
+        <button class="btn sm" onclick="saveSuperuserCredentials()">Update Superuser Login</button>
+      </section>
+
       <!-- INSPECTION SETTINGS -->
       <section class="mblock">
         <h3>Inspection Settings</h3>
@@ -405,6 +419,36 @@ function dbLogout(){
 }
 
 function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
+function saveSuperuserCredentials(){
+  if(currentRole !== 'superuser'){ alert('Superuser required'); return; }
+  var current = document.getElementById('suCurrentPass').value || '';
+  var newUser = (document.getElementById('suNewUser').value || '').trim();
+  var newPass = document.getElementById('suNewPass').value || '';
+  var confirmPass = document.getElementById('suConfirmPass').value || '';
+  if(!current){ alert('Enter your current password'); return; }
+  if(!newUser && !newPass){ alert('Enter a new username and/or password'); return; }
+  if(newUser && !/^[A-Za-z0-9._@-]{3,64}$/.test(newUser)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
+  if(newPass){
+    if(newPass !== confirmPass){ alert('New passwords do not match'); return; }
+    if(newPass.length < 10 || !/[A-Z]/.test(newPass) || !/[0-9]/.test(newPass) || !/[^A-Za-z0-9]/.test(newPass)){
+      alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return;
+    }
+  }
+  if(!confirm('Update the Superuser login? This will sign out all active admin sessions.')) return;
+  fetch('/api/superuser/credentials', {
+    method:'POST',
+    headers:Object.assign({'Content-Type':'application/json'}, authHdr()),
+    body:JSON.stringify({currentPassword:current,newUsername:newUser,newPassword:newPass})
+  }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok){ alert((x.d && x.d.error) || 'Credential update failed'); return; }
+      sessionStorage.removeItem('tmv_auth_token');
+      sessionStorage.removeItem('tmv_auth_role');
+      sessionStorage.removeItem('tmv_auth_name');
+      alert('Superuser login updated. Sign in again with the new credentials.');
+      location.href='/';
+    }).catch(function(){ alert('Credential update failed'); });
+}
 var DB_AUTH_IDLE_MS = 15 * 60 * 1000;
 var dbAuthLastActivity = Date.now();
 var dbAuthLastHeartbeat = 0;
@@ -433,6 +477,8 @@ function applyRoleUi(){
   var manager = currentRole === 'manager';
   var cat = document.querySelector('.catblock');
   if(cat) cat.style.display = manager ? 'none' : '';
+  var suSecurity = document.getElementById('superuserSecurityBlock');
+  if(suSecurity) suSecurity.style.display = currentRole === 'superuser' ? '' : 'none';
   ['deleteTmv()','deleteLoc()','deleteMgr()','purgeData()'].forEach(function(call){
     document.querySelectorAll('[onclick="'+call+'"]').forEach(function(el){ el.style.display = manager ? 'none' : ''; });
   });
