@@ -1,8 +1,10 @@
+const smsConsent = require('./sms-consent-server');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const { buildWorkOrder } = require('./work-orders');
 const { DB_PATH } = db;
 
 // Load .env (git-ignored) for local secrets — dependency-free.
@@ -17,7 +19,7 @@ const { DB_PATH } = db;
   }catch(e){ /* ignore missing/invalid .env */ }
 })();
 
-const PORT = 9240;
+const PORT = Number(process.env.PORT || 9240);
 const DATA_FILE = path.join(__dirname, 'assets.json');
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
@@ -397,7 +399,7 @@ http.createServer((req, res) => {
     const full = path.join(__dirname, safe);
     if (full.startsWith(__dirname)) {
       // app.js and index.html never cached; other static assets can cache.
-      if (safe === 'app.js' || safe === 'index.html') {
+      if (['app.js','index.html','assign.html','privacy.html','terms.html','sms-consent.html','sms-consent.js'].includes(safe)) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         res.setHeader('Pragma', 'no-cache');
       }
@@ -416,6 +418,8 @@ http.createServer((req, res) => {
     const ext = path.extname(filename).toLowerCase();
     return serveFile(res, filepath, MIME[ext] || 'application/octet-stream');
   }
+
+  if (smsConsent.handle(req, res, url, db, () => mergeTechPhones(loadConfig()))) return;
 
   // ── GET /api/config — public config (no auth needed) ────
   // Real technician phones live in the git-ignored TECH_PHONES env var
@@ -510,11 +514,13 @@ http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const d = JSON.parse(body);
-        const to = (d.to || '').replace(/\D/g, '');
+        const to = smsConsent.normalizePhone(d.to);
         const message = (d.message || '').toString().slice(0, 1600);
         if (!to) return sendJson(res, 400, { ok: false, error: 'Recipient phone required' });
         if (!message.trim()) return sendJson(res, 400, { ok: false, error: 'Message required' });
 
+        const blocked = smsConsent.sendBlockReason(to, db, process.env);
+        if (blocked) return sendJson(res, 403, { ok: false, error: blocked });
         const provider = (process.env.SMS_PROVIDER || 'textbelt').toLowerCase();
         let p;
         if (provider === 'twilio') p = sendViaTwilio(to, message);
@@ -670,6 +676,7 @@ http.createServer((req, res) => {
     const assignments = loadAssignments();
     let updated = 0, missingVan = 0;
     assignments.forEach(a => {
+      if (Array.isArray(a.selectedSectionTitles)) return; // Preserve deliberately scoped work orders.
       if (!a.vanType) { missingVan++; return; }
       const full = expectedSections(a.vanType, config);
       if (!full.length) { missingVan++; return; }
@@ -908,6 +915,30 @@ http.createServer((req, res) => {
   }
 
   // ── Assignments API (admin assigns work → technician mobile completes) ──
+
+  // Combined workflow: one transaction, retry-safe, no automatic messages.
+  // Same access policy as the existing assignment creation route.
+  if (url.pathname === '/api/work-orders' && req.method === 'POST') {
+    let body = '', tooLarge = false;
+    req.on('data', chunk => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 256 * 1024) { tooLarge = true; body = ''; }
+    });
+    req.on('end', () => {
+      if (tooLarge) return sendJson(res, 413, { error: 'Request too large' });
+      try {
+        const work = buildWorkOrder(JSON.parse(body), mergeTechPhones(loadConfig()));
+        work.order = loadAssignments().filter(a => (a.technician?.name || a.technician) === work.technician.name).length;
+        const saved = db.createWorkOrder(work);
+        sendJson(res, saved.replayed ? 200 : 201, { ok: true, ...saved, ticket: saved.assignment.report.text });
+      } catch (error) {
+        sendJson(res, error.status || (error instanceof SyntaxError ? 400 : 500),
+          { error: error.status || error instanceof SyntaxError ? error.message : 'Unable to save work order' });
+      }
+    });
+    return;
+  }
 
   // POST /api/assignments — create a work assignment (public; desktop admin)
   // Body: { tmv, vanType, location, technician, date, sections:[{title,items:[{label,type}]}] }

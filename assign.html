@@ -40,6 +40,18 @@
   .muted{color:#888;font-size:13px}
   .err{color:var(--red);font-weight:600}
 </style>
+
+<style id="tmv-footer-black-override">
+footer,
+footer a,
+footer a:link,
+footer a:visited,
+footer a:hover,
+footer a:active {
+    color: #000 !important;
+}
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -50,7 +62,26 @@
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function statusLabel(s){ return (s||'assigned').replace('_',' '); }
 
-function contactBar(t, cfg){
+function workOrderEmail(a, technicianName){
+  var subject='CUDD PM Work Order — '+(a.tmv||'TMV');
+  var lines=['CUDD Energy Services — Maintenance Work Order',
+    'Work order: '+a.id, 'TMV: '+(a.tmv||''),
+    'Technician: '+technicianName, 'District: '+(a.location||''),
+    'Scheduled date: '+(a.date||''), 'Status: '+statusLabel(a.status), '',
+    'Open your work order: '+location.origin+'/tech/'+encodeURIComponent(a.id), '',
+    'Work Order Checklist'];
+  (a.sections||[]).forEach(function(section){
+    lines.push('',section.title||'Section');
+    var result=(a.results||[]).find(function(r){return r.title===section.title;});
+    (section.items||[]).forEach(function(item,index){
+      var value=result&&result.items&&result.items[index]?result.items[index].value:item.value;
+      lines.push('• '+(item.label||'')+(value!==undefined&&value!==null&&value!==''?': '+String(value):''));
+    });
+  });
+  return {subject:subject,body:lines.join('\n')};
+}
+
+function contactBar(t, cfg, assignment){
   if(!t) return '<div class="muted">No technician assigned.</div>';
   var name = (typeof t === 'string') ? t : (t.name || '');
   // join contact details from config technicians (by name) when the record
@@ -65,7 +96,11 @@ function contactBar(t, cfg){
   var sms=String(phone).replace(/\D/g,'');
   var b='<div class="contact-bar">';
   if(phone) b+='<a class="cb-call" href="tel:'+esc(phone)+'">📞 Call</a>';
-  if(em) b+='<a class="cb-email" href="mailto:'+esc(em)+'">✉️ Email</a>';
+  if(em){
+    var email=workOrderEmail(assignment,name);
+    var href='mailto:'+encodeURIComponent(em)+'?subject='+encodeURIComponent(email.subject)+'&body='+encodeURIComponent(email.body);
+    b+='<a class="cb-email" href="'+esc(href)+'">✉️ Email</a>';
+  }
   if(sms) b+='<button class="cb-sms" data-sms="'+esc(sms)+'" onclick="sendSms(this)">💬 Text / SMS</button>';
   if(!phone && !em) b+='<span class="muted">No phone/email on file for '+esc(name)+' — add them in config to enable Call / Text / Email.</span>';
   b+='</div>';
@@ -149,10 +184,11 @@ async function sendSms(btn){
     if(sub) h+='<div class="sub">'+sub+'</div>';
     var techName=(typeof t==='string')?t:(t.name||'');
     if(techName) h+='<div class="tech">👷 '+esc(techName)+'</div>';
-    h+=contactBar(t, cfg);
+    h+=contactBar(t, cfg, a);
     if(cnt) h+='<div class="muted" style="margin:6px 0">'+cnt+' items · '+(a.sections?a.sections.length:0)+' sections</div>';
     h+='<div class="section"><h3>Work Order Checklist</h3>'+mergeSheet(a)+'</div>';
     if((a.photos||[]).length) h+='<div class="section"><h3>Photos</h3>'+photoGrid(a.photos)+'</div>';
+    if(a.report) h+='<div class="section"><h3>Generated Report</h3><pre style="white-space:pre-wrap">'+esc(a.report.text)+'</pre><div class="muted">Assignment logged: '+esc(new Date(a.report.createdAt).toLocaleString())+'</div></div>';
     h+='</div>';
     root.innerHTML=h;
   }catch(e){ root.innerHTML='<p class="err">Error: '+(e.message||e)+'</p>'; }
