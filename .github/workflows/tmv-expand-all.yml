@@ -1,0 +1,67 @@
+name: Apply TMV Expand All
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/tmv-expand-all.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-expand-all:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out TMV layout branch
+        uses: actions/checkout@v4
+        with:
+          ref: tmv-layout-recovery
+
+      - name: Add Expand All / Collapse All control
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('db-viewer.html')
+          text = p.read_text()
+
+          old_heading = '        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>'
+          new_heading = '        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span><button id="toggleAllCatsBtn" class="btn sm ghost" onclick="toggleAllCats()" style="float:right;margin-top:-4px">Expand All</button></h3>'
+          if old_heading in text:
+              text = text.replace(old_heading, new_heading, 1)
+          elif 'id="toggleAllCatsBtn"' not in text:
+              raise SystemExit('Maintenance Categories heading did not match expected source')
+
+          old_render = "  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';\n  var wrap = document.getElementById('catCards');"
+          new_render = "  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';\n  var toggleAllBtn = document.getElementById('toggleAllCatsBtn');\n  if(toggleAllBtn){\n    var everyOpen = cfg.checklist.length > 0 && cfg.checklist.every(function(_, ci){ return isCatOpen(ci); });\n    toggleAllBtn.textContent = everyOpen ? 'Collapse All' : 'Expand All';\n  }\n  var wrap = document.getElementById('catCards');"
+          if old_render in text:
+              text = text.replace(old_render, new_render, 1)
+          elif "var toggleAllBtn = document.getElementById('toggleAllCatsBtn');" not in text:
+              raise SystemExit('renderCatCards insertion point did not match expected source')
+
+          old_toggle = "function isCatOpen(ci){ return _openCats[ci] === true; }\nfunction toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }\nfunction toggleCatInclude(ci, val){"
+          new_toggle = "function isCatOpen(ci){ return _openCats[ci] === true; }\nfunction toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }\nfunction toggleAllCats(){\n  var cfg = dbData.config || {};\n  var cats = cfg.checklist || [];\n  var everyOpen = cats.length > 0 && cats.every(function(_, ci){ return isCatOpen(ci); });\n  cats.forEach(function(_, ci){ _openCats[ci] = !everyOpen; });\n  renderCatCards();\n}\nfunction toggleCatInclude(ci, val){"
+          if old_toggle in text:
+              text = text.replace(old_toggle, new_toggle, 1)
+          elif 'function toggleAllCats(){' not in text:
+              raise SystemExit('category toggle insertion point did not match expected source')
+
+          p.write_text(text)
+          PY
+
+      - name: Commit patched admin page
+        shell: bash
+        run: |
+          git config user.name "TMV Maintenance Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add db-viewer.html
+          if git diff --cached --quiet; then
+            echo "No source change required."
+            exit 0
+          fi
+          git commit -m "Add expand all maintenance categories"
+          git push origin HEAD:tmv-layout-recovery
