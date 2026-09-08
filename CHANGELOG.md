@@ -1,4 +1,13 @@
 
+## 2026-09-08 — Superuser User Roles
+- Added a Superuser-only **User Roles** panel beside Superuser Security.
+- Lists Recovery Superuser, additional Superusers, Managers, and Technicians with a role dropdown.
+- Role changes are enforced server-side, invalidate the changed user's sessions, and write an audit entry.
+- Recovery Superuser role is locked as the emergency owner account.
+- Additional Superuser login is supported for promoted Manager accounts.
+- Public `/api/config` responses now strip credential hashes and privileged role metadata.
+
+
 ## 2026-09-08 — Authentication idle timeout and private Superuser credentials
 - Superuser username/password now come from the private `.env` (`ADMIN_USER`, `ADMIN_PASS`) instead of source code.
 - Added a rolling 15-minute inactivity timeout for server auth sessions.

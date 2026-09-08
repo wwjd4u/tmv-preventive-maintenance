@@ -308,10 +308,10 @@ function serveFile(res, p, contentType) {
 const authSessions = new Map();
 const AUTH_IDLE_MINUTES = Math.max(1, Number(process.env.AUTH_IDLE_MINUTES || 15));
 const AUTH_IDLE_MS = AUTH_IDLE_MINUTES * 60 * 1000;
-function newAuthSession(role, username, name) {
+function newAuthSession(role, username, name, authSource) {
   const token = crypto.randomBytes(32).toString('hex');
   const now = Date.now();
-  authSessions.set(token, { role, username, name: name || username, createdAt: now, lastActivity: now });
+  authSessions.set(token, { role, username, name: name || username, authSource: authSource || 'account', createdAt: now, lastActivity: now });
   return token;
 }
 function getAuthSession(token) {
@@ -473,10 +473,21 @@ http.createServer((req, res) => {
   if (smsConsent.handle(req, res, url, db, () => mergeTechPhones(loadConfig()))) return;
 
   // ── GET /api/config — public config (no auth needed) ────
-  // Real technician phones live in the git-ignored TECH_PHONES env var
-  // (a JSON map of name -> phone) so they never hit the public repo.
+  // Real technician phones live in the git-ignored TECH_PHONES env var.
+  // Password hashes / privileged account metadata are stripped before response.
   if (url.pathname === '/api/config' && req.method === 'GET') {
-    sendJson(res, 200, mergeTechPhones(loadConfig()));
+    const raw = mergeTechPhones(loadConfig()) || {};
+    const pub = { ...raw };
+    pub.technicians = (raw.technicians || []).map(function(t){
+      if (typeof t === 'string') return t;
+      const x = { ...t }; delete x.password; delete x.role; return x;
+    });
+    pub.managers = (raw.managers || []).map(function(m){
+      const x = { ...m }; delete x.password; delete x.role; return x;
+    });
+    delete pub.superusers;
+    delete pub.roleAudit;
+    sendJson(res, 200, pub);
     return;
   }
 
@@ -681,11 +692,17 @@ http.createServer((req, res) => {
       try {
         const d = JSON.parse(body);
         if (ADMIN_USER && ADMIN_PASS && d.username === ADMIN_USER && d.password === ADMIN_PASS) {
-          const token = newAuthSession('superuser', ADMIN_USER, 'Superuser');
+          const token = newAuthSession('superuser', ADMIN_USER, 'Superuser', 'recovery');
           return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser' });
         }
+        const cfgAuth = loadConfig() || {};
+        const extraSu = (cfgAuth.superusers || []).find(s => (s.username || s.name) === d.username);
+        if (extraSu && verifyPassword(d.password || '', extraSu.password)) {
+          const token = newAuthSession('superuser', extraSu.username || extraSu.name, extraSu.name || extraSu.username, 'account');
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: extraSu.name || extraSu.username });
+        }
         // Saved manager login receives a Manager session with restricted Setup rights.
-        const cfgMgr = (loadConfig() || {}).managers || [];
+        const cfgMgr = cfgAuth.managers || [];
         const mgr = cfgMgr.find(m => (m.username || m.name) === d.username);
         if (mgr && verifyPassword(d.password || '', mgr.password)) {
           const token = newAuthSession('manager', mgr.username || mgr.name, mgr.name || mgr.username);
@@ -704,7 +721,7 @@ http.createServer((req, res) => {
     const auth = req.headers['authorization'] || '';
     const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     const session = getAuthSession(tok);
-    if (!session || session.role !== 'superuser') return sendJson(res, 403, { error: 'Superuser required' });
+    if (!session || session.role !== 'superuser' || session.authSource !== 'recovery') return sendJson(res, 403, { error: 'Recovery Superuser required' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
@@ -760,6 +777,97 @@ http.createServer((req, res) => {
   const isSuperuserReq = !!authSession && authSession.role === 'superuser';
   const isManagerReq = !!authSession && authSession.role === 'manager';
   const isAdminReq = isSuperuserReq || isManagerReq; // operational admin access
+
+  // ── Superuser-only User Roles management ────────────────
+  if (url.pathname === '/api/user-roles' && req.method === 'GET') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    const cfg = loadConfig() || {};
+    const users = [];
+    users.push({ key: '__recovery__', name: 'Recovery Superuser', username: ADMIN_USER, role: 'superuser', recovery: true, loginReady: !!(ADMIN_USER && ADMIN_PASS) });
+    (cfg.superusers || []).forEach(function(u){ users.push({ key: u.username || u.name, name: u.name || u.username || '', username: u.username || '', role: 'superuser', recovery: false, loginReady: !!(u.username && u.password) }); });
+    (cfg.managers || []).forEach(function(u){ users.push({ key: u.username || u.name, name: u.name || u.username || '', username: u.username || '', role: 'manager', recovery: false, loginReady: !!(u.username && u.password) }); });
+    (cfg.technicians || []).forEach(function(raw){
+      const u = typeof raw === 'string' ? { name: raw } : raw;
+      users.push({ key: u.username || u.name, name: u.name || u.username || '', username: u.username || '', role: 'technician', recovery: false, loginReady: !!(u.username && u.password) });
+    });
+    return sendJson(res, 200, { ok: true, users, audit: (cfg.roleAudit || []).slice(-25).reverse() });
+  }
+
+  if (url.pathname === '/api/user-roles' && req.method === 'PUT') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body || '{}');
+        const sourceRole = String(d.currentRole || '').toLowerCase();
+        const nextRole = String(d.newRole || '').toLowerCase();
+        const key = String(d.key || '').trim();
+        if (key === '__recovery__') return sendJson(res, 400, { error: 'The Recovery Superuser role is locked.' });
+        if (!['superuser','manager','technician'].includes(sourceRole) || !['superuser','manager','technician'].includes(nextRole)) {
+          return sendJson(res, 400, { error: 'Invalid role selection' });
+        }
+        if (!key) return sendJson(res, 400, { error: 'User is required' });
+        if (sourceRole === nextRole) return sendJson(res, 200, { ok: true, message: 'Role unchanged' });
+
+        const cfg = loadConfig() || {};
+        cfg.superusers = Array.isArray(cfg.superusers) ? cfg.superusers : [];
+        cfg.managers = Array.isArray(cfg.managers) ? cfg.managers : [];
+        cfg.technicians = Array.isArray(cfg.technicians) ? cfg.technicians : [];
+        const lists = { superuser: cfg.superusers, manager: cfg.managers, technician: cfg.technicians };
+        const src = lists[sourceRole];
+        const idx = src.findIndex(function(raw){
+          const u = typeof raw === 'string' ? { name: raw } : raw;
+          return (u.username || u.name) === key;
+        });
+        if (idx < 0) return sendJson(res, 404, { error: 'User not found in current role' });
+        let rec = src[idx];
+        if (typeof rec === 'string') rec = { name: rec, email: '', phone: '', username: '', password: '' };
+        rec = { ...rec };
+        rec.name = rec.name || rec.username || key;
+
+        if (!rec.username && nextRole !== 'technician') {
+          rec.username = String(rec.name || '').toLowerCase().replace(/[^a-z0-9._@-]+/g, '.').replace(/^\.+|\.+$/g, '');
+        }
+        const proposedKey = rec.username || rec.name;
+        const allPriv = cfg.superusers.concat(cfg.managers).filter(function(x){ return x !== src[idx]; });
+        if (nextRole !== 'technician') {
+          if (!proposedKey) return sendJson(res, 400, { error: 'A username is required for Manager or Superuser access' });
+          if (proposedKey === ADMIN_USER) return sendJson(res, 400, { error: 'That username is reserved by the Recovery Superuser' });
+          const dup = allPriv.some(function(u){ return (u.username || u.name) === proposedKey; });
+          if (dup) return sendJson(res, 400, { error: 'That username is already in use' });
+        }
+        if (nextRole === 'superuser' && (!rec.username || !rec.password || !String(rec.password).startsWith('scrypt$'))) {
+          return sendJson(res, 400, { error: 'Set this person up as a Manager with a login password first, then promote to Superuser.' });
+        }
+
+        src.splice(idx, 1);
+        rec.role = nextRole;
+        lists[nextRole].push(rec);
+        cfg.roleAudit = Array.isArray(cfg.roleAudit) ? cfg.roleAudit : [];
+        cfg.roleAudit.push({
+          at: Date.now(),
+          actor: authSession.username || authSession.name || 'superuser',
+          user: rec.name || rec.username || key,
+          username: rec.username || '',
+          from: sourceRole,
+          to: nextRole
+        });
+        if (cfg.roleAudit.length > 200) cfg.roleAudit = cfg.roleAudit.slice(-200);
+        saveConfig(cfg);
+
+        // Any live session for the changed account is invalidated immediately.
+        for (const [tok, s] of authSessions.entries()) {
+          if ((rec.username && s.username === rec.username) || (rec.name && s.name === rec.name)) authSessions.delete(tok);
+        }
+        const needsPassword = nextRole === 'manager' && (!rec.password || !String(rec.password).startsWith('scrypt$'));
+        return sendJson(res, 200, { ok: true, message: needsPassword ? 'Role changed to Manager. Set a login password in the Managers section before this user can sign in.' : 'Role changed successfully.' });
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Role change failed: ' + e.message });
+      }
+    });
+    return;
+  }
 
   // ── GET /api/admin/db — full DB dump for admin viewer (admin only) ──
   if (url.pathname === '/api/admin/db' && req.method === 'GET') {

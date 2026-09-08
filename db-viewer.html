@@ -326,6 +326,14 @@ footer a:active {
         <button class="btn sm" onclick="saveSuperuserCredentials()">Update Superuser Login</button>
       </section>
 
+      <!-- USER ROLES -->
+      <section class="mblock" id="userRolesBlock" style="display:none">
+        <h3>User Roles</h3>
+        <div style="font-size:13px;color:#666;margin-bottom:10px">Superuser-only role management. The Recovery Superuser is locked. Role changes take effect immediately and sign out the changed account.</div>
+        <div id="userRolesList"><div class="empty">Loading users…</div></div>
+        <div id="userRolesStatus" class="saved-ok" style="display:block;margin:10px 0 0"></div>
+      </section>
+
       <!-- INSPECTION SETTINGS -->
       <section class="mblock">
         <h3>Inspection Settings</h3>
@@ -449,6 +457,58 @@ function saveSuperuserCredentials(){
       location.href='/';
     }).catch(function(){ alert('Credential update failed'); });
 }
+function loadUserRoles(){
+  if(currentRole !== 'superuser') return;
+  fetch('/api/user-roles',{headers:authHdr()})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok) throw new Error((x.d&&x.d.error)||'Could not load users');
+      renderUserRoles(x.d.users || []);
+    }).catch(function(e){
+      var box=document.getElementById('userRolesList');
+      if(box) box.innerHTML='<div class="empty">'+esc(e.message||'Could not load users')+'</div>';
+    });
+}
+function renderUserRoles(users){
+  var box=document.getElementById('userRolesList');
+  if(!box) return;
+  if(!users.length){ box.innerHTML='<div class="empty">No users configured.</div>'; return; }
+  box.innerHTML = users.map(function(u){
+    var locked = !!u.recovery;
+    var label = u.name || u.username || 'Unnamed user';
+    var login = u.username ? '<div style="font-size:12px;color:#777">'+esc(u.username)+'</div>' : '<div style="font-size:12px;color:#a16207">No login username</div>';
+    var note = locked ? '<div style="font-size:11px;color:#777;margin-top:3px">Emergency recovery account — role locked</div>' : (!u.loginReady && u.role!=='technician' ? '<div style="font-size:11px;color:#b45309;margin-top:3px">Login password still needs to be set</div>' : '');
+    return '<div style="display:grid;grid-template-columns:minmax(160px,1fr) 150px auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:10px;margin:8px 0;background:#fff">'+
+      '<div><b>'+esc(label)+'</b>'+login+note+'</div>'+
+      '<select class="msel" id="roleSel_'+encodeURIComponent(u.role+'|'+u.key)+'" '+(locked?'disabled':'')+'>'+
+        '<option value="technician" '+(u.role==='technician'?'selected':'')+'>Technician</option>'+
+        '<option value="manager" '+(u.role==='manager'?'selected':'')+'>Manager</option>'+
+        '<option value="superuser" '+(u.role==='superuser'?'selected':'')+'>Superuser</option>'+
+      '</select>'+
+      '<button class="btn sm" '+(locked?'disabled':'')+' onclick="changeUserRole('+JSON.stringify(u.key)+','+JSON.stringify(u.role)+')">Change Role</button>'+
+    '</div>';
+  }).join('');
+}
+function changeUserRole(key,currentRoleValue){
+  var id='roleSel_'+encodeURIComponent(currentRoleValue+'|'+key);
+  var sel=document.getElementById(id);
+  if(!sel) return;
+  var next=sel.value;
+  if(next===currentRoleValue){ alert('This user already has that role.'); return; }
+  var pretty = next.charAt(0).toUpperCase()+next.slice(1);
+  if(!confirm('Change this user from '+currentRoleValue+' to '+pretty+'?\n\nTheir active login session will be ended immediately.')){ sel.value=currentRoleValue; return; }
+  fetch('/api/user-roles',{
+    method:'PUT',
+    headers:Object.assign({'Content-Type':'application/json'},authHdr()),
+    body:JSON.stringify({key:key,currentRole:currentRoleValue,newRole:next})
+  }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok){ alert((x.d&&x.d.error)||'Role change failed'); sel.value=currentRoleValue; return; }
+      var s=document.getElementById('userRolesStatus'); if(s) s.textContent=x.d.message||'Role changed.';
+      loadData();
+    }).catch(function(){ alert('Role change failed'); sel.value=currentRoleValue; });
+}
+
 var DB_AUTH_IDLE_MS = 15 * 60 * 1000;
 var dbAuthLastActivity = Date.now();
 var dbAuthLastHeartbeat = 0;
@@ -479,6 +539,8 @@ function applyRoleUi(){
   if(cat) cat.style.display = manager ? 'none' : '';
   var suSecurity = document.getElementById('superuserSecurityBlock');
   if(suSecurity) suSecurity.style.display = currentRole === 'superuser' ? '' : 'none';
+  var userRoles = document.getElementById('userRolesBlock');
+  if(userRoles) userRoles.style.display = currentRole === 'superuser' ? '' : 'none';
   ['deleteTmv()','deleteLoc()','deleteMgr()','purgeData()'].forEach(function(call){
     document.querySelectorAll('[onclick="'+call+'"]').forEach(function(el){ el.style.display = manager ? 'none' : ''; });
   });
@@ -507,6 +569,7 @@ function loadData(){
       try { renderAssignments(); } catch(e){ console.error('renderAssignments', e); }
       try { renderAssetManager(); } catch(e){ console.error('renderAssetManager', e); }
       try { populateConfig(); } catch(e){ console.error('populateConfig', e); }
+      if(currentRole === 'superuser') { try { loadUserRoles(); } catch(e){ console.error('loadUserRoles', e); } }
     })
     .catch(() => alert('Failed to load DB data'));
 }
