@@ -327,7 +327,7 @@ footer a:active {
 
       <!-- CATEGORIES (expandable cards) -->
       <section class="mblock catblock">
-        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>
+        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span><button id="toggleAllCatsBtn" class="btn sm ghost" onclick="toggleAllCats()" style="float:right;margin-top:-4px">Expand All</button></h3>
         <div class="mrow addrow">
           <input id="newCat" class="minput" placeholder="Air Conditioning">
           <button class="btn sm" onclick="addCat()">+ Add Category</button>
@@ -903,6 +903,11 @@ function renderCatCards(){
   var cfg = dbData.config || {};
   cfg.checklist = cfg.checklist || [];
   document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';
+  var toggleAllBtn = document.getElementById('toggleAllCatsBtn');
+  if(toggleAllBtn){
+    var everyOpen = cfg.checklist.length > 0 && cfg.checklist.every(function(_, ci){ return isCatOpen(ci); });
+    toggleAllBtn.textContent = everyOpen ? 'Collapse All' : 'Expand All';
+  }
   var wrap = document.getElementById('catCards');
   wrap.innerHTML = '';
   cfg.checklist.forEach(function(c, ci){
@@ -957,6 +962,13 @@ function renderCatCards(){
 var _openCats = {};
 function isCatOpen(ci){ return _openCats[ci] === true; }
 function toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }
+function toggleAllCats(){
+  var cfg = dbData.config || {};
+  var cats = cfg.checklist || [];
+  var everyOpen = cats.length > 0 && cats.every(function(_, ci){ return isCatOpen(ci); });
+  cats.forEach(function(_, ci){ _openCats[ci] = !everyOpen; });
+  renderCatCards();
+}
 function toggleCatInclude(ci, val){
   var cfg = dbData.config;
   if(!cfg.checklist[ci]) return;
