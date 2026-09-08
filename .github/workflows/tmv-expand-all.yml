@@ -1,4 +1,4 @@
-name: Apply TMV PWA Finish
+name: Apply TMV Auth Idle Timeout
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
       - master
     paths:
       - .github/workflows/tmv-expand-all.yml
-      - updates/apply-pwa-finish.py
+      - updates/apply-auth-idle-env.py
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  apply-pwa-finish:
+  apply-auth-idle:
     runs-on: ubuntu-latest
     steps:
       - name: Check out production branch
@@ -28,17 +28,20 @@ jobs:
           ref: master
           path: control
 
-      - name: Apply PWA patch
-        run: python3 control/updates/apply-pwa-finish.py prod
+      - name: Apply auth patch
+        run: python3 control/updates/apply-auth-idle-env.py prod
 
-      - name: Verify PWA patch
+      - name: Verify auth patch
         working-directory: prod
         run: |
-          grep -n "pwaInstallBtn\|pwaInstallModal\|pwa.js" index.html
-          grep -n "safe-area-inset" index.html
-          grep -n '"shortcuts"' manifest.webmanifest
-          grep -n "tmv-pwa-v9\|/pwa.js" sw.js
-          test -f pwa.js
+          grep -n "ADMIN_USER = String(process.env.ADMIN_USER" api-server.js
+          grep -n "AUTH_IDLE_MINUTES\|AUTH_IDLE_MS" api-server.js
+          grep -n "Signed out after 15 minutes of inactivity" app.js db-viewer.html
+          grep -n "app.js?v=20260908AUTH3" index.html
+          if grep -n "const ADMIN_PASS = '" api-server.js; then
+            echo "Hardcoded admin password still present"
+            exit 1
+          fi
           git diff --check
 
       - name: Commit and push production branch
@@ -46,6 +49,6 @@ jobs:
         run: |
           git config user.name "TMV Maintenance Automation"
           git config user.email "actions@users.noreply.github.com"
-          git add CHANGELOG.md index.html
-          git commit -m "Finish mobile PWA install experience"
+          git add CHANGELOG.md api-server.js app.js db-viewer.html index.html
+          git commit -m "Add 15 minute auth idle timeout"
           git push origin HEAD:ms02-live-sync-20260908-085804
