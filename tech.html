@@ -104,6 +104,14 @@ async function load(){
     var d = await r.json();
     if(!r.ok) throw new Error(d.error||'Not found');
     ASSIGN = d.assignment;
+    // Restore saved assignment photos before render/save. Otherwise reopening
+    // the task starts PHOTOS empty and can overwrite saved photo references.
+    PHOTOS = Array.isArray(ASSIGN.photos)
+      ? ASSIGN.photos.map(function(p){
+          if(typeof p === 'string') return {file:p, caption:''};
+          return {file:(p&&p.file)||'', caption:(p&&p.caption)||''};
+        }).filter(function(p){ return !!p.file; })
+      : [];
     render();
   }catch(e){ document.getElementById('app').innerHTML='<div class="err">Could not load task: '+esc(e.message)+'</div>'; }
 }
