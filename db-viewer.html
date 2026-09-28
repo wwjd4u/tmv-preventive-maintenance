@@ -888,9 +888,13 @@ function renderAssetManager(){
   document.getElementById('cntLoc').textContent = '(' + cfg.locations.length + ')';
 
   // --- Personnel district dropdowns ---
+  // Technicians belong to a specific district. Managers may use ALL to cover
+  // every district while still allowing a specific district assignment.
   var districtOpts=[{value:'',label:'— Select district —'}].concat(cfg.locations.map(function(l){return {value:l,label:l};}));
+  var managerDistrictOpts=[{value:'',label:'— Select district —'},{value:'ALL',label:'ALL — All districts'}]
+    .concat(cfg.locations.map(function(l){return {value:l,label:l};}));
   _fill('techDistrict',districtOpts);
-  _fill('mgrDistrict',districtOpts);
+  _fill('mgrDistrict',managerDistrictOpts);
 
   // --- Technicians ---
   var prevTechName = (function(){ var s=document.getElementById('selTech'); return (s && s.selectedIndex>=0) ? s.options[s.selectedIndex].text : null; })();
