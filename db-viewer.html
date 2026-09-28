@@ -535,7 +535,7 @@ function renderUserRoles(users){
         '<option value="superuser" '+(u.role==='superuser'?'selected':'')+'>Superuser</option>'+
       '</select>'+
       '<button class="btn sm user-role-action" '+(locked?'disabled':'')+
-        ' data-user-key="'+escAttr(u.key)+'" data-current-role="'+escAttr(u.role)+'" onclick="changeUserRoleFromButton(this)">Change Role</button>'+
+        ' data-user-key="'+esc(u.key)+'" data-current-role="'+esc(u.role)+'" onclick="changeUserRoleFromButton(this)">Change Role</button>'+
     '</div>';
   }).join('');
 }
