@@ -131,8 +131,11 @@
 
   /* SINGLE-PAGE ASSET MANAGER */
   .muted{color:#888;font-size:13px;margin-left:8px}
-  .asset-manage{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;margin-top:12px}
+  .asset-manage{display:grid;grid-template-columns:repeat(2,minmax(360px,1fr));gap:16px;margin-top:12px}
+  .setup-left{grid-column:1}
+  .setup-right{grid-column:2}
   .mblock{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+  @media (max-width:850px){.asset-manage{grid-template-columns:1fr}.setup-left,.setup-right{grid-column:1}}
   .mblock h3{margin:0 0 14px;color:var(--cudd);font-size:15px;border-bottom:2px solid var(--cudd);padding-bottom:8px}
   .mblock .cnt{color:#999;font-weight:normal;font-size:13px}
   .mrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
@@ -297,8 +300,27 @@ footer a:active {
 
     <div class="asset-manage">
 
+      <!-- SUPERUSERS (normal promoted accounts only; Recovery Superuser stays in Security) -->
+      <section class="mblock setup-left" style="grid-row:1">
+        <h3>Superusers <span class="cnt" id="cntSu"></span></h3>
+        <div class="mrow">
+          <select id="selSu" class="msel" onchange="fillSu()" autocomplete="off" name="setup_su"></select>
+        </div>
+        <div class="contact-grid">
+          <input id="suName" class="minput" placeholder="Display name">
+          <input id="suUser" class="minput" placeholder="Login username" autocomplete="username">
+          <input id="suEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
+          <input id="suPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
+          <select id="suDistrict" class="msel" aria-label="Superuser district"></select>
+          <input id="suPass" class="minput" type="password" placeholder="New password (optional)" autocomplete="new-password">
+          <input id="suPassConfirm" class="minput" type="password" placeholder="Confirm new password" autocomplete="new-password">
+        </div>
+        <div style="font-size:12px;color:#777;margin:9px 0">Normal Superuser accounts only. Recovery Superuser remains locked under Security.</div>
+        <button class="btn sm" onclick="saveSu()">Save Superuser</button>
+      </section>
+
       <!-- TMV UNITS -->
-      <section class="mblock">
+      <section class="mblock setup-left" style="grid-row:2">
         <h3>Equipment Units <span class="cnt" id="cntTmv"></span></h3>
         <div class="mrow">
           <select id="selTmv" class="msel" onchange="onSelTmv()" autocomplete="off" name="setup_tmv"></select>
@@ -324,7 +346,7 @@ footer a:active {
       </section>
 
       <!-- MANAGERS -->
-      <section class="mblock">
+      <section class="mblock setup-right" style="grid-row:1">
         <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
         <div class="mrow">
           <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
@@ -347,7 +369,7 @@ footer a:active {
       </section>
 
       <!-- TECHNICIANS -->
-      <section class="mblock">
+      <section class="mblock setup-left" style="grid-row:3">
         <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
         <div class="mrow">
           <select id="selTech" class="msel" onchange="fillTechContact()" autocomplete="off" name="setup_tech"></select>
@@ -370,7 +392,7 @@ footer a:active {
       </section>
 
       <!-- LOCATIONS -->
-      <section class="mblock">
+      <section class="mblock setup-right" style="grid-row:2">
         <h3>Districts <span class="cnt" id="cntLoc"></span></h3>
         <div class="mrow">
           <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
@@ -384,7 +406,7 @@ footer a:active {
       </section>
 
       <!-- INSPECTION SETTINGS -->
-      <section class="mblock">
+      <section class="mblock setup-right" style="grid-row:3">
         <h3>Inspection Settings</h3>
         <div style="margin-bottom:14px">
           <label>Inspection Intervals (days, comma-separated):</label><br>
@@ -900,6 +922,15 @@ function renderAssetManager(){
     .concat(cfg.locations.map(function(l){return {value:l,label:l};}));
   _fill('techDistrict',districtOpts);
   _fill('mgrDistrict',managerDistrictOpts);
+  _fill('suDistrict',managerDistrictOpts);
+
+  // --- Superusers (normal promoted accounts; Recovery Superuser is not stored here) ---
+  _fill('selSu', (cfg.superusers||[]).map(function(t,i){
+    var name = t.name || t.username || '';
+    return {value:String(i), label:name};
+  }));
+  document.getElementById('cntSu').textContent = '(' + (cfg.superusers||[]).length + ')';
+  fillSu();
 
   // --- Technicians ---
   var prevTechName = (function(){ var s=document.getElementById('selTech'); return (s && s.selectedIndex>=0) ? s.options[s.selectedIndex].text : null; })();
@@ -1019,6 +1050,508 @@ function deleteLoc(){
   if(!confirm('Remove district "' + cfg.locations[i] + '"?')) return;
   cfg.locations.splice(i,1);
   saveConfigArray('locations', cfg.locations);
+}
+
+/* ---- Superusers (normal promoted accounts only) ---- */
+function suObj(i){
+  var cfg=dbData.config||{};
+  cfg.superusers=cfg.superusers||[];
+  var cur=cfg.superusers[i];
+  if(!cur) return null;
+  if(typeof cur==='string'){ cfg.superusers[i]={name:cur,username:cur,email:'',phone:'',district:'',password:''}; cur=cfg.superusers[i]; }
+  if(!cur.username) cur.username=cur.name||'';
+  if(!cur.name) cur.name=cur.username||'';
+  if(!cur.email) cur.email='';
+  if(!cur.phone) cur.phone='';
+  if(!cur.district) cur.district='';
+  if(typeof cur.password==='undefined') cur.password='';
+  return cur;
+}
+function fillSu(){
+  var sel=document.getElementById('selSu');
+  if(!sel || sel.value==='') {
+    ['suName','suUser','suEmail','suPhone','suPass','suPassConfirm'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    var sd=document.getElementById('suDistrict'); if(sd) sd.value='';
+    return;
+  }
+  var i=parseInt(sel.value,10);
+  if(isNaN(i)) return;
+  var u=suObj(i); if(!u) return;
+  document.getElementById('suName').value=u.name||'';
+  document.getElementById('suUser').value=u.username||'';
+  document.getElementById('suEmail').value=u.email||'';
+  document.getElementById('suPhone').value=u.phone||'';
+  document.getElementById('suDistrict').value=u.district||'';
+  document.getElementById('suPass').value='';
+  document.getElementById('suPassConfirm').value='';
+}
+function saveSu(){
+  if(currentRole!=='superuser'){ alert('Superuser required'); return; }
+  var cfg=dbData.config||{};
+  var i=parseInt(document.getElementById('selSu').value,10);
+  if(isNaN(i)){ alert('Select a Superuser first'); return; }
+  var u=suObj(i); if(!u) return;
+  var name=document.getElementById('suName').value.trim();
+  var username=document.getElementById('suUser').value.trim();
+  var pw=document.getElementById('suPass').value||'';
+  var confirmPw=document.getElementById('suPassConfirm').value||'';
+  if(!username){ alert('Login username required'); return; }
+  if(!/^[A-Za-z0-9._@-]{3,64}$/.test(username)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
+  if(pw!==confirmPw){ alert('Superuser passwords do not match'); return; }
+  if(pw && (pw.length<10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){
+    alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return;
+  }
+  u.name=name||username;
+  u.username=username;
+  u.email=document.getElementById('suEmail').value.trim();
+  u.phone=document.getElementById('suPhone').value.trim();
+  u.district=document.getElementById('suDistrict').value||'';
+  if(pw) u.password=pw;
+  fetch('/api/superusers',{
+    method:'PUT',
+    headers:{...authHdr(),'Content-Type':'application/json'},
+    body:JSON.stringify({superusers:(cfg.superusers||[]).map(function(x){
+      return {name:x.name||'',username:x.username||'',email:x.email||'',phone:x.phone||'',district:x.district||'',password:(x.password && !String(x.password).startsWith('scrypt
+  var cfg = dbData.config;
+  var v = document.getElementById('newTech').value.trim();
+  if(!v){ alert('Technician name required'); return; }
+  if(!cfg.technicians) cfg.technicians = [];
+  cfg.technicians.push({name:v, username:'', email:'', phone:'', district:'', password:''});
+  document.getElementById('newTech').value = '';
+  saveTechnicians();
+}
+function techObj(i){
+  var cfg = dbData.config;
+  var cur = cfg.technicians[i];
+  if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, email:'', phone:''}; cur = cfg.technicians[i]; }
+  if(!cur.username) cur.username='';
+  if(!cur.email)   cur.email='';
+  if(!cur.phone)   cur.phone='';
+  if(!cur.district) cur.district='';
+  if(typeof cur.password==='undefined') cur.password='';
+  return cur;
+}
+function fillTechContact(){
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)) return;
+  var t = techObj(i);
+  document.getElementById('techUser').value = t.username || '';
+  document.getElementById('techEmail').value = t.email || '';
+  document.getElementById('techPhone').value = t.phone || '';
+  document.getElementById('techDistrict').value = t.district || '';
+  document.getElementById('techPass').value = ''; // never echo the stored hash
+  document.getElementById('techPassConfirm').value = '';
+}
+function saveTechnicians(){
+  var cfg = dbData.config || {};
+  fetch('/api/technicians', {
+    method:'PUT',
+    headers:{ ...authHdr(), 'Content-Type':'application/json' },
+    body:JSON.stringify({ technicians:(cfg.technicians||[]).map(function(raw){
+      var t=typeof raw==='string'?{name:raw}:raw;
+      return { name:t.name||'', username:t.username||'', email:t.email||'', phone:t.phone||'', district:t.district||'', password:(t.password && !String(t.password).startsWith('scrypt$'))?t.password:'' };
+    }) })
+  }).then(function(r){ return r.json().then(function(d){return {ok:r.ok,d:d};}); })
+    .then(function(x){ if(!x.ok) throw new Error((x.d&&x.d.error)||'Technician save failed'); loadData(); showSaved('techStatus'); })
+    .catch(function(e){ alert(e.message||'Technician save failed'); });
+}
+function saveTechContact(){
+  var cfg = dbData.config;
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)){ alert('Select a technician first'); return; }
+  var t = techObj(i);
+  var username = document.getElementById('techUser').value.trim();
+  var pw = document.getElementById('techPass').value || '';
+  var pwConfirm = document.getElementById('techPassConfirm').value || '';
+  if(pw !== pwConfirm){ alert('Technician passwords do not match'); return; }
+  if(username && !/^[A-Za-z0-9._@-]{3,64}$/.test(username)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
+  t.username = username;
+  t.email = document.getElementById('techEmail').value.trim();
+  t.phone = document.getElementById('techPhone').value.trim();
+  t.district = document.getElementById('techDistrict').value || '';
+  if(pw) t.password = pw;
+  saveTechnicians();
+}
+function renameTech(){
+  var cfg = dbData.config;
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)) return;
+  var cur = cfg.technicians[i];
+  var curName = typeof cur==='string' ? cur : (cur.name||'');
+  var v = prompt('Rename technician:', curName);
+  if(v!==null && v.trim()){
+    if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), email:'', phone:''};
+    else cur.name = v.trim();
+    if(document.getElementById('selTech').value==String(i)) fillTechContact();
+    saveTechnicians();
+  }
+}
+function openSmsPreferences(kind){
+  var item = null;
+  if(kind==='technician'){
+    var ti = parseInt(document.getElementById('selTech').value,10);
+    if(!isNaN(ti)) item = techObj(ti);
+  } else {
+    var mi = parseInt(document.getElementById('selMgr').value,10);
+    if(!isNaN(mi)) item = mgrObj(mi);
+  }
+  if(!item){ alert('Select a '+(kind==='technician'?'technician':'manager')+' first'); return; }
+  var name = item.name || item.username || '';
+  var phone = item.phone || '';
+  if(!phone){ alert('Save a mobile phone number first'); return; }
+  window.open('/sms-consent.html?name='+encodeURIComponent(name)+'&phone='+encodeURIComponent(phone), '_blank');
+}
+
+function deleteTech(){
+  var cfg = dbData.config;
+  var i = parseInt(document.getElementById('selTech').value, 10);
+  if(isNaN(i)) return;
+  var cur = cfg.technicians[i];
+  var name = typeof cur==='string' ? cur : (cur.name||'');
+  if(!confirm('Remove technician "' + name + '"?')) return;
+  cfg.technicians.splice(i,1);
+  saveTechnicians();
+}
+
+/* ---- Managers (full admin rights) ---- */
+function mgrObj(i){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var cur = cfg.managers[i];
+  if(!cur) return null;
+  if(typeof cur==='string'){ cfg.managers[i] = {name:cur, username:cur, password:''}; cur = cfg.managers[i]; }
+  if(!cur.username) cur.username = cur.name || '';
+  if(!cur.name) cur.name = cur.username || '';
+  if(!cur.district) cur.district = '';
+  if(typeof cur.password==='undefined') cur.password = '';
+  return cur;
+}
+function fillMgr(){
+  var i = parseInt(document.getElementById('selMgr').value, 10);
+  if(isNaN(i)) return;
+  var m = mgrObj(i);
+  if(!m) return;
+  document.getElementById('mgrName').value = m.name || '';
+  document.getElementById('mgrUser').value = m.username || '';
+  document.getElementById('mgrEmail').value = m.email || '';
+  document.getElementById('mgrPhone').value = m.phone || '';
+  document.getElementById('mgrDistrict').value = m.district || '';
+  document.getElementById('mgrPass').value = ''; // never echo the stored hash
+  document.getElementById('mgrPassConfirm').value = '';
+}
+function addMgr(){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var v = document.getElementById('newMgr').value.trim();
+  if(!v){ alert('Manager name required'); return; }
+  cfg.managers.push({name:v, username:v, email:'', phone:'', district:'', password:''});
+  document.getElementById('newMgr').value = '';
+  saveConfigArray('managers', cfg.managers);
+}
+function saveMgr(){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var i = parseInt(document.getElementById('selMgr').value, 10);
+  if(isNaN(i)){ alert('Add the manager first (use + Add Manager), then set username & password.'); return; }
+  var m = mgrObj(i);
+  if(!m) return;
+  var nm = document.getElementById('mgrName').value.trim();
+  var un = document.getElementById('mgrUser').value.trim();
+  var pw = document.getElementById('mgrPass').value;
+  var pwConfirm = document.getElementById('mgrPassConfirm').value || '';
+  if(pw !== pwConfirm){ alert('Manager passwords do not match'); return; }
+  if(!un){ alert('Login username required'); return; }
+  m.name = nm || un;
+  m.username = un;
+  m.email = document.getElementById('mgrEmail').value.trim();
+  m.phone = document.getElementById('mgrPhone').value.trim();
+  m.district = document.getElementById('mgrDistrict').value || '';
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
+  if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
+  // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
+  fetch('/api/managers', {
+    method:'PUT',
+    headers:{ ...authHdr(), 'Content-Type':'application/json' },
+    body: JSON.stringify({ managers: cfg.managers.map(function(x){
+      return { name:x.name, username:x.username, email:x.email||'', phone:x.phone||'', district:x.district||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
+    }) })
+  })
+  .then(function(){ loadData(); })
+  .catch(function(){ alert('Manager save failed'); });
+}
+function deleteMgr(){
+  var cfg = dbData.config;
+  if(!cfg.managers) cfg.managers = [];
+  var i = parseInt(document.getElementById('selMgr').value, 10);
+  if(isNaN(i)) return;
+  var m = mgrObj(i);
+  if(!m) return;
+  if(!confirm('Remove manager "' + (m.name||m.username) + '"? They will lose admin access.')) return;
+  cfg.managers.splice(i,1);
+  saveConfigArray('managers', cfg.managers);
+}
+
+/* ---- Categories (checklist sections) — expandable cards ---- */
+var TASK_TYPES = [
+  {value:'yn',     label:'Yes/No'},
+  {value:'num',    label:'Number'},
+  {value:'text',   label:'Text'},
+  {value:'date',   label:'Date'},
+  {value:'choice', label:'Choice'},
+  {value:'ynver',  label:'Yes/No + Verify'}
+];
+function taskTypeOptions(current){
+  return TASK_TYPES.map(function(t){
+    return '<option value="' + t.value + '"' + (t.value===current?' selected':'') + '>' + t.label + '</option>';
+  }).join('');
+}
+function renderCatCards(){
+  var cfg = dbData.config || {};
+  cfg.checklist = cfg.checklist || [];
+  document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';
+  var toggleAllBtn = document.getElementById('toggleAllCatsBtn');
+  if(toggleAllBtn){
+    var everyOpen = cfg.checklist.length > 0 && cfg.checklist.every(function(_, ci){ return isCatOpen(ci); });
+    toggleAllBtn.textContent = everyOpen ? 'Collapse All' : 'Expand All';
+  }
+  var wrap = document.getElementById('catCards');
+  wrap.innerHTML = '';
+  cfg.checklist.forEach(function(c, ci){
+    var title = typeof c==='string' ? c : (c.title||c.label||('Category '+(ci+1)));
+    var items = (typeof c==='object' && c.items) ? c.items : [];
+    var inc = (typeof c==='object') ? (c.include!==false) : true;
+    var html = '<div class="catcard">' +
+      '<div class="cathead">' +
+        '<div class="catname" onclick="toggleCat(' + ci + ')"><span class="car">' + (isCatOpen(ci)?'▾':'▸') + '</span> ' + esc(title) + ' <span class="cnt">(' + items.length + ')</span></div>' +
+        '<div class="catbtns">' +
+          '<label class="incToggle" title="Show this section on inspection forms"><input type="checkbox" onchange="toggleCatInclude(' + ci + ',this.checked)"' + (inc?' checked':'') + '> include</label>' +
+          '<button class="btn sm ghost" onclick="renameCat(' + ci + ')">Rename</button>' +
+          '<button class="btn sm danger" onclick="deleteCat(' + ci + ')">× Remove</button>' +
+        '</div>' +
+      '</div>';
+    if(isCatOpen(ci)){
+      html += '<div class="cattasks">';
+      if(items.length){
+        items.forEach(function(it, ii){
+          var label = typeof it==='string' ? it : (it.label||'');
+          var type  = typeof it==='object' ? (it.type||'text') : 'text';
+          html += '<div class="taskline" draggable="true" data-ci="' + ci + '" data-ii="' + ii + '" ondragstart="taskDragStart(event,' + ci + ',' + ii + ')" ondragover="taskDragOver(event,' + ci + ',' + ii + ')" ondragleave="taskDragLeave(event)" ondrop="taskDrop(event,' + ci + ',' + ii + ')" ondragend="taskDragEnd(event)">' +
+            '<span class="taskdrag" title="Drag to reorder" style="cursor:grab;font-size:18px;line-height:1;user-select:none;padding:0 6px">⋮⋮</span>' +
+            '<span class="tlabel">' + esc(label) + '</span>' +
+            '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +
+              taskTypeOptions(type) +
+            '</select>' +
+            '<button class="btn sm danger" onclick="deleteTask(' + ci + ',' + ii + ')">×</button>' +
+          '</div>';
+        });
+      } else {
+        html += '<div class="empty">No tasks yet.</div>';
+      }
+      html += '<div class="addtaskrow">' +
+        '<input id="newTaskLabel_' + ci + '" class="minput" placeholder="Task description (e.g. AC filter replaced)">' +
+        '<select id="newTaskType_' + ci + '" class="msel">' +
+          '<option value="yn">Yes/No</option>' +
+          '<option value="num">Number</option>' +
+          '<option value="text">Text</option>' +
+          '<option value="date">Date</option>' +
+          '<option value="choice">Choice</option>' +
+        '</select>' +
+        '<button class="btn sm" onclick="addTask(' + ci + ')">+ Add Task</button>' +
+      '</div>';
+
+      html += '</div>';
+      }
+    html += '</div>';
+    wrap.innerHTML += html;
+  });
+}
+
+var _openCats = {};
+function isCatOpen(ci){ return _openCats[ci] === true; }
+function toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }
+function toggleAllCats(){
+  var cfg = dbData.config || {};
+  var cats = cfg.checklist || [];
+  var everyOpen = cats.length > 0 && cats.every(function(_, ci){ return isCatOpen(ci); });
+  cats.forEach(function(_, ci){ _openCats[ci] = !everyOpen; });
+  renderCatCards();
+}
+function toggleCatInclude(ci, val){
+  var cfg = dbData.config;
+  if(!cfg.checklist[ci]) return;
+  if(typeof cfg.checklist[ci]==='string') cfg.checklist[ci] = {title:cfg.checklist[ci], appliesTo:[], items:[]};
+  cfg.checklist[ci].include = !!val;
+  saveConfigArray('checklist', cfg.checklist);
+}
+
+function addCat(){
+  var cfg = dbData.config;
+  var v = document.getElementById('newCat').value.trim();
+  if(!v){ alert('Category name required'); return; }
+  if(!cfg.checklist) cfg.checklist = [];
+  cfg.checklist.push({title:v, appliesTo:[], items:[]});
+  document.getElementById('newCat').value = '';
+  saveConfigArray('checklist', cfg.checklist);
+}
+function renameCat(ci){
+  var cfg = dbData.config;
+  var cur = cfg.checklist[ci];
+  if(!cur) return;
+  var curTitle = typeof cur==='string' ? cur : (cur.title||cur.label||'');
+  var v = prompt('Rename category:', curTitle);
+  if(v!==null && v.trim()){
+    if(typeof cur==='string') cfg.checklist[ci] = {title:v.trim(), appliesTo:[], items:[]};
+    else cur.title = v.trim();
+    saveConfigArray('checklist', cfg.checklist);
+  }
+}
+function deleteCat(ci){
+  var cfg = dbData.config;
+  var cur = cfg.checklist[ci];
+  var title = typeof cur==='string' ? cur : (cur.title||cur.label||'');
+  if(!confirm('Remove category "' + title + '" and ALL its tasks?')) return;
+  cfg.checklist.splice(ci,1);
+  if(_openCats[ci]) delete _openCats[ci];
+  saveConfigArray('checklist', cfg.checklist);
+}
+
+/* task add/remove within a category */
+function addTask(ci){
+  var cfg = dbData.config;
+  var cat = cfg.checklist[ci];
+  if(!cat) return;
+  if(typeof cat==='string'){ cat = cfg.checklist[ci] = {title:cat, appliesTo:[], items:[]}; }
+  var label = document.getElementById('newTaskLabel_' + ci).value.trim();
+  if(!label){ alert('Task description required'); return; }
+  var type = document.getElementById('newTaskType_' + ci).value;
+  if(!cat.items) cat.items = [];
+  cat.items.push({label:label, type:type});
+  saveConfigArray('checklist', cfg.checklist);
+}
+function deleteTask(ci, ii){
+  var cfg = dbData.config;
+  var cat = cfg.checklist[ci];
+  if(!cat || typeof cat==='string') return;
+  if(!confirm('Delete task "' + ((cat.items[ii].label)||'') + '"?')) return;
+  cat.items.splice(ii, 1);
+  saveConfigArray('checklist', cfg.checklist);
+}
+function changeTaskType(ci, ii, val){
+  var cfg = dbData.config;
+  var cat = cfg.checklist[ci];
+  if(!cat || typeof cat==='string') return;
+  if(!cat.items[ii]) return;
+  cat.items[ii].type = val;
+  saveConfigArray('checklist', cfg.checklist);
+}
+var _taskDrag = null;
+function clearTaskDropLines(){
+  document.querySelectorAll('.taskline').forEach(function(el){
+    el.style.borderTop = '';
+    el.style.borderBottom = '';
+    el.style.opacity = '';
+  });
+}
+function taskDragStart(e, ci, ii){
+  _taskDrag = {ci:ci, ii:ii};
+  if(e.dataTransfer){
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', ci + ':' + ii); }catch(_e){}
+  }
+  e.currentTarget.style.opacity = '0.45';
+}
+function taskDragOver(e, ci, ii){
+  if(!_taskDrag || _taskDrag.ci !== ci) return;
+  e.preventDefault();
+  if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  clearTaskDropLines();
+  var r = e.currentTarget.getBoundingClientRect();
+  var after = e.clientY > (r.top + r.height / 2);
+  e.currentTarget.style.borderTop = after ? '' : '3px solid #812F2F';
+  e.currentTarget.style.borderBottom = after ? '3px solid #812F2F' : '';
+}
+function taskDragLeave(e){
+  e.currentTarget.style.borderTop = '';
+  e.currentTarget.style.borderBottom = '';
+}
+function taskDrop(e, ci, ii){
+  if(!_taskDrag || _taskDrag.ci !== ci) return;
+  e.preventDefault();
+  var cfg = dbData.config;
+  var cat = cfg.checklist && cfg.checklist[ci];
+  if(!cat || typeof cat==='string' || !Array.isArray(cat.items)) return;
+  var r = e.currentTarget.getBoundingClientRect();
+  var after = e.clientY > (r.top + r.height / 2);
+  var from = _taskDrag.ii;
+  var insertAt = ii + (after ? 1 : 0);
+  var moved = cat.items.splice(from, 1)[0];
+  if(from < insertAt) insertAt--;
+  if(insertAt < 0) insertAt = 0;
+  if(insertAt > cat.items.length) insertAt = cat.items.length;
+  cat.items.splice(insertAt, 0, moved);
+  _openCats[ci] = true;
+  _taskDrag = null;
+  clearTaskDropLines();
+  saveConfigArray('checklist', cfg.checklist);
+}
+function taskDragEnd(){
+  _taskDrag = null;
+  clearTaskDropLines();
+}
+
+
+/* CONFIG HELPERS */
+function showSaved(elId){
+  var el = elId ? document.getElementById(elId) : null;
+  if(!el){ el = document.getElementById('globalStatus'); }
+  if(!el) return;
+  el.textContent = 'Saved ✓';
+  el.className = 'saved-ok';
+  setTimeout(function(){ if(el){ el.textContent=''; el.className=''; } }, 2500);
+}
+function saveConfigArray(key, value){
+  var cfg = dbData.config;
+  cfg[key] = value;
+  var patch = {}; patch[key] = value;
+  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(patch) })
+    .then(function(){ loadData(); showSaved('techStatus'); })
+    .catch(function(){ alert('Update failed'); });
+}
+
+function populateConfig(){
+  const cfg = dbData.config || {};
+  document.getElementById('cfgIntervals').value = (cfg.intervals||[]).join(', ');
+  document.getElementById('cfgUnits').value = (cfg.unitOptions||[]).join('\n');
+}
+
+function saveConfig(){
+  const cfg = {
+    intervals: document.getElementById('cfgIntervals').value.split(',').map(Number).filter(function(n){return n>0}),
+    unitOptions: document.getElementById('cfgUnits').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),
+  };
+  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
+    .then(function(){ document.getElementById('cfgStatus').textContent='Saved!'; setTimeout(function(){document.getElementById('cfgStatus').textContent='';},2000); loadData(); })
+    .catch(function(){ alert('Save failed'); });
+}
+
+function purgeData(){
+  if(!confirm('This will DELETE ALL assignment records. Are you sure?')) return;
+  fetch('/api/admin/purge', { method:'POST', headers: authHdr() })
+    .then(function(){ alert('Purged!'); loadData(); })
+    .catch(function(){ alert('Purge failed'); });
+}
+
+// Enter key login
+document.getElementById('pass').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>
+))?x.password:''};
+    })})
+  }).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+    .then(function(x){if(!x.ok)throw new Error((x.d&&x.d.error)||'Superuser save failed');loadData();})
+    .catch(function(e){alert(e.message||'Superuser save failed');});
 }
 
 /* ---- Technicians ---- */
