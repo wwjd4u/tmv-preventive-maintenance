@@ -3,26 +3,60 @@ const el=id=>document.getElementById(id);
 const draftId=new URLSearchParams(location.search).get('draft');
 const draftKey='tmv.workOrderDraft.'+draftId;
 let draft, definitions=[], busy=false;
-function selectedTitles(){return [...document.querySelectorAll('#sections input:checked')].map(input=>input.value);}
+
+function sectionBoxes(){return [...document.querySelectorAll('#sections input.section-check')];}
+function taskBoxes(){return [...document.querySelectorAll('#sections input.task-check')];}
+function selectedTaskMap(){
+  const out={};
+  for(const section of definitions){
+    const labels=taskBoxes().filter(x=>x.dataset.section===section.title&&x.checked).map(x=>x.value);
+    if(labels.length)out[section.title]=labels;
+  }
+  return out;
+}
+function selectedTitles(){return Object.keys(selectedTaskMap());}
 function persist(){sessionStorage.setItem(draftKey,JSON.stringify(draft));}
+function syncSectionFromTasks(title){
+  const tasks=taskBoxes().filter(x=>x.dataset.section===title);
+  const sec=sectionBoxes().find(x=>x.value===title);
+  if(!sec)return;
+  const checked=tasks.filter(x=>x.checked).length;
+  sec.checked=checked===tasks.length&&tasks.length>0;
+  sec.indeterminate=checked>0&&checked<tasks.length;
+}
+function onSectionChange(input){
+  taskBoxes().filter(x=>x.dataset.section===input.value).forEach(x=>x.checked=input.checked);
+  input.indeterminate=false;
+  updateSelection();
+}
+function onTaskChange(input){
+  syncSectionFromTasks(input.dataset.section);
+  updateSelection();
+}
 function updateSelection(){
-  const titles=selectedTitles();
-  const items=definitions.filter(s=>titles.includes(s.title)).reduce((n,s)=>n+s.items.length,0);
-  el('count').textContent=titles.length+' of '+definitions.length+' sections selected · '+items+' items';
-  el('generate').disabled=busy||!titles.length;
+  const map=selectedTaskMap();
+  const titles=Object.keys(map);
+  const items=Object.values(map).reduce((n,arr)=>n+arr.length,0);
+  const total=definitions.reduce((n,s)=>n+s.items.length,0);
+  el('count').textContent=titles.length+' of '+definitions.length+' sections selected · '+items+' of '+total+' tasks';
+  el('generate').disabled=busy||!items;
   draft.selectedSectionTitles=titles;
+  draft.selectedTaskLabels=map;
   try{persist();}catch(error){el('message').textContent='Unable to retain selections: '+error.message;el('generate').disabled=true;}
 }
-function selectAll(checked){document.querySelectorAll('#sections input').forEach(input=>input.checked=checked);updateSelection();}
+function selectAll(checked){
+  document.querySelectorAll('#sections input').forEach(input=>{input.checked=checked;input.indeterminate=false;});
+  updateSelection();
+}
 async function generate(){
-  if(busy||!selectedTitles().length)return;
+  const taskMap=selectedTaskMap();
+  if(busy||!Object.keys(taskMap).length)return;
   busy=true;el('message').textContent='';
   document.querySelectorAll('button, #sections input').forEach(control=>control.disabled=true);
   el('generate').textContent='Saving…';
   try{
-    const titles=selectedTitles();
-    const payload={tmv:draft.tmv,technician:draft.technician,location:draft.location,date:draft.date,selectedSectionTitles:titles};
-    // Retain a request ID across uncertain responses, refreshes and retries.
+    const titles=Object.keys(taskMap);
+    const payload={tmv:draft.tmv,technician:draft.technician,location:draft.location,date:draft.date,selectedSectionTitles:titles,selectedTaskLabels:taskMap};
     const fingerprint=JSON.stringify(payload);
     if(draft.pending?.fingerprint!==fingerprint)draft.pending={fingerprint,requestId:crypto.randomUUID()};
     persist();
@@ -50,15 +84,26 @@ async function init(){
     const config=await response.json(),types=config.tmvVanMap?.[draft.tmv]||[];
     definitions=(config.checklist||[]).filter(s=>s&&s.include!==false&&Array.isArray(s.appliesTo)&&s.appliesTo.some(type=>types.includes(type)));
     if(!definitions.length)throw new Error('No checklist sections are configured for this TMV.');
+    const savedMap=draft.selectedTaskLabels||null;
     for(const section of definitions){
       const box=document.createElement('section');box.className='section';
-      const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=section.title;input.checked=(draft.selectedSectionTitles||[]).includes(section.title);input.onchange=updateSelection;
+      const label=document.createElement('label'),input=document.createElement('input');
+      input.type='checkbox';input.className='section-check';input.value=section.title;
+      const savedSection=(draft.selectedSectionTitles||[]).includes(section.title);
+      input.checked=savedMap ? ((savedMap[section.title]||[]).length===section.items.length&&section.items.length>0) : savedSection;
+      input.onchange=()=>onSectionChange(input);
       const title=document.createElement('span');title.textContent=section.title;
       const count=document.createElement('small');count.textContent=section.items.length+' items';
       label.append(input,title,count);
       const list=document.createElement('ul');
-      for(const item of section.items){const row=document.createElement('li');row.textContent=item.label;list.append(row);}
+      for(const item of section.items){
+        const row=document.createElement('li'),taskLabel=document.createElement('label'),task=document.createElement('input'),text=document.createElement('span');
+        taskLabel.className='task-label';task.type='checkbox';task.className='task-check';task.dataset.section=section.title;task.value=item.label;
+        task.checked=savedMap ? (savedMap[section.title]||[]).includes(item.label) : savedSection;
+        task.onchange=()=>onTaskChange(task);text.textContent=item.label;taskLabel.append(task,text);row.append(taskLabel);list.append(row);
+      }
       box.append(label,list);el('sections').append(box);
+      syncSectionFromTasks(section.title);
     }
     el('selectAll').disabled=false;el('clearAll').disabled=false;
     el('selectAll').onclick=()=>selectAll(true);el('clearAll').onclick=()=>selectAll(false);el('generate').onclick=generate;

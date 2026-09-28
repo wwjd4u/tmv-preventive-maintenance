@@ -25,6 +25,17 @@ function buildWorkOrder(input, config) {
         new Set(selectedTitles).size !== selectedTitles.length) bad('Select at least one valid checklist section');
     definitions = definitions.filter(s => selectedTitles.includes(s.title));
   }
+  const selectedTaskLabels = input.selectedTaskLabels;
+  if (selectedTaskLabels !== undefined) {
+    if (!selectedTaskLabels || typeof selectedTaskLabels !== 'object' || Array.isArray(selectedTaskLabels)) bad('Invalid task selection');
+    definitions = definitions.map(s => {
+      const labels = selectedTaskLabels[s.title];
+      if (!Array.isArray(labels) || !labels.length) return null;
+      if (labels.some(label => typeof label !== 'string' || !s.items.some(i => i.label === label)) || new Set(labels).size !== labels.length) bad('Select only valid checklist tasks');
+      return { ...s, items: s.items.filter(i => labels.includes(i.label)) };
+    }).filter(Boolean);
+    if (!definitions.length) bad('Select at least one checklist task');
+  }
   const submitted = input.sections === undefined ? [] : input.sections;
   if (!Array.isArray(submitted)) bad('Invalid checklist');
   for (const section of submitted) {
@@ -52,6 +63,7 @@ function buildWorkOrder(input, config) {
   return { id, ticketNumber, tmv, vanType: types.join(' + '), location, technician: { ...technician }, date,
     createdAt, status: 'assigned', sections, results: null, completedAt: null, photos: [],
     ...(selectedTitles !== undefined ? { selectedSectionTitles: sections.map(s => s.title) } : {}),
+    ...(selectedTaskLabels !== undefined ? { selectedTaskLabels: Object.fromEntries(sections.map(s => [s.title, s.items.map(i => i.label)])) } : {}),
     requestHash, report: { id, createdAt, text: ticket }, dispatchLog: log };
 }
 
