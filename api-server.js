@@ -1394,8 +1394,29 @@ http.createServer((req, res) => {
   // GET /api/assignments/:id — technician fetches their assignment
   const assignGet = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
   if (assignGet && req.method === 'GET') {
-    const a = loadAssignments().find(x => x.id === assignGet[1]);
+    const assignments = loadAssignments();
+    const a = assignments.find(x => x.id === assignGet[1]);
     if (!a) return sendJson(res, 404, { error: 'Assignment not found' });
+
+    // Recover orphaned assignment photo references if an older client cleared
+    // the photos array after the files were already uploaded. Assignment photo
+    // filenames are prefixed with "<assignment-id>_".
+    if (!Array.isArray(a.photos) || !a.photos.length) {
+      try {
+        const prefix = a.id + '_';
+        const recovered = fs.readdirSync(UPLOADS_DIR)
+          .filter(name => name.startsWith(prefix) && /\.(jpe?g|png|gif|webp|heic|avif)$/i.test(name))
+          .sort()
+          .map(file => ({ file, caption: '' }));
+        if (recovered.length) {
+          a.photos = recovered;
+          saveAssignments(assignments);
+          console.log('[photos] recovered', recovered.length, 'photo(s) for assignment', a.id);
+        }
+      } catch (e) {
+        console.error('[photos] recovery failed for', a.id, e.message);
+      }
+    }
     return sendJson(res, 200, { assignment: a });
   }
 
