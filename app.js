@@ -559,7 +559,11 @@ function paintRadios(){
 
 function personnelForDistrict(list,district){
   if(!district) return list||[];
-  return (list||[]).filter(function(p){ return p && String(p.district||'')===String(district); });
+  return (list||[]).filter(function(p){
+    if(!p) return false;
+    var pd=String(p.district||'');
+    return pd==='ALL' || pd===String(district);
+  });
 }
 function rebuildDetailTechSelect(){
   var sel=document.getElementById('dTech'); if(!sel) return;
