@@ -454,6 +454,7 @@ footer a:active {
 let token = null;
 let currentRole = '';
 let currentUserName = '';
+let currentAuthSource = '';
 let dbData = { assignments:[], assets:[], config:{} };
 
 /* AUTH - working bypass login */
@@ -464,7 +465,7 @@ function doLogin(){
   fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
     .then(r => r.json())
     .then(d => {
-      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now(); sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
+      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; currentAuthSource = d.authSource || 'account'; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now(); sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
       else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
     })
     .catch(() => document.getElementById('loginErr').textContent = 'Server error');
@@ -477,7 +478,7 @@ function doLogin(){
   fetch('/api/session', { headers:{'Authorization':'Bearer '+shared} })
     .then(function(r){ if(!r.ok) throw new Error('expired'); return r.json(); })
     .then(function(d){
-      token = shared; currentRole = d.role || ''; currentUserName = d.name || ''; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now();
+      token = shared; currentRole = d.role || ''; currentUserName = d.name || ''; currentAuthSource = d.authSource || 'account'; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now();
       document.getElementById('loginOverlay').style.display='none';
       applyRoleUi(); loadData();
     })
@@ -487,7 +488,7 @@ function doLogin(){
 function dbLogout(){
   var headers = token ? {'Authorization':'Bearer '+token} : {};
   fetch('/api/logout', {method:'POST', headers:headers}).catch(function(){}).finally(function(){
-    token=null; currentRole=''; currentUserName='';
+    token=null; currentRole=''; currentUserName=''; currentAuthSource='';
     sessionStorage.removeItem('tmv_auth_token');
     sessionStorage.removeItem('tmv_auth_role');
     sessionStorage.removeItem('tmv_auth_name');
@@ -499,7 +500,7 @@ function dbLogout(){
 
 function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
 function saveSuperuserCredentials(){
-  if(currentRole !== 'superuser'){ alert('Superuser required'); return; }
+  if(currentRole !== 'superuser' || currentAuthSource !== 'recovery'){ alert('Recovery Superuser required'); return; }
   var current = document.getElementById('suCurrentPass').value || '';
   var newUser = (document.getElementById('suNewUser').value || '').trim();
   var newPass = document.getElementById('suNewPass').value || '';
@@ -634,7 +635,7 @@ function applyRoleUi(){
   var cat = document.querySelector('.catblock');
   if(cat) cat.style.display = manager ? 'none' : '';
   var suSecurity = document.getElementById('superuserSecurityBlock');
-  if(suSecurity) suSecurity.style.display = currentRole === 'superuser' ? '' : 'none';
+  if(suSecurity) suSecurity.style.display = (currentRole === 'superuser' && currentAuthSource === 'recovery') ? '' : 'none';
   var userRoles = document.getElementById('userRolesBlock');
   if(userRoles) userRoles.style.display = currentRole === 'superuser' ? '' : 'none';
   var auditLog = document.getElementById('auditLogBlock');
