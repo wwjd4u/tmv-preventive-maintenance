@@ -1064,17 +1064,19 @@ http.createServer((req, res) => {
         const current = Array.isArray(config.superusers) ? config.superusers : [];
         const managers = Array.isArray(config.managers) ? config.managers : [];
 
-        // Setup edits existing promoted Superusers; role creation/promotion stays
-        // in Security > User Roles so Recovery Superuser is never conflated here.
         if (incoming.length !== current.length) {
           return sendJson(res, 400, { error: 'Add or remove Superusers through Security > User Roles.' });
         }
 
-        const managerKeys = new Set(managers.map(m => String((m && (m.username || m.name)) || '').trim()).filter(Boolean));
+        const managerKeys = new Set(
+          managers.map(m => String((m && (m.username || m.name)) || '').trim()).filter(Boolean)
+        );
         const seen = new Set();
+
         const out = incoming.map((raw, i) => {
           const u = raw && typeof raw === 'object' ? raw : {};
           const prior = current[i] && typeof current[i] === 'object' ? current[i] : {};
+
           const name = String(u.name || u.username || prior.name || prior.username || '').trim();
           const username = String(u.username || prior.username || '').trim();
 
@@ -1088,7 +1090,91 @@ http.createServer((req, res) => {
           seen.add(username);
 
           let password = prior.password || '';
-          if (u.password && !String(u.password).startsWith('scrypt  if (url.pathname === '/api/managers' && req.method === 'PUT') {
+          if (u.password && !String(u.password).startsWith('scrypt$')) {
+            if (!validAdminPassword(u.password)) {
+              throw new Error('Superuser password must be at least 10 characters with an uppercase letter, number, and special character');
+            }
+            password = hashPassword(u.password);
+          }
+          if (!password || !String(password).startsWith('scrypt$')) {
+            throw new Error('This Superuser does not have a valid saved login password. Use Security > User Roles to correct the account first.');
+          }
+
+          const email = String(u.email != null ? u.email : (prior.email || '')).trim();
+          const phone = String(u.phone != null ? u.phone : (prior.phone || '')).trim();
+          const district = String(u.district != null ? u.district : (prior.district || '')).trim();
+
+          return {
+            name: name || username,
+            username,
+            email,
+            phone,
+            district,
+            password,
+            role: 'superuser'
+          };
+        });
+
+        const merged = { ...config, superusers: out };
+        saveConfig(merged);
+
+        auditEvent(
+          authSession,
+          'superusers_updated',
+          'Superusers',
+          current.map(u => ({
+            name: (u && u.name) || '',
+            username: (u && u.username) || '',
+            email: (u && u.email) || '',
+            phone: (u && u.phone) || '',
+            district: (u && u.district) || ''
+          })),
+          out.map(u => ({
+            name: u.name,
+            username: u.username,
+            email: u.email,
+            phone: u.phone,
+            district: u.district
+          })),
+          {
+            passwordUpdatedFor: incoming
+              .filter(u => u && u.password && !String(u.password).startsWith('scrypt$'))
+              .map(u => u.username || u.name || '')
+              .filter(Boolean)
+          }
+        );
+
+        current.forEach((prior, i) => {
+          const before = prior && (prior.username || prior.name);
+          const after = out[i] && (out[i].username || out[i].name);
+          if (before && before !== after) {
+            for (const [tok, sess] of authSessions.entries()) {
+              if (sess.username === before || sess.name === (prior.name || before)) {
+                authSessions.delete(tok);
+              }
+            }
+          }
+        });
+
+        return sendJson(res, 200, {
+          ok: true,
+          superusers: out.map(u => ({
+            name: u.name,
+            username: u.username,
+            email: u.email,
+            phone: u.phone,
+            district: u.district
+          }))
+        });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message || 'Superuser save failed' });
+      }
+    });
+    return;
+  }
+
+  // ── PUT /api/managers — Superuser full control; Managers may add/update but not remove ──
+  if (url.pathname === '/api/managers' && req.method === 'PUT') {
     if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
     let body = '';
     req.on('data', c => body += c);
@@ -1107,8 +1193,6 @@ http.createServer((req, res) => {
           const name = m.name || m.username || '';
           const username = m.username || m.name || '';
           const existing = savedByName[username];
-          // Hash the password only if a new plaintext password was supplied;
-          // otherwise preserve the already-hashed value already stored.
           let password = existing ? existing.password : '';
           if (m.password && !m.password.startsWith('scrypt$')) {
             if (!validAdminPassword(m.password)) throw new Error('Manager password must be at least 10 characters with an uppercase letter, number, and special character');
