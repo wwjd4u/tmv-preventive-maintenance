@@ -1049,6 +1049,1608 @@ http.createServer((req, res) => {
     return;
   }
 
+  // ── PUT /api/superusers — edit normal promoted Superusers only ──
+  // Recovery Superuser remains private in ADMIN_USER/ADMIN_PASS and is never
+  // included in or modified by this endpoint.
+  if (url.pathname === '/api/superusers' && req.method === 'PUT') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const incoming = Array.isArray(parsed.superusers) ? parsed.superusers : [];
+        const config = loadConfig() || {};
+        const current = Array.isArray(config.superusers) ? config.superusers : [];
+        const managers = Array.isArray(config.managers) ? config.managers : [];
+
+        // Setup edits existing promoted Superusers; role creation/promotion stays
+        // in Security > User Roles so Recovery Superuser is never conflated here.
+        if (incoming.length !== current.length) {
+          return sendJson(res, 400, { error: 'Add or remove Superusers through Security > User Roles.' });
+        }
+
+        const managerKeys = new Set(managers.map(m => String((m && (m.username || m.name)) || '').trim()).filter(Boolean));
+        const seen = new Set();
+        const out = incoming.map((raw, i) => {
+          const u = raw && typeof raw === 'object' ? raw : {};
+          const prior = current[i] && typeof current[i] === 'object' ? current[i] : {};
+          const name = String(u.name || u.username || prior.name || prior.username || '').trim();
+          const username = String(u.username || prior.username || '').trim();
+
+          if (!username) throw new Error('Superuser login username is required');
+          if (!/^[A-Za-z0-9._@-]{3,64}$/.test(username)) {
+            throw new Error('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen');
+          }
+          if (username === ADMIN_USER) throw new Error('That username is reserved by the Recovery Superuser');
+          if (seen.has(username)) throw new Error('Duplicate Superuser username: ' + username);
+          if (managerKeys.has(username)) throw new Error('That username is already used by a Manager');
+          seen.add(username);
+
+          let password = prior.password || '';
+          if (u.password && !String(u.password).startsWith('scrypt  if (url.pathname === '/api/managers' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).managers || [];
+        const current = (loadConfig() || {}).managers || [];
+        if (isManagerReq) {
+          const incomingKeys = new Set(incoming.map(m => m.username || m.name));
+          const removed = current.some(m => !incomingKeys.has(m.username || m.name));
+          if (removed) return sendJson(res, 403, { error: 'Managers may add or update managers but cannot delete managers' });
+        }
+        const savedByName = {};
+        current.forEach(m => { savedByName[m.username || m.name] = m; });
+        const out = incoming.map(m => {
+          const name = m.name || m.username || '';
+          const username = m.username || m.name || '';
+          const existing = savedByName[username];
+          // Hash the password only if a new plaintext password was supplied;
+          // otherwise preserve the already-hashed value already stored.
+          let password = existing ? existing.password : '';
+          if (m.password && !m.password.startsWith('scrypt$')) {
+            if (!validAdminPassword(m.password)) throw new Error('Manager password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(m.password);
+          }
+          const email = (m.email || (existing && existing.email) || '').trim();
+          const phone = (m.phone || (existing && existing.phone) || '').trim();
+          const district = String(m.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'manager' };
+        });
+        const config = loadConfig() || {};
+        const merged = { ...config, managers: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'managers_updated', 'Managers',
+          current.map(m => ({ name: m.name || '', username: m.username || '' })),
+          out.map(m => ({ name: m.name || '', username: m.username || '' })),
+          { passwordUpdatedFor: incoming.filter(m => m.password && !String(m.password).startsWith('scrypt$')).map(m => m.username || m.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone, district: m.district })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/technicians — account/contact save with hashed passwords ──
+  if (url.pathname === '/api/technicians' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).technicians || [];
+        const config = loadConfig() || {};
+        const current = Array.isArray(config.technicians) ? config.technicians : [];
+        const saved = {};
+        current.forEach(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          if (t.username) saved['u:' + t.username] = t;
+          if (t.name) saved['n:' + t.name] = t;
+        });
+        const out = incoming.map(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          const name = String(t.name || t.username || '').trim();
+          const username = String(t.username || '').trim();
+          const existing = (username && saved['u:' + username]) || (name && saved['n:' + name]) || null;
+          let password = existing ? (existing.password || '') : '';
+          if (t.password && !String(t.password).startsWith('scrypt$')) {
+            if (!validAdminPassword(t.password)) throw new Error('Technician password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(t.password);
+          }
+          const email = String(t.email || (existing && existing.email) || '').trim();
+          const phone = String(t.phone || (existing && existing.phone) || '').trim();
+          const district = String(t.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'technician' };
+        });
+        const merged = { ...config, technicians: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'technicians_updated', 'Technicians',
+          current.map(function(raw){ const t=typeof raw==='string'?{name:raw}:raw; return {name:t.name||'',username:t.username||'',email:t.email||'',phone:t.phone||''}; }),
+          out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })),
+          { passwordUpdatedFor: incoming.filter(t => t && t.password && !String(t.password).startsWith('scrypt$')).map(t => t.username || t.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── GET /api/assets — list all assets (public) ──────────
+  if (url.pathname === '/api/assets' && req.method === 'GET')
+    return sendJson(res, 200, { assets: loadAssets() });
+
+  // ── POST /api/assets — add new asset (admin only) ───────
+  if (url.pathname === '/api/assets' && req.method === 'POST') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required to add assets' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const a = JSON.parse(body);
+        const assets = loadAssets();
+        a.id = Date.now();
+        a.tmvId = a.tmvId || '';
+        a.unit = a.unit || 'days';
+        a.photos = a.photos || [];
+        a.lastMaint = a.lastMaint !== undefined ? a.lastMaint : null;
+        assets.push(a);
+        saveAssets(assets);
+        auditEvent(authSession, 'asset_added', a.tmvId || a.name || String(a.id), null,
+          { id: a.id, tmvId: a.tmvId || '', name: a.name || '', type: a.type || '', location: a.location || '' }, null);
+        sendJson(res, 200, { ok: true, asset: a });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/assets/:id — update asset (public for now) ──
+  const putMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (putMatch && req.method === 'PUT') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const updates = JSON.parse(body);
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(putMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Not found' });
+        assets[idx] = { ...assets[idx], ...updates };
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: assets[idx] });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── DELETE /api/assets/:id — delete asset (admin only) ──
+  const delMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (delMatch && req.method === 'DELETE') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required to delete assets' });
+    const id = parseInt(delMatch[1]);
+    const assets = loadAssets();
+    const target = assets.find(a => a.id === id);
+    // Clean up associated photos
+    if (target && target.photos) {
+      target.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p);
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      });
+    }
+    saveAssets(assets.filter(a => a.id !== id));
+    auditEvent(authSession, 'asset_deleted', target ? (target.tmvId || target.name || String(id)) : String(id),
+      target ? { id: target.id, tmvId: target.tmvId || '', name: target.name || '', type: target.type || '', location: target.location || '' } : null, null, null);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // ── POST /api/assets/:id/maintain — log maintenance (public) ─
+  const maintMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/maintain$/);
+  if (maintMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { notes } = JSON.parse(body);
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(maintMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Not found' });
+        assets[idx].lastMaint = Date.now();
+        assets[idx].maintBy = assets[idx].maintBy || 'field';
+        if (notes) assets[idx].notes = notes;
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: assets[idx] });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/inspection — log a full TMV inspection (public) ──
+  if (url.pathname === '/api/inspection' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const tmv = (d.tmv || '').trim();
+        if (!tmv) return sendJson(res, 400, { error: 'TMV required' });
+        const when = d.date ? new Date(d.date).getTime() : Date.now();
+        const assets = loadAssets();
+        // find an asset for this TMV, else create one
+        let asset = assets.find(a => a.tmvId === tmv);
+        if (!asset) {
+          asset = {
+            id: Date.now(), name: tmv + ' Inspection', type: (d.vanType || 'TMV'),
+            location: d.location || '', interval: 90, unit: 'days', lastMaint: when,
+            notes: '', tmvId: tmv, photos: [], maintBy: (d.technician && d.technician.name) || 'field'
+          };
+          assets.push(asset);
+        } else {
+          asset.lastMaint = when;
+          if (d.location) asset.location = d.location;
+          if (d.technician && d.technician.name) asset.maintBy = d.technician.name;
+        }
+        asset.inspections = asset.inspections || [];
+        asset.inspections.push({
+          date: when,
+          technician: (d.technician && d.technician.name) || '',
+          location: d.location || '',
+          sections: d.sections || []
+        });
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/assets/:id/photos — upload photo (public) ──
+  const photoUploadMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/photos$/);
+  if (photoUploadMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { data, name } = JSON.parse(body);
+        if (!data) return sendJson(res, 400, { error: 'No image data' });
+        const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+        const ext = path.extname(name || 'photo.jpg') || '.jpg';
+        const filename = `${photoUploadMatch[1]}_${Date.now()}${ext}`;
+        const filepath = path.join(UPLOADS_DIR, filename);
+        fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(photoUploadMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Asset not found' });
+        if (!assets[idx].photos) assets[idx].photos = [];
+        assets[idx].photos.push(filename);
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, photo: filename });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/assets/:id/photos/delete — delete photo ───
+  const photoDelMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/photos\/delete$/);
+  if (photoDelMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { photo } = JSON.parse(body);
+        if (!photo) return sendJson(res, 400, { error: 'No photo filename' });
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(photoDelMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Asset not found' });
+        if (assets[idx].photos) {
+          assets[idx].photos = assets[idx].photos.filter(p => p !== photo);
+        }
+        const filepath = path.join(UPLOADS_DIR, photo);
+        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── Assignments API (admin assigns work → technician mobile completes) ──
+
+  // Combined workflow: one transaction, retry-safe, no automatic messages.
+  // Same access policy as the existing assignment creation route.
+  if (url.pathname === '/api/work-orders' && req.method === 'POST') {
+    let body = '', tooLarge = false;
+    req.on('data', chunk => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 256 * 1024) { tooLarge = true; body = ''; }
+    });
+    req.on('end', () => {
+      if (tooLarge) return sendJson(res, 413, { error: 'Request too large' });
+      try {
+        const work = buildWorkOrder(JSON.parse(body), mergeTechPhones(loadConfig()));
+        work.order = loadAssignments().filter(a => (a.technician?.name || a.technician) === work.technician.name).length;
+        const saved = db.createWorkOrder(work);
+        sendJson(res, saved.replayed ? 200 : 201, { ok: true, ...saved, ticket: saved.assignment.report.text });
+      } catch (error) {
+        sendJson(res, error.status || (error instanceof SyntaxError ? 400 : 500),
+          { error: error.status || error instanceof SyntaxError ? error.message : 'Unable to save work order' });
+      }
+    });
+    return;
+  }
+
+  // POST /api/assignments — create a work assignment (public; desktop admin)
+  // Body: { tmv, vanType, location, technician, date, sections:[{title,items:[{label,type}]}] }
+  if (url.pathname === '/api/assignments' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        if (!d.tmv) return sendJson(res, 400, { error: 'TMV unit required' });
+        if (!d.technician) return sendJson(res, 400, { error: 'Technician required' });
+        // Normalize technician: accept either a plain name string or a full object.
+        let techIn = d.technician;
+        if (typeof techIn === 'string') techIn = { name: techIn };
+        techIn = {
+          name: techIn.name || 'Unassigned',
+          email: techIn.email || '',
+          phone: techIn.phone || ''
+        };
+        const config = loadConfig();
+        const full = expectedSections(d.vanType, config);
+        const sections = reconcileSections(d.sections, full);
+        if (!sections.length) return sendJson(res, 400, { error: 'No checklist sections apply to this van type' });
+        const assignments = loadAssignments();
+        const assignment = {
+          id: crypto.randomBytes(6).toString('hex'),
+          tmv: d.tmv,
+          vanType: d.vanType || '',
+          location: d.location || '',
+          technician: techIn,
+          date: d.date || new Date().toISOString().slice(0, 10),
+          createdAt: Date.now(),
+          status: 'assigned',           // assigned → in_progress → completed
+          order: loadAssignments().filter(a => (a.technician && (a.technician.name || a.technician)) === (techIn.name || techIn)).length,
+          sections,                     // [{title, items:[{label,type}]}]
+          results: null,                // filled by technician
+          completedAt: null,
+          photos: []                    // [{file, caption}] filenames in uploads/
+        };
+        assignments.push(assignment);
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, assignment });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // GET /api/assignments — list all (desktop status board)
+  if (url.pathname === '/api/assignments' && req.method === 'GET') {
+    return sendJson(res, 200, { assignments: loadAssignments() });
+  }
+
+  // GET /api/assignments/:id — technician fetches their assignment
+  const assignGet = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignGet && req.method === 'GET') {
+    const assignments = loadAssignments();
+    const a = assignments.find(x => x.id === assignGet[1]);
+    if (!a) return sendJson(res, 404, { error: 'Assignment not found' });
+
+    // Recover orphaned assignment photo references if an older client cleared
+    // the photos array after the files were already uploaded. Assignment photo
+    // filenames are prefixed with "<assignment-id>_".
+    if (!Array.isArray(a.photos) || !a.photos.length) {
+      try {
+        const prefix = a.id + '_';
+        const recovered = fs.readdirSync(UPLOADS_DIR)
+          .filter(name => name.startsWith(prefix) && /\.(jpe?g|png|gif|webp|heic|avif)$/i.test(name))
+          .sort()
+          .map(file => ({ file, caption: '' }));
+        if (recovered.length) {
+          a.photos = recovered;
+          saveAssignments(assignments);
+          console.log('[photos] recovered', recovered.length, 'photo(s) for assignment', a.id);
+        }
+      } catch (e) {
+        console.error('[photos] recovery failed for', a.id, e.message);
+      }
+    }
+    return sendJson(res, 200, { assignment: a });
+  }
+
+  // PUT /api/assignments/:id — technician saves progress / completes
+  // Body: { status, results:[{title,items:[{label,type,value}]}], photos:[{file,caption}] }
+  const assignPut = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignPut && req.method === 'PUT') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const assignments = loadAssignments();
+        const idx = assignments.findIndex(x => x.id === assignPut[1]);
+        if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+        if (d.status) assignments[idx].status = d.status;
+        if (d.results) assignments[idx].results = d.results;
+        if (Array.isArray(d.photos)) assignments[idx].photos = d.photos;
+        if (typeof d.order === 'number' && isFinite(d.order)) assignments[idx].order = d.order;
+        // Persist reassignment to a different technician (drag-and-drop move).
+        if (d.technician) {
+          if (typeof d.technician === 'string') assignments[idx].technician = { name: d.technician };
+          else if (typeof d.technician === 'object') assignments[idx].technician = d.technician;
+        }
+        if (d.status === 'completed') assignments[idx].completedAt = Date.now();
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, assignment: assignments[idx] });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PATCH /api/assignments/order — bulk-save drag reorder + reassignment ──
+  // Body: { items: [{ id, technician, order }] }  (technician may be null/'' = Unassigned)
+  if (url.pathname === '/api/assignments/order' && req.method === 'PATCH') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const updates = Array.isArray(d.items) ? d.items : [];
+        const assignments = loadAssignments();
+        const byId = {};
+        assignments.forEach(a => { byId[a.id] = a; });
+        updates.forEach(u => {
+          const a = byId[u.id];
+          if (!a) return;
+          if (typeof u.order === 'number' && isFinite(u.order)) a.order = u.order;
+          if ('technician' in u) {
+            const t = u.technician;
+            a.technician = t ? (typeof t === 'string' ? { name: t } : t) : { name: '' };
+          }
+        });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, saved: updates.length });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // DELETE /api/assignments/:id — remove a single assignment (admin only). NOT a purge.
+  const assignDel = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignDel && req.method === 'DELETE') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assignments' });
+    const assignments = loadAssignments();
+    const idx = assignments.findIndex(x => x.id === assignDel[1]);
+    if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+    const removed = assignments[idx];
+    // Clean up associated photo files for this assignment only
+    if (Array.isArray(removed.photos)) {
+      removed.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p.file || p);
+        try { if (fp && fs.existsSync(fp)) fs.unlinkSync(fp); } catch (e) {}
+      });
+    }
+    assignments.splice(idx, 1);
+    saveAssignments(assignments);
+    return sendJson(res, 200, { ok: true, deleted: removed.id });
+  }
+
+  // POST /api/assignments/:id/photos — upload a photo (base64) for an assignment
+  const assignPhoto = url.pathname.match(/^\/api\/assignments\/([\w-]+)\/photos$/);
+  if (assignPhoto && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { data, name, caption } = JSON.parse(body);
+        if (!data) return sendJson(res, 400, { error: 'No image data' });
+        const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+        const ext = path.extname(name || 'photo.jpg') || '.jpg';
+        const filename = `${assignPhoto[1]}_${Date.now()}${ext}`;
+        fs.writeFileSync(path.join(UPLOADS_DIR, filename), Buffer.from(base64Data, 'base64'));
+        const assignments = loadAssignments();
+        const idx = assignments.findIndex(x => x.id === assignPhoto[1]);
+        if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+        if (!assignments[idx].photos) assignments[idx].photos = [];
+        assignments[idx].photos.push({ file: filename, caption: caption || '' });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, photo: { file: filename, caption: caption || '' } });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // POST /api/assignments/demo — seed sample demo work orders for testing
+  if (url.pathname === '/api/assignments/demo' && req.method === 'POST') {
+    const config = loadConfig();
+    const allSecs = config.checklist || [];
+    const pick = (titles) => allSecs.filter(s => titles.indexOf(s.title) >= 0)
+      .map(s => ({ title: s.title, items: (s.items||[]).map(i => ({ label: i.label, type: i.type, opts: i.opts })) }));
+    const norm = (t) => t.replace(/\s+/g,' ').trim();
+    const demo = [
+      { tmv:'TMV57449B', vanType:'Virtual TMV', location:'Odessa', technician:'Mike Stettler',
+        sections: pick(['Virtual TMV','Network and Server Components','UPS and Power Systems']) },
+      { tmv:'TMV57744B', vanType:'Legacy TMV', location:'Kilgore', technician:'Johnathon Gouge',
+        sections: pick(['Legacy TMV','Serial and DeviceMaster','Monitors']) },
+      { tmv:'TMV57560B', vanType:'Twinfrac TMV', location:'Seminole', technician:'Payton Calicutt',
+        sections: pick(['Twinfrac TMV','FracLink','Observability Server']) }
+    ];
+    const assignments = loadAssignments();
+    const created = demo.map(d => ({
+      id: crypto.randomBytes(6).toString('hex'),
+      tmv: d.tmv, vanType: d.vanType, location: d.location, technician: d.technician,
+      date: new Date().toISOString().slice(0,10), createdAt: Date.now(),
+      status: 'assigned', sections: d.sections, results: null, completedAt: null, photos: []
+    }));
+    saveAssignments(assignments.concat(created));
+    return sendJson(res, 200, { ok: true, created });
+  }
+
+  res.writeHead(404); res.end('Not found');
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`🏭 TMV Master App running at http://0.0.0.0:${PORT} (all interfaces)`);
+  console.log(`   Windows access: http://localhost:${PORT}`);
+  console.log(`   Admin login: POST /api/login  (user: ${ADMIN_USER} / pass: ${ADMIN_PASS})`);
+});
+)) {
+            if (!validAdminPassword(u.password)) {
+              throw new Error('Superuser password must be at least 10 characters with an uppercase letter, number, and special character');
+            }
+            password = hashPassword(u.password);
+          }
+          if (!password || !String(password).startsWith('scrypt  if (url.pathname === '/api/managers' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).managers || [];
+        const current = (loadConfig() || {}).managers || [];
+        if (isManagerReq) {
+          const incomingKeys = new Set(incoming.map(m => m.username || m.name));
+          const removed = current.some(m => !incomingKeys.has(m.username || m.name));
+          if (removed) return sendJson(res, 403, { error: 'Managers may add or update managers but cannot delete managers' });
+        }
+        const savedByName = {};
+        current.forEach(m => { savedByName[m.username || m.name] = m; });
+        const out = incoming.map(m => {
+          const name = m.name || m.username || '';
+          const username = m.username || m.name || '';
+          const existing = savedByName[username];
+          // Hash the password only if a new plaintext password was supplied;
+          // otherwise preserve the already-hashed value already stored.
+          let password = existing ? existing.password : '';
+          if (m.password && !m.password.startsWith('scrypt$')) {
+            if (!validAdminPassword(m.password)) throw new Error('Manager password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(m.password);
+          }
+          const email = (m.email || (existing && existing.email) || '').trim();
+          const phone = (m.phone || (existing && existing.phone) || '').trim();
+          const district = String(m.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'manager' };
+        });
+        const config = loadConfig() || {};
+        const merged = { ...config, managers: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'managers_updated', 'Managers',
+          current.map(m => ({ name: m.name || '', username: m.username || '' })),
+          out.map(m => ({ name: m.name || '', username: m.username || '' })),
+          { passwordUpdatedFor: incoming.filter(m => m.password && !String(m.password).startsWith('scrypt$')).map(m => m.username || m.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone, district: m.district })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/technicians — account/contact save with hashed passwords ──
+  if (url.pathname === '/api/technicians' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).technicians || [];
+        const config = loadConfig() || {};
+        const current = Array.isArray(config.technicians) ? config.technicians : [];
+        const saved = {};
+        current.forEach(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          if (t.username) saved['u:' + t.username] = t;
+          if (t.name) saved['n:' + t.name] = t;
+        });
+        const out = incoming.map(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          const name = String(t.name || t.username || '').trim();
+          const username = String(t.username || '').trim();
+          const existing = (username && saved['u:' + username]) || (name && saved['n:' + name]) || null;
+          let password = existing ? (existing.password || '') : '';
+          if (t.password && !String(t.password).startsWith('scrypt$')) {
+            if (!validAdminPassword(t.password)) throw new Error('Technician password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(t.password);
+          }
+          const email = String(t.email || (existing && existing.email) || '').trim();
+          const phone = String(t.phone || (existing && existing.phone) || '').trim();
+          const district = String(t.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'technician' };
+        });
+        const merged = { ...config, technicians: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'technicians_updated', 'Technicians',
+          current.map(function(raw){ const t=typeof raw==='string'?{name:raw}:raw; return {name:t.name||'',username:t.username||'',email:t.email||'',phone:t.phone||''}; }),
+          out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })),
+          { passwordUpdatedFor: incoming.filter(t => t && t.password && !String(t.password).startsWith('scrypt$')).map(t => t.username || t.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── GET /api/assets — list all assets (public) ──────────
+  if (url.pathname === '/api/assets' && req.method === 'GET')
+    return sendJson(res, 200, { assets: loadAssets() });
+
+  // ── POST /api/assets — add new asset (admin only) ───────
+  if (url.pathname === '/api/assets' && req.method === 'POST') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required to add assets' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const a = JSON.parse(body);
+        const assets = loadAssets();
+        a.id = Date.now();
+        a.tmvId = a.tmvId || '';
+        a.unit = a.unit || 'days';
+        a.photos = a.photos || [];
+        a.lastMaint = a.lastMaint !== undefined ? a.lastMaint : null;
+        assets.push(a);
+        saveAssets(assets);
+        auditEvent(authSession, 'asset_added', a.tmvId || a.name || String(a.id), null,
+          { id: a.id, tmvId: a.tmvId || '', name: a.name || '', type: a.type || '', location: a.location || '' }, null);
+        sendJson(res, 200, { ok: true, asset: a });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/assets/:id — update asset (public for now) ──
+  const putMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (putMatch && req.method === 'PUT') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const updates = JSON.parse(body);
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(putMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Not found' });
+        assets[idx] = { ...assets[idx], ...updates };
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: assets[idx] });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── DELETE /api/assets/:id — delete asset (admin only) ──
+  const delMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (delMatch && req.method === 'DELETE') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required to delete assets' });
+    const id = parseInt(delMatch[1]);
+    const assets = loadAssets();
+    const target = assets.find(a => a.id === id);
+    // Clean up associated photos
+    if (target && target.photos) {
+      target.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p);
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      });
+    }
+    saveAssets(assets.filter(a => a.id !== id));
+    auditEvent(authSession, 'asset_deleted', target ? (target.tmvId || target.name || String(id)) : String(id),
+      target ? { id: target.id, tmvId: target.tmvId || '', name: target.name || '', type: target.type || '', location: target.location || '' } : null, null, null);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // ── POST /api/assets/:id/maintain — log maintenance (public) ─
+  const maintMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/maintain$/);
+  if (maintMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { notes } = JSON.parse(body);
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(maintMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Not found' });
+        assets[idx].lastMaint = Date.now();
+        assets[idx].maintBy = assets[idx].maintBy || 'field';
+        if (notes) assets[idx].notes = notes;
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: assets[idx] });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/inspection — log a full TMV inspection (public) ──
+  if (url.pathname === '/api/inspection' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const tmv = (d.tmv || '').trim();
+        if (!tmv) return sendJson(res, 400, { error: 'TMV required' });
+        const when = d.date ? new Date(d.date).getTime() : Date.now();
+        const assets = loadAssets();
+        // find an asset for this TMV, else create one
+        let asset = assets.find(a => a.tmvId === tmv);
+        if (!asset) {
+          asset = {
+            id: Date.now(), name: tmv + ' Inspection', type: (d.vanType || 'TMV'),
+            location: d.location || '', interval: 90, unit: 'days', lastMaint: when,
+            notes: '', tmvId: tmv, photos: [], maintBy: (d.technician && d.technician.name) || 'field'
+          };
+          assets.push(asset);
+        } else {
+          asset.lastMaint = when;
+          if (d.location) asset.location = d.location;
+          if (d.technician && d.technician.name) asset.maintBy = d.technician.name;
+        }
+        asset.inspections = asset.inspections || [];
+        asset.inspections.push({
+          date: when,
+          technician: (d.technician && d.technician.name) || '',
+          location: d.location || '',
+          sections: d.sections || []
+        });
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/assets/:id/photos — upload photo (public) ──
+  const photoUploadMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/photos$/);
+  if (photoUploadMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { data, name } = JSON.parse(body);
+        if (!data) return sendJson(res, 400, { error: 'No image data' });
+        const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+        const ext = path.extname(name || 'photo.jpg') || '.jpg';
+        const filename = `${photoUploadMatch[1]}_${Date.now()}${ext}`;
+        const filepath = path.join(UPLOADS_DIR, filename);
+        fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(photoUploadMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Asset not found' });
+        if (!assets[idx].photos) assets[idx].photos = [];
+        assets[idx].photos.push(filename);
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, photo: filename });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/assets/:id/photos/delete — delete photo ───
+  const photoDelMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/photos\/delete$/);
+  if (photoDelMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { photo } = JSON.parse(body);
+        if (!photo) return sendJson(res, 400, { error: 'No photo filename' });
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(photoDelMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Asset not found' });
+        if (assets[idx].photos) {
+          assets[idx].photos = assets[idx].photos.filter(p => p !== photo);
+        }
+        const filepath = path.join(UPLOADS_DIR, photo);
+        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── Assignments API (admin assigns work → technician mobile completes) ──
+
+  // Combined workflow: one transaction, retry-safe, no automatic messages.
+  // Same access policy as the existing assignment creation route.
+  if (url.pathname === '/api/work-orders' && req.method === 'POST') {
+    let body = '', tooLarge = false;
+    req.on('data', chunk => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 256 * 1024) { tooLarge = true; body = ''; }
+    });
+    req.on('end', () => {
+      if (tooLarge) return sendJson(res, 413, { error: 'Request too large' });
+      try {
+        const work = buildWorkOrder(JSON.parse(body), mergeTechPhones(loadConfig()));
+        work.order = loadAssignments().filter(a => (a.technician?.name || a.technician) === work.technician.name).length;
+        const saved = db.createWorkOrder(work);
+        sendJson(res, saved.replayed ? 200 : 201, { ok: true, ...saved, ticket: saved.assignment.report.text });
+      } catch (error) {
+        sendJson(res, error.status || (error instanceof SyntaxError ? 400 : 500),
+          { error: error.status || error instanceof SyntaxError ? error.message : 'Unable to save work order' });
+      }
+    });
+    return;
+  }
+
+  // POST /api/assignments — create a work assignment (public; desktop admin)
+  // Body: { tmv, vanType, location, technician, date, sections:[{title,items:[{label,type}]}] }
+  if (url.pathname === '/api/assignments' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        if (!d.tmv) return sendJson(res, 400, { error: 'TMV unit required' });
+        if (!d.technician) return sendJson(res, 400, { error: 'Technician required' });
+        // Normalize technician: accept either a plain name string or a full object.
+        let techIn = d.technician;
+        if (typeof techIn === 'string') techIn = { name: techIn };
+        techIn = {
+          name: techIn.name || 'Unassigned',
+          email: techIn.email || '',
+          phone: techIn.phone || ''
+        };
+        const config = loadConfig();
+        const full = expectedSections(d.vanType, config);
+        const sections = reconcileSections(d.sections, full);
+        if (!sections.length) return sendJson(res, 400, { error: 'No checklist sections apply to this van type' });
+        const assignments = loadAssignments();
+        const assignment = {
+          id: crypto.randomBytes(6).toString('hex'),
+          tmv: d.tmv,
+          vanType: d.vanType || '',
+          location: d.location || '',
+          technician: techIn,
+          date: d.date || new Date().toISOString().slice(0, 10),
+          createdAt: Date.now(),
+          status: 'assigned',           // assigned → in_progress → completed
+          order: loadAssignments().filter(a => (a.technician && (a.technician.name || a.technician)) === (techIn.name || techIn)).length,
+          sections,                     // [{title, items:[{label,type}]}]
+          results: null,                // filled by technician
+          completedAt: null,
+          photos: []                    // [{file, caption}] filenames in uploads/
+        };
+        assignments.push(assignment);
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, assignment });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // GET /api/assignments — list all (desktop status board)
+  if (url.pathname === '/api/assignments' && req.method === 'GET') {
+    return sendJson(res, 200, { assignments: loadAssignments() });
+  }
+
+  // GET /api/assignments/:id — technician fetches their assignment
+  const assignGet = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignGet && req.method === 'GET') {
+    const assignments = loadAssignments();
+    const a = assignments.find(x => x.id === assignGet[1]);
+    if (!a) return sendJson(res, 404, { error: 'Assignment not found' });
+
+    // Recover orphaned assignment photo references if an older client cleared
+    // the photos array after the files were already uploaded. Assignment photo
+    // filenames are prefixed with "<assignment-id>_".
+    if (!Array.isArray(a.photos) || !a.photos.length) {
+      try {
+        const prefix = a.id + '_';
+        const recovered = fs.readdirSync(UPLOADS_DIR)
+          .filter(name => name.startsWith(prefix) && /\.(jpe?g|png|gif|webp|heic|avif)$/i.test(name))
+          .sort()
+          .map(file => ({ file, caption: '' }));
+        if (recovered.length) {
+          a.photos = recovered;
+          saveAssignments(assignments);
+          console.log('[photos] recovered', recovered.length, 'photo(s) for assignment', a.id);
+        }
+      } catch (e) {
+        console.error('[photos] recovery failed for', a.id, e.message);
+      }
+    }
+    return sendJson(res, 200, { assignment: a });
+  }
+
+  // PUT /api/assignments/:id — technician saves progress / completes
+  // Body: { status, results:[{title,items:[{label,type,value}]}], photos:[{file,caption}] }
+  const assignPut = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignPut && req.method === 'PUT') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const assignments = loadAssignments();
+        const idx = assignments.findIndex(x => x.id === assignPut[1]);
+        if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+        if (d.status) assignments[idx].status = d.status;
+        if (d.results) assignments[idx].results = d.results;
+        if (Array.isArray(d.photos)) assignments[idx].photos = d.photos;
+        if (typeof d.order === 'number' && isFinite(d.order)) assignments[idx].order = d.order;
+        // Persist reassignment to a different technician (drag-and-drop move).
+        if (d.technician) {
+          if (typeof d.technician === 'string') assignments[idx].technician = { name: d.technician };
+          else if (typeof d.technician === 'object') assignments[idx].technician = d.technician;
+        }
+        if (d.status === 'completed') assignments[idx].completedAt = Date.now();
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, assignment: assignments[idx] });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PATCH /api/assignments/order — bulk-save drag reorder + reassignment ──
+  // Body: { items: [{ id, technician, order }] }  (technician may be null/'' = Unassigned)
+  if (url.pathname === '/api/assignments/order' && req.method === 'PATCH') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const updates = Array.isArray(d.items) ? d.items : [];
+        const assignments = loadAssignments();
+        const byId = {};
+        assignments.forEach(a => { byId[a.id] = a; });
+        updates.forEach(u => {
+          const a = byId[u.id];
+          if (!a) return;
+          if (typeof u.order === 'number' && isFinite(u.order)) a.order = u.order;
+          if ('technician' in u) {
+            const t = u.technician;
+            a.technician = t ? (typeof t === 'string' ? { name: t } : t) : { name: '' };
+          }
+        });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, saved: updates.length });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // DELETE /api/assignments/:id — remove a single assignment (admin only). NOT a purge.
+  const assignDel = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignDel && req.method === 'DELETE') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assignments' });
+    const assignments = loadAssignments();
+    const idx = assignments.findIndex(x => x.id === assignDel[1]);
+    if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+    const removed = assignments[idx];
+    // Clean up associated photo files for this assignment only
+    if (Array.isArray(removed.photos)) {
+      removed.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p.file || p);
+        try { if (fp && fs.existsSync(fp)) fs.unlinkSync(fp); } catch (e) {}
+      });
+    }
+    assignments.splice(idx, 1);
+    saveAssignments(assignments);
+    return sendJson(res, 200, { ok: true, deleted: removed.id });
+  }
+
+  // POST /api/assignments/:id/photos — upload a photo (base64) for an assignment
+  const assignPhoto = url.pathname.match(/^\/api\/assignments\/([\w-]+)\/photos$/);
+  if (assignPhoto && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { data, name, caption } = JSON.parse(body);
+        if (!data) return sendJson(res, 400, { error: 'No image data' });
+        const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+        const ext = path.extname(name || 'photo.jpg') || '.jpg';
+        const filename = `${assignPhoto[1]}_${Date.now()}${ext}`;
+        fs.writeFileSync(path.join(UPLOADS_DIR, filename), Buffer.from(base64Data, 'base64'));
+        const assignments = loadAssignments();
+        const idx = assignments.findIndex(x => x.id === assignPhoto[1]);
+        if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+        if (!assignments[idx].photos) assignments[idx].photos = [];
+        assignments[idx].photos.push({ file: filename, caption: caption || '' });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, photo: { file: filename, caption: caption || '' } });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // POST /api/assignments/demo — seed sample demo work orders for testing
+  if (url.pathname === '/api/assignments/demo' && req.method === 'POST') {
+    const config = loadConfig();
+    const allSecs = config.checklist || [];
+    const pick = (titles) => allSecs.filter(s => titles.indexOf(s.title) >= 0)
+      .map(s => ({ title: s.title, items: (s.items||[]).map(i => ({ label: i.label, type: i.type, opts: i.opts })) }));
+    const norm = (t) => t.replace(/\s+/g,' ').trim();
+    const demo = [
+      { tmv:'TMV57449B', vanType:'Virtual TMV', location:'Odessa', technician:'Mike Stettler',
+        sections: pick(['Virtual TMV','Network and Server Components','UPS and Power Systems']) },
+      { tmv:'TMV57744B', vanType:'Legacy TMV', location:'Kilgore', technician:'Johnathon Gouge',
+        sections: pick(['Legacy TMV','Serial and DeviceMaster','Monitors']) },
+      { tmv:'TMV57560B', vanType:'Twinfrac TMV', location:'Seminole', technician:'Payton Calicutt',
+        sections: pick(['Twinfrac TMV','FracLink','Observability Server']) }
+    ];
+    const assignments = loadAssignments();
+    const created = demo.map(d => ({
+      id: crypto.randomBytes(6).toString('hex'),
+      tmv: d.tmv, vanType: d.vanType, location: d.location, technician: d.technician,
+      date: new Date().toISOString().slice(0,10), createdAt: Date.now(),
+      status: 'assigned', sections: d.sections, results: null, completedAt: null, photos: []
+    }));
+    saveAssignments(assignments.concat(created));
+    return sendJson(res, 200, { ok: true, created });
+  }
+
+  res.writeHead(404); res.end('Not found');
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`🏭 TMV Master App running at http://0.0.0.0:${PORT} (all interfaces)`);
+  console.log(`   Windows access: http://localhost:${PORT}`);
+  console.log(`   Admin login: POST /api/login  (user: ${ADMIN_USER} / pass: ${ADMIN_PASS})`);
+});
+)) {
+            throw new Error('This Superuser does not have a valid saved login password. Use Security > User Roles to correct the account first.');
+          }
+
+          const email = String(u.email != null ? u.email : (prior.email || '')).trim();
+          const phone = String(u.phone != null ? u.phone : (prior.phone || '')).trim();
+          const district = String(u.district != null ? u.district : (prior.district || '')).trim();
+          return { name: name || username, username, email, phone, district, password, role: 'superuser' };
+        });
+
+        const merged = { ...config, superusers: out };
+        saveConfig(merged);
+
+        auditEvent(authSession, 'superusers_updated', 'Superusers',
+          current.map(u => ({ name: (u && u.name) || '', username: (u && u.username) || '', email: (u && u.email) || '', phone: (u && u.phone) || '', district: (u && u.district) || '' })),
+          out.map(u => ({ name: u.name, username: u.username, email: u.email, phone: u.phone, district: u.district })),
+          {
+            passwordUpdatedFor: incoming
+              .filter(u => u && u.password && !String(u.password).startsWith('scrypt  if (url.pathname === '/api/managers' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).managers || [];
+        const current = (loadConfig() || {}).managers || [];
+        if (isManagerReq) {
+          const incomingKeys = new Set(incoming.map(m => m.username || m.name));
+          const removed = current.some(m => !incomingKeys.has(m.username || m.name));
+          if (removed) return sendJson(res, 403, { error: 'Managers may add or update managers but cannot delete managers' });
+        }
+        const savedByName = {};
+        current.forEach(m => { savedByName[m.username || m.name] = m; });
+        const out = incoming.map(m => {
+          const name = m.name || m.username || '';
+          const username = m.username || m.name || '';
+          const existing = savedByName[username];
+          // Hash the password only if a new plaintext password was supplied;
+          // otherwise preserve the already-hashed value already stored.
+          let password = existing ? existing.password : '';
+          if (m.password && !m.password.startsWith('scrypt$')) {
+            if (!validAdminPassword(m.password)) throw new Error('Manager password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(m.password);
+          }
+          const email = (m.email || (existing && existing.email) || '').trim();
+          const phone = (m.phone || (existing && existing.phone) || '').trim();
+          const district = String(m.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'manager' };
+        });
+        const config = loadConfig() || {};
+        const merged = { ...config, managers: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'managers_updated', 'Managers',
+          current.map(m => ({ name: m.name || '', username: m.username || '' })),
+          out.map(m => ({ name: m.name || '', username: m.username || '' })),
+          { passwordUpdatedFor: incoming.filter(m => m.password && !String(m.password).startsWith('scrypt$')).map(m => m.username || m.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone, district: m.district })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/technicians — account/contact save with hashed passwords ──
+  if (url.pathname === '/api/technicians' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).technicians || [];
+        const config = loadConfig() || {};
+        const current = Array.isArray(config.technicians) ? config.technicians : [];
+        const saved = {};
+        current.forEach(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          if (t.username) saved['u:' + t.username] = t;
+          if (t.name) saved['n:' + t.name] = t;
+        });
+        const out = incoming.map(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          const name = String(t.name || t.username || '').trim();
+          const username = String(t.username || '').trim();
+          const existing = (username && saved['u:' + username]) || (name && saved['n:' + name]) || null;
+          let password = existing ? (existing.password || '') : '';
+          if (t.password && !String(t.password).startsWith('scrypt$')) {
+            if (!validAdminPassword(t.password)) throw new Error('Technician password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(t.password);
+          }
+          const email = String(t.email || (existing && existing.email) || '').trim();
+          const phone = String(t.phone || (existing && existing.phone) || '').trim();
+          const district = String(t.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'technician' };
+        });
+        const merged = { ...config, technicians: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'technicians_updated', 'Technicians',
+          current.map(function(raw){ const t=typeof raw==='string'?{name:raw}:raw; return {name:t.name||'',username:t.username||'',email:t.email||'',phone:t.phone||''}; }),
+          out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })),
+          { passwordUpdatedFor: incoming.filter(t => t && t.password && !String(t.password).startsWith('scrypt$')).map(t => t.username || t.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── GET /api/assets — list all assets (public) ──────────
+  if (url.pathname === '/api/assets' && req.method === 'GET')
+    return sendJson(res, 200, { assets: loadAssets() });
+
+  // ── POST /api/assets — add new asset (admin only) ───────
+  if (url.pathname === '/api/assets' && req.method === 'POST') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required to add assets' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const a = JSON.parse(body);
+        const assets = loadAssets();
+        a.id = Date.now();
+        a.tmvId = a.tmvId || '';
+        a.unit = a.unit || 'days';
+        a.photos = a.photos || [];
+        a.lastMaint = a.lastMaint !== undefined ? a.lastMaint : null;
+        assets.push(a);
+        saveAssets(assets);
+        auditEvent(authSession, 'asset_added', a.tmvId || a.name || String(a.id), null,
+          { id: a.id, tmvId: a.tmvId || '', name: a.name || '', type: a.type || '', location: a.location || '' }, null);
+        sendJson(res, 200, { ok: true, asset: a });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/assets/:id — update asset (public for now) ──
+  const putMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (putMatch && req.method === 'PUT') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const updates = JSON.parse(body);
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(putMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Not found' });
+        assets[idx] = { ...assets[idx], ...updates };
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: assets[idx] });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── DELETE /api/assets/:id — delete asset (admin only) ──
+  const delMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
+  if (delMatch && req.method === 'DELETE') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required to delete assets' });
+    const id = parseInt(delMatch[1]);
+    const assets = loadAssets();
+    const target = assets.find(a => a.id === id);
+    // Clean up associated photos
+    if (target && target.photos) {
+      target.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p);
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      });
+    }
+    saveAssets(assets.filter(a => a.id !== id));
+    auditEvent(authSession, 'asset_deleted', target ? (target.tmvId || target.name || String(id)) : String(id),
+      target ? { id: target.id, tmvId: target.tmvId || '', name: target.name || '', type: target.type || '', location: target.location || '' } : null, null, null);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // ── POST /api/assets/:id/maintain — log maintenance (public) ─
+  const maintMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/maintain$/);
+  if (maintMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { notes } = JSON.parse(body);
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(maintMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Not found' });
+        assets[idx].lastMaint = Date.now();
+        assets[idx].maintBy = assets[idx].maintBy || 'field';
+        if (notes) assets[idx].notes = notes;
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset: assets[idx] });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/inspection — log a full TMV inspection (public) ──
+  if (url.pathname === '/api/inspection' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const tmv = (d.tmv || '').trim();
+        if (!tmv) return sendJson(res, 400, { error: 'TMV required' });
+        const when = d.date ? new Date(d.date).getTime() : Date.now();
+        const assets = loadAssets();
+        // find an asset for this TMV, else create one
+        let asset = assets.find(a => a.tmvId === tmv);
+        if (!asset) {
+          asset = {
+            id: Date.now(), name: tmv + ' Inspection', type: (d.vanType || 'TMV'),
+            location: d.location || '', interval: 90, unit: 'days', lastMaint: when,
+            notes: '', tmvId: tmv, photos: [], maintBy: (d.technician && d.technician.name) || 'field'
+          };
+          assets.push(asset);
+        } else {
+          asset.lastMaint = when;
+          if (d.location) asset.location = d.location;
+          if (d.technician && d.technician.name) asset.maintBy = d.technician.name;
+        }
+        asset.inspections = asset.inspections || [];
+        asset.inspections.push({
+          date: when,
+          technician: (d.technician && d.technician.name) || '',
+          location: d.location || '',
+          sections: d.sections || []
+        });
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, asset });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/assets/:id/photos — upload photo (public) ──
+  const photoUploadMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/photos$/);
+  if (photoUploadMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { data, name } = JSON.parse(body);
+        if (!data) return sendJson(res, 400, { error: 'No image data' });
+        const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+        const ext = path.extname(name || 'photo.jpg') || '.jpg';
+        const filename = `${photoUploadMatch[1]}_${Date.now()}${ext}`;
+        const filepath = path.join(UPLOADS_DIR, filename);
+        fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(photoUploadMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Asset not found' });
+        if (!assets[idx].photos) assets[idx].photos = [];
+        assets[idx].photos.push(filename);
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true, photo: filename });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── POST /api/assets/:id/photos/delete — delete photo ───
+  const photoDelMatch = url.pathname.match(/^\/api\/assets\/(\d+)\/photos\/delete$/);
+  if (photoDelMatch && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { photo } = JSON.parse(body);
+        if (!photo) return sendJson(res, 400, { error: 'No photo filename' });
+        const assets = loadAssets();
+        const idx = assets.findIndex(a => a.id === parseInt(photoDelMatch[1]));
+        if (idx === -1) return sendJson(res, 404, { error: 'Asset not found' });
+        if (assets[idx].photos) {
+          assets[idx].photos = assets[idx].photos.filter(p => p !== photo);
+        }
+        const filepath = path.join(UPLOADS_DIR, photo);
+        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        saveAssets(assets);
+        sendJson(res, 200, { ok: true });
+      } catch(e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── Assignments API (admin assigns work → technician mobile completes) ──
+
+  // Combined workflow: one transaction, retry-safe, no automatic messages.
+  // Same access policy as the existing assignment creation route.
+  if (url.pathname === '/api/work-orders' && req.method === 'POST') {
+    let body = '', tooLarge = false;
+    req.on('data', chunk => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 256 * 1024) { tooLarge = true; body = ''; }
+    });
+    req.on('end', () => {
+      if (tooLarge) return sendJson(res, 413, { error: 'Request too large' });
+      try {
+        const work = buildWorkOrder(JSON.parse(body), mergeTechPhones(loadConfig()));
+        work.order = loadAssignments().filter(a => (a.technician?.name || a.technician) === work.technician.name).length;
+        const saved = db.createWorkOrder(work);
+        sendJson(res, saved.replayed ? 200 : 201, { ok: true, ...saved, ticket: saved.assignment.report.text });
+      } catch (error) {
+        sendJson(res, error.status || (error instanceof SyntaxError ? 400 : 500),
+          { error: error.status || error instanceof SyntaxError ? error.message : 'Unable to save work order' });
+      }
+    });
+    return;
+  }
+
+  // POST /api/assignments — create a work assignment (public; desktop admin)
+  // Body: { tmv, vanType, location, technician, date, sections:[{title,items:[{label,type}]}] }
+  if (url.pathname === '/api/assignments' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        if (!d.tmv) return sendJson(res, 400, { error: 'TMV unit required' });
+        if (!d.technician) return sendJson(res, 400, { error: 'Technician required' });
+        // Normalize technician: accept either a plain name string or a full object.
+        let techIn = d.technician;
+        if (typeof techIn === 'string') techIn = { name: techIn };
+        techIn = {
+          name: techIn.name || 'Unassigned',
+          email: techIn.email || '',
+          phone: techIn.phone || ''
+        };
+        const config = loadConfig();
+        const full = expectedSections(d.vanType, config);
+        const sections = reconcileSections(d.sections, full);
+        if (!sections.length) return sendJson(res, 400, { error: 'No checklist sections apply to this van type' });
+        const assignments = loadAssignments();
+        const assignment = {
+          id: crypto.randomBytes(6).toString('hex'),
+          tmv: d.tmv,
+          vanType: d.vanType || '',
+          location: d.location || '',
+          technician: techIn,
+          date: d.date || new Date().toISOString().slice(0, 10),
+          createdAt: Date.now(),
+          status: 'assigned',           // assigned → in_progress → completed
+          order: loadAssignments().filter(a => (a.technician && (a.technician.name || a.technician)) === (techIn.name || techIn)).length,
+          sections,                     // [{title, items:[{label,type}]}]
+          results: null,                // filled by technician
+          completedAt: null,
+          photos: []                    // [{file, caption}] filenames in uploads/
+        };
+        assignments.push(assignment);
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, assignment });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // GET /api/assignments — list all (desktop status board)
+  if (url.pathname === '/api/assignments' && req.method === 'GET') {
+    return sendJson(res, 200, { assignments: loadAssignments() });
+  }
+
+  // GET /api/assignments/:id — technician fetches their assignment
+  const assignGet = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignGet && req.method === 'GET') {
+    const assignments = loadAssignments();
+    const a = assignments.find(x => x.id === assignGet[1]);
+    if (!a) return sendJson(res, 404, { error: 'Assignment not found' });
+
+    // Recover orphaned assignment photo references if an older client cleared
+    // the photos array after the files were already uploaded. Assignment photo
+    // filenames are prefixed with "<assignment-id>_".
+    if (!Array.isArray(a.photos) || !a.photos.length) {
+      try {
+        const prefix = a.id + '_';
+        const recovered = fs.readdirSync(UPLOADS_DIR)
+          .filter(name => name.startsWith(prefix) && /\.(jpe?g|png|gif|webp|heic|avif)$/i.test(name))
+          .sort()
+          .map(file => ({ file, caption: '' }));
+        if (recovered.length) {
+          a.photos = recovered;
+          saveAssignments(assignments);
+          console.log('[photos] recovered', recovered.length, 'photo(s) for assignment', a.id);
+        }
+      } catch (e) {
+        console.error('[photos] recovery failed for', a.id, e.message);
+      }
+    }
+    return sendJson(res, 200, { assignment: a });
+  }
+
+  // PUT /api/assignments/:id — technician saves progress / completes
+  // Body: { status, results:[{title,items:[{label,type,value}]}], photos:[{file,caption}] }
+  const assignPut = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignPut && req.method === 'PUT') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const assignments = loadAssignments();
+        const idx = assignments.findIndex(x => x.id === assignPut[1]);
+        if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+        if (d.status) assignments[idx].status = d.status;
+        if (d.results) assignments[idx].results = d.results;
+        if (Array.isArray(d.photos)) assignments[idx].photos = d.photos;
+        if (typeof d.order === 'number' && isFinite(d.order)) assignments[idx].order = d.order;
+        // Persist reassignment to a different technician (drag-and-drop move).
+        if (d.technician) {
+          if (typeof d.technician === 'string') assignments[idx].technician = { name: d.technician };
+          else if (typeof d.technician === 'object') assignments[idx].technician = d.technician;
+        }
+        if (d.status === 'completed') assignments[idx].completedAt = Date.now();
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, assignment: assignments[idx] });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PATCH /api/assignments/order — bulk-save drag reorder + reassignment ──
+  // Body: { items: [{ id, technician, order }] }  (technician may be null/'' = Unassigned)
+  if (url.pathname === '/api/assignments/order' && req.method === 'PATCH') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const updates = Array.isArray(d.items) ? d.items : [];
+        const assignments = loadAssignments();
+        const byId = {};
+        assignments.forEach(a => { byId[a.id] = a; });
+        updates.forEach(u => {
+          const a = byId[u.id];
+          if (!a) return;
+          if (typeof u.order === 'number' && isFinite(u.order)) a.order = u.order;
+          if ('technician' in u) {
+            const t = u.technician;
+            a.technician = t ? (typeof t === 'string' ? { name: t } : t) : { name: '' };
+          }
+        });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, saved: updates.length });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // DELETE /api/assignments/:id — remove a single assignment (admin only). NOT a purge.
+  const assignDel = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
+  if (assignDel && req.method === 'DELETE') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assignments' });
+    const assignments = loadAssignments();
+    const idx = assignments.findIndex(x => x.id === assignDel[1]);
+    if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+    const removed = assignments[idx];
+    // Clean up associated photo files for this assignment only
+    if (Array.isArray(removed.photos)) {
+      removed.photos.forEach(p => {
+        const fp = path.join(UPLOADS_DIR, p.file || p);
+        try { if (fp && fs.existsSync(fp)) fs.unlinkSync(fp); } catch (e) {}
+      });
+    }
+    assignments.splice(idx, 1);
+    saveAssignments(assignments);
+    return sendJson(res, 200, { ok: true, deleted: removed.id });
+  }
+
+  // POST /api/assignments/:id/photos — upload a photo (base64) for an assignment
+  const assignPhoto = url.pathname.match(/^\/api\/assignments\/([\w-]+)\/photos$/);
+  if (assignPhoto && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { data, name, caption } = JSON.parse(body);
+        if (!data) return sendJson(res, 400, { error: 'No image data' });
+        const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+        const ext = path.extname(name || 'photo.jpg') || '.jpg';
+        const filename = `${assignPhoto[1]}_${Date.now()}${ext}`;
+        fs.writeFileSync(path.join(UPLOADS_DIR, filename), Buffer.from(base64Data, 'base64'));
+        const assignments = loadAssignments();
+        const idx = assignments.findIndex(x => x.id === assignPhoto[1]);
+        if (idx === -1) return sendJson(res, 404, { error: 'Assignment not found' });
+        if (!assignments[idx].photos) assignments[idx].photos = [];
+        assignments[idx].photos.push({ file: filename, caption: caption || '' });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, photo: { file: filename, caption: caption || '' } });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // POST /api/assignments/demo — seed sample demo work orders for testing
+  if (url.pathname === '/api/assignments/demo' && req.method === 'POST') {
+    const config = loadConfig();
+    const allSecs = config.checklist || [];
+    const pick = (titles) => allSecs.filter(s => titles.indexOf(s.title) >= 0)
+      .map(s => ({ title: s.title, items: (s.items||[]).map(i => ({ label: i.label, type: i.type, opts: i.opts })) }));
+    const norm = (t) => t.replace(/\s+/g,' ').trim();
+    const demo = [
+      { tmv:'TMV57449B', vanType:'Virtual TMV', location:'Odessa', technician:'Mike Stettler',
+        sections: pick(['Virtual TMV','Network and Server Components','UPS and Power Systems']) },
+      { tmv:'TMV57744B', vanType:'Legacy TMV', location:'Kilgore', technician:'Johnathon Gouge',
+        sections: pick(['Legacy TMV','Serial and DeviceMaster','Monitors']) },
+      { tmv:'TMV57560B', vanType:'Twinfrac TMV', location:'Seminole', technician:'Payton Calicutt',
+        sections: pick(['Twinfrac TMV','FracLink','Observability Server']) }
+    ];
+    const assignments = loadAssignments();
+    const created = demo.map(d => ({
+      id: crypto.randomBytes(6).toString('hex'),
+      tmv: d.tmv, vanType: d.vanType, location: d.location, technician: d.technician,
+      date: new Date().toISOString().slice(0,10), createdAt: Date.now(),
+      status: 'assigned', sections: d.sections, results: null, completedAt: null, photos: []
+    }));
+    saveAssignments(assignments.concat(created));
+    return sendJson(res, 200, { ok: true, created });
+  }
+
+  res.writeHead(404); res.end('Not found');
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`🏭 TMV Master App running at http://0.0.0.0:${PORT} (all interfaces)`);
+  console.log(`   Windows access: http://localhost:${PORT}`);
+  console.log(`   Admin login: POST /api/login  (user: ${ADMIN_USER} / pass: ${ADMIN_PASS})`);
+});
+))
+              .map(u => u.username || u.name || '')
+              .filter(Boolean)
+          });
+
+        // If a username was changed, invalidate the old account session.
+        current.forEach((prior, i) => {
+          const before = prior && (prior.username || prior.name);
+          const after = out[i] && (out[i].username || out[i].name);
+          if (before && before !== after) {
+            for (const [tok, sess] of authSessions.entries()) {
+              if (sess.username === before || sess.name === (prior.name || before)) authSessions.delete(tok);
+            }
+          }
+        });
+
+        return sendJson(res, 200, {
+          ok: true,
+          superusers: out.map(u => ({ name: u.name, username: u.username, email: u.email, phone: u.phone, district: u.district }))
+        });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message || 'Superuser save failed' });
+      }
+    });
+    return;
+  }
+
   // ── PUT /api/managers — Superuser full control; Managers may add/update but not remove ──
   if (url.pathname === '/api/managers' && req.method === 'PUT') {
     if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
