@@ -131,11 +131,13 @@
 
   /* SINGLE-PAGE ASSET MANAGER */
   .muted{color:#888;font-size:13px;margin-left:8px}
-  .asset-manage{display:grid;grid-template-columns:repeat(2,minmax(360px,1fr));gap:16px;margin-top:12px}
-  .setup-left{grid-column:1}
-  .setup-right{grid-column:2}
+  .asset-manage{display:grid;grid-template-columns:repeat(3,minmax(300px,1fr));gap:16px;margin-top:12px}
+  .setup-c1{grid-column:1}
+  .setup-c2{grid-column:2}
+  .setup-c3{grid-column:3}
   .mblock{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
-  @media (max-width:850px){.asset-manage{grid-template-columns:1fr}.setup-left,.setup-right{grid-column:1}}
+  @media (max-width:1100px){.asset-manage{grid-template-columns:repeat(2,minmax(300px,1fr))}.setup-c1,.setup-c2,.setup-c3{grid-column:auto}}
+  @media (max-width:760px){.asset-manage{grid-template-columns:1fr}.setup-c1,.setup-c2,.setup-c3{grid-column:1}}
   .mblock h3{margin:0 0 14px;color:var(--cudd);font-size:15px;border-bottom:2px solid var(--cudd);padding-bottom:8px}
   .mblock .cnt{color:#999;font-weight:normal;font-size:13px}
   .mrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
@@ -301,7 +303,7 @@ footer a:active {
     <div class="asset-manage">
 
       <!-- SUPERUSERS (normal promoted accounts only; Recovery Superuser stays in Security) -->
-      <section class="mblock setup-left" style="grid-row:1">
+      <section class="mblock setup-c1" style="grid-row:1">
         <h3>Superusers <span class="cnt" id="cntSu"></span></h3>
         <div class="mrow">
           <select id="selSu" class="msel" onchange="fillSu()" autocomplete="off" name="setup_su"></select>
@@ -320,7 +322,7 @@ footer a:active {
       </section>
 
       <!-- TMV UNITS -->
-      <section class="mblock setup-left" style="grid-row:2">
+      <section class="mblock setup-c1" style="grid-row:2">
         <h3>Equipment Units <span class="cnt" id="cntTmv"></span></h3>
         <div class="mrow">
           <select id="selTmv" class="msel" onchange="onSelTmv()" autocomplete="off" name="setup_tmv"></select>
@@ -346,7 +348,7 @@ footer a:active {
       </section>
 
       <!-- MANAGERS -->
-      <section class="mblock setup-right" style="grid-row:1">
+      <section class="mblock setup-c2" style="grid-row:1">
         <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
         <div class="mrow">
           <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
@@ -369,7 +371,7 @@ footer a:active {
       </section>
 
       <!-- TECHNICIANS -->
-      <section class="mblock setup-left" style="grid-row:3">
+      <section class="mblock setup-c3" style="grid-row:1">
         <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
         <div class="mrow">
           <select id="selTech" class="msel" onchange="fillTechContact()" autocomplete="off" name="setup_tech"></select>
@@ -392,7 +394,7 @@ footer a:active {
       </section>
 
       <!-- LOCATIONS -->
-      <section class="mblock setup-right" style="grid-row:2">
+      <section class="mblock setup-c2" style="grid-row:2">
         <h3>Districts <span class="cnt" id="cntLoc"></span></h3>
         <div class="mrow">
           <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
@@ -406,7 +408,7 @@ footer a:active {
       </section>
 
       <!-- INSPECTION SETTINGS -->
-      <section class="mblock setup-right" style="grid-row:3">
+      <section class="mblock setup-c3" style="grid-row:2">
         <h3>Inspection Settings</h3>
         <div style="margin-bottom:14px">
           <label>Inspection Intervals (days, comma-separated):</label><br>
@@ -421,7 +423,7 @@ footer a:active {
       </section>
 
       <!-- CATEGORIES (expandable cards) -->
-      <section class="mblock catblock">
+      <section class="mblock catblock" style="grid-column:1 / -1">
         <h3>Maintenance Categories <span class="cnt" id="cntCat"></span><button id="toggleAllCatsBtn" class="btn sm ghost" onclick="toggleAllCats()" style="float:right;margin-top:-4px">Expand All</button></h3>
         <div class="mrow addrow">
           <input id="newCat" class="minput" placeholder="Air Conditioning">
