@@ -1674,5 +1674,5 @@ http.createServer((req, res) => {
 }).listen(PORT, '0.0.0.0', () => {
   console.log(`🏭 TMV Master App running at http://0.0.0.0:${PORT} (all interfaces)`);
   console.log(`   Windows access: http://localhost:${PORT}`);
-  console.log(`   Admin login: POST /api/login  (user: ${ADMIN_USER} / pass: ${ADMIN_PASS})`);
+  console.log('   Admin login endpoint: POST /api/login');
 });
