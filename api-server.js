@@ -742,13 +742,13 @@ http.createServer((req, res) => {
         const d = JSON.parse(body);
         if (ADMIN_USER && ADMIN_PASS && d.username === ADMIN_USER && d.password === ADMIN_PASS) {
           const token = newAuthSession('superuser', ADMIN_USER, 'Superuser', 'recovery');
-          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser', idleMinutes: AUTH_IDLE_MINUTES });
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser', authSource: 'recovery', idleMinutes: AUTH_IDLE_MINUTES });
         }
         const cfgAuth = loadConfig() || {};
         const extraSu = (cfgAuth.superusers || []).find(s => (s.username || s.name) === d.username);
         if (extraSu && verifyPassword(d.password || '', extraSu.password)) {
           const token = newAuthSession('superuser', extraSu.username || extraSu.name, extraSu.name || extraSu.username, 'account');
-          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: extraSu.name || extraSu.username, idleMinutes: AUTH_IDLE_MINUTES });
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: extraSu.name || extraSu.username, authSource: 'account', idleMinutes: AUTH_IDLE_MINUTES });
         }
         // Saved manager login receives a Manager session with restricted Setup rights.
         const cfgMgr = cfgAuth.managers || [];
@@ -820,7 +820,7 @@ http.createServer((req, res) => {
     const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     const session = getAuthSession(tok);
     if (!session) return sendJson(res, 401, { error: 'Login required' });
-    return sendJson(res, 200, { ok: true, role: session.role, name: session.name, username: session.username, idleMinutes: AUTH_IDLE_MINUTES });
+    return sendJson(res, 200, { ok: true, role: session.role, name: session.name, username: session.username, authSource: session.authSource || 'account', idleMinutes: AUTH_IDLE_MINUTES });
   }
 
   if (url.pathname === '/api/logout' && req.method === 'POST') {
