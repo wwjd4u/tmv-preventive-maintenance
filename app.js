@@ -17,16 +17,144 @@ var assignments = [];
 var selectedTmv = null;
 var selectedVan = null;
 
+// ── STATIC IMPORTED POSITIONS ──────────────────────────────────────────────
+// Real TMV lat/long imported from the asset table (the DevIoT vendor feed is
+// Entra-ID gated / 401, so it could not be scraped). These are the ACTUAL yard
+// coordinates — NOT demo data. Used as a fallback position source when no live
+// DevIoT feed is configured, so the Location column shows real coordinates.
+// Keyed by TMV id (Asset ID with the TMV prefix). radius (m) defines the yard.
+var __staticPositions = {
+  'TMV57449B': { lat: 31.23, lng: -103.16, radius: 500 },
+  'TMV57454B': { lat: 32.74, lng: -103.68, radius: 500 },
+  'TMV57560B': { lat: 34.99, lng: -97.40,  radius: 500 },
+  'TMV57566B': { lat: 32.74, lng: -100.93, radius: 500 },
+  'TMV57738B': { lat: 36.26, lng: -100.89, radius: 500 },
+  'TMV57744B': { lat: 31.85, lng: -102.31, radius: 500 },
+  'TMV57757B': { lat: 31.44, lng: -102.64, radius: 500 },
+  'TMV57763B': { lat: 32.41, lng: -94.90,  radius: 500 },
+  'TMV57879B': { lat: 32.51, lng: -101.45, radius: 500 },
+  'TMV57903B': { lat: 31.58, lng: -102.27, radius: 500 },
+  'TMV57909B': { lat: 32.41, lng: -94.90,  radius: 500 },
+  'TMV87455B': { lat: 31.85, lng: -102.31, radius: 500 },
+  'TMV87461B': { lat: 31.85, lng: -102.31, radius: 500 },
+  'TMV97776B': { lat: 34.99, lng: -97.42,  radius: 500 }
+};
+// Asset 27616B had N/A coordinates → intentionally omitted (shows "Location set").
+var APP_TOKEN = sessionStorage.getItem('tmv_auth_token') || '';
+var APP_ROLE = sessionStorage.getItem('tmv_auth_role') || '';
+var APP_USER = sessionStorage.getItem('tmv_auth_name') || '';
+function isAdmin(){ return APP_ROLE === 'superuser' || APP_ROLE === 'manager'; }
+
+// Authentication idle policy: sign out after 15 minutes with no user activity.
+// Real activity also refreshes the rolling server-side session at most once/minute.
+var AUTH_IDLE_MS = 15 * 60 * 1000;
+var AUTH_HEARTBEAT_MS = 60 * 1000;
+var authLastActivity = Date.now();
+var authLastHeartbeat = 0;
+var authIdleTimer = null;
+function expireAppForIdle(){
+  if(!APP_TOKEN) return;
+  var oldToken = APP_TOKEN;
+  clearAppSession();
+  try{ fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+oldToken}}); }catch(_e){}
+  showAppLogin('Signed out after 15 minutes of inactivity.');
+}
+function checkAppIdle(){
+  if(APP_TOKEN && Date.now() - authLastActivity >= AUTH_IDLE_MS) expireAppForIdle();
+}
+function noteAppActivity(){
+  if(!APP_TOKEN) return;
+  authLastActivity = Date.now();
+  if(Date.now() - authLastHeartbeat < AUTH_HEARTBEAT_MS) return;
+  authLastHeartbeat = Date.now();
+  fetch('/api/session',{headers:appAuthHeaders()}).then(function(r){
+    if(r.status===401) expireAppForIdle();
+  }).catch(function(){});
+}
+function startAppIdleWatch(){
+  authLastActivity = Date.now();
+  if(authIdleTimer) clearInterval(authIdleTimer);
+  authIdleTimer = setInterval(checkAppIdle, 15000);
+}
+['pointerdown','keydown','touchstart','scroll'].forEach(function(evt){
+  window.addEventListener(evt, noteAppActivity, {passive:true});
+});
+
+function appAuthHeaders(extra){
+  var h = Object.assign({}, extra || {});
+  if(APP_TOKEN) h.Authorization = 'Bearer ' + APP_TOKEN;
+  return h;
+}
+function updateAppAuthUi(){
+  var label = document.getElementById('appAuthUser');
+  if(label) label.textContent = APP_ROLE ? ((APP_ROLE === 'superuser' ? 'Superuser' : 'Manager') + (APP_USER ? ' — ' + APP_USER : '')) : '';
+}
+function showAppLogin(message){
+  var overlay = document.getElementById('appLoginOverlay');
+  if(overlay) overlay.style.display = 'flex';
+  var err = document.getElementById('appLoginErr');
+  if(err) err.textContent = message || '';
+}
+function hideAppLogin(){ var overlay=document.getElementById('appLoginOverlay'); if(overlay) overlay.style.display='none'; }
+function clearAppSession(){
+  APP_TOKEN=''; APP_ROLE=''; APP_USER='';
+  sessionStorage.removeItem('tmv_auth_token');
+  sessionStorage.removeItem('tmv_auth_role');
+  sessionStorage.removeItem('tmv_auth_name');
+}
+async function doAppLogin(){
+  var u=(document.getElementById('appLoginUser').value||'').trim();
+  var p=document.getElementById('appLoginPass').value||'';
+  var err=document.getElementById('appLoginErr'); if(err) err.textContent='';
+  try{
+    var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json();
+    if(!r.ok || !d.token) throw new Error(d.error||'Invalid credentials');
+    APP_TOKEN=d.token; APP_ROLE=d.role||''; APP_USER=d.name||u;
+    if(d.idleMinutes) AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000;
+    sessionStorage.setItem('tmv_auth_token',APP_TOKEN);
+    sessionStorage.setItem('tmv_auth_role',APP_ROLE);
+    sessionStorage.setItem('tmv_auth_name',APP_USER);
+    document.getElementById('appLoginPass').value='';
+    startAppIdleWatch();
+    await boot();
+  }catch(e){ showAppLogin(e.message||'Login failed'); }
+}
+async function appLogout(){
+  try{ if(APP_TOKEN) await fetch('/api/logout',{method:'POST',headers:appAuthHeaders()}); }catch(_e){}
+  clearAppSession();
+  location.reload();
+}
+
 async function boot(){
   try{
+    if(!APP_TOKEN){ showAppLogin(); return; }
+    var sr=await fetch('/api/session',{headers:appAuthHeaders()});
+    if(!sr.ok){ clearAppSession(); showAppLogin('Please sign in.'); return; }
+    var sd=await sr.json();
+    APP_ROLE=sd.role||APP_ROLE; APP_USER=sd.name||APP_USER;
+    if(sd.idleMinutes) AUTH_IDLE_MS=Math.max(15,Number(sd.idleMinutes))*60*1000;
+    sessionStorage.setItem('tmv_auth_role',APP_ROLE);
+    sessionStorage.setItem('tmv_auth_name',APP_USER);
+    hideAppLogin(); updateAppAuthUi(); startAppIdleWatch();
     await loadConfig();
+    loadPositions();
     await loadAssets();
     await loadAssignments();
     buildTracker();
     buildTechFilter();
     buildTmvGrid();
     buildTechSelect();
+    if (__geoDemoMode) { var db = document.getElementById('demoBanner'); if (db) db.classList.remove('hidden'); }
+    showViewFromHash();
+    window.addEventListener('hashchange', showViewFromHash);
   }catch(e){ showErr('boot failed: '+((e&&(e.stack||e.message))||e)); }
+}
+function showViewFromHash(){
+  var v = (location.hash||'').replace('#','');
+  if(v!=='tracker' && v!=='tmv' && v!=='tech') v='tmv';
+  showView(v);
+  if(v==='tracker') buildTracker();
 }
 
 async function loadAssignments(){
@@ -63,7 +191,7 @@ function statusOf(a){ if(a.lastMaint==null) return 'none'; var d=daysLeft(a); re
 var SL={ok:'OK',warn:'Due Soon',due:'DUE',none:'Never Done'};
 var SC={ok:'b-ok',warn:'b-warn',due:'b-due',none:'b-none'};
 
-// ── Tracker = assignments board (clickable) ──────────────────
+// ── Tracker = assignments TABLE (matches db-viewer Assignments tab) ──
 var SL2={assigned:'Assigned',in_progress:'In Progress',completed:'Completed',rejected:'Rejected'};
 function buildTechFilter(){
   var sel=document.getElementById('filterTech');
@@ -74,95 +202,247 @@ function buildTechFilter(){
   names.sort().forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
   sel.value=names.includes(selected)?selected:'all';
 }
-function contactBar(tech){
-  if(!tech) return '';
-  var phone=tech.phone||'';
-  var em=tech.email||'';
-  var smsDigits=phone.replace(/\D/g,'');
-  var bars='<div class="contact-bar">';
-  if(phone) bars+='<a class="cb-call" href="tel:'+escAttr(phone)+'">📞 Call</a>';
-  if(em) bars+='<a class="cb-email" href="mailto:'+escAttr(em)+'">✉️ Email</a>';
-  if(smsDigits) bars+='<button class="cb-sms" data-sms="'+escAttr(smsDigits)+'" onclick="sendSms(this)">💬 Text / SMS</button>';
-  bars+='</div>';
-  return bars;
+function tStatusBadge(s){
+  var cls='b-'+(s||'assigned');
+  var label=(SL2[s]||s||'assigned');
+  return '<span class="badge '+cls+'">'+escapeHtml(label)+'</span>';
 }
-function photoGrid(photos){
-  if(!photos||!photos.length) return '';
-  return '<div class="photos">'+photos.map(function(p){
-    var src=p.file?('/uploads/'+encodeURIComponent(p.file)):p.local;
-    return '<div class="photo"><img src="'+escAttr(src)+'" alt="" loading="lazy"></div>';
-  }).join('')+'</div>';
-}
-function resultsHtml(a){
-  if(!a.results||!a.results.length) {
-    return a.status==='completed' ? '<div class="results-sec"><b>No results recorded.</b></div>' : '';
-  }
-  var h='<div class="results-sec"><b>Results</b>';
-  a.results.forEach(function(s){
-    h+='<div style="margin-top:6px"><u>'+escapeHtml(s.title)+'</u></div>';
-    (s.items||[]).forEach(function(it){
-      h+='<div class="row" style="border:0;padding:2px 0"><span class="lbl" style="font-size:13px">'+escapeHtml(it.label)+'</span><span class="ctl">'+escapeHtml(it.value==null?'':it.value)+'</span></div>';
+function tTechName(a){ var t=a.technician; if(!t) return '-'; if(typeof t==='string') return t; return t.name||'-'; }
+function tTs(v){ if(!v) return '-'; try{ return new Date(v).toLocaleString([], {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '-'; } }
+function tDate(v){ if(!v) return '-'; try{ return new Date(v).toLocaleDateString([], {year:'numeric',month:'2-digit',day:'2-digit'}); }catch(e){ return '-'; } }
+// ── Geofencing (fence definition only for now; live position pluggable) ──
+// Position source is intentionally decoupled. Today getTmvPosition() returns
+// null (no live feed) → status shows "Fence set". The DevIoT vendor feed is
+// proxied server-side at GET /api/positions and cached in window.__positions;
+// once authenticated it returns { tmvId:{lat,lng} } and statuses go live.
+var __positions = null;           // { tmvId:{lat,lng} } | null (not yet loaded)
+var __positionsLoading = false;
+async function loadPositions() {
+  if (__positionsLoading) return;
+  __positionsLoading = true;
+  try {
+    var r = await fetch('/api/positions', { headers: appAuthHeaders() });
+    if (r.ok) { var d = await r.json(); __positions = (d && d.positions) || {}; }
+  } catch (e) { /* feed unavailable — leave Fence set */ }
+  // Imported real positions: when no live feed is configured, fall back to the
+  // static imported lat/long so the Location column shows actual coordinates.
+  if (!__positions || Object.keys(__positions).length === 0) {
+    __positions = {};
+    Object.keys(__staticPositions).forEach(function (k) {
+      __positions[k] = { lat: __staticPositions[k].lat, lng: __staticPositions[k].lng };
     });
-  });
-  h+='</div>';
-  return h;
+  }
+  // Imported yards also set the geofence (location) so the cell shows real coords.
+  // The imported coordinates are the authoritative source (pulled from the asset
+  // table), so they override any rounded/stale value already in config.
+  if (configData && !configData.geofences) configData.geofences = {};
+  if (configData && configData.geofences) {
+    Object.keys(__staticPositions).forEach(function (k) {
+      configData.geofences[k] = {
+        lat: __staticPositions[k].lat, lng: __staticPositions[k].lng,
+        radius: __staticPositions[k].radius
+      };
+    });
+  }
+  __positionsLoading = false;
 }
-function trackerCard(a){
-  var t=a.technician||{};
-  var cnt=0; (a.sections||[]).forEach(function(s){ cnt+=(s.items||[]).length; });
-  var detId='det_'+a.id;
-  var techLine = t.name ? ('<div class="tech">👷 '+escapeHtml(t.name)+'</div>') : '';
-  var sub = [a.vanType, a.location, a.date].filter(Boolean).map(escapeHtml).join(' · ');
-  // Build full detail (hidden until expand): contact + results + photos
-  var detail =
-    contactBar(t)
-    + resultsHtml(a)
-    + photoGrid(a.photos)
-    + (a.report ? '<div class="ticket"><h3>Maintenance Report</h3><pre>'+escapeHtml(a.report.text)+'</pre><div class="meta">Assignment creation logged: '+escapeHtml(new Date(a.report.createdAt).toLocaleString())+'</div></div>' : '');
-  return '<div class="assign-card" onclick="toggleAssign(\''+escAttr(a.id)+'\')">'
-    + '<div class="top"><h3>'+escapeHtml(a.tmv||'Untitled')+'</h3>'
-    + '<span class="st st-'+(a.status||'assigned')+'">'+(SL2[a.status]||a.status)+'</span></div>'
-    + (sub?'<div class="sub">'+sub+'</div>':'')
-    + techLine
-    + '<div class="cnt">'+cnt+' items · '+a.sections.length+' sections</div>'
-    + '<div class="assign-detail hidden" id="'+detId+'">'+detail+'</div>'
-    + '</div>';
+function getTmvPosition(tmvId) {
+  if (__geoDemoMode) { var d = getDemoPosition(tmvId); if (d) return d; }
+  if (!tmvId || !__positions) return null;   // feed not live/loaded → "Fence set"
+  var p = __positions[tmvId];
+  if (!p || p.lat == null || p.lng == null) return null;
+  return { lat: +p.lat, lng: +p.lng };
+}
+
+// ── DEMO MODE (opt-in only via ?demo=1) ──────────────────────────────────
+// The real vendor feed (deviotinfo.azurewebsites.net) is Entra-ID gated (401),
+// so it cannot be scraped. This generates SIMULATED, clearly-labeled positions
+// around the West Texas oilfield (Odessa, TX) so the geofence column can be
+// demoed. NEVER used in production — production reads the proxied /api/positions.
+var __geoDemoMode = (location.search || '').indexOf('demo=1') >= 0;
+function __demoHash(s) { var h = 2166136261 >>> 0; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h; }
+var __DEMO_BASE = { lat: 31.8457, lng: -102.3676 }; // Odessa, TX yard
+function __demoGeoFor(tmv) {
+  if (!tmv) return null;
+  var h = __demoHash(String(tmv));
+  var dLat = ((h & 0xff) / 255 - 0.5) * 0.40;          // ±0.20°
+  var dLng = (((h >>> 8) & 0xff) / 255 - 0.5) * 0.40;
+  var yard = { lat: __DEMO_BASE.lat + dLat, lng: __DEMO_BASE.lng + dLng };
+  var onsite = (h & 1) === 0;
+  var pos = onsite ? { lat: yard.lat, lng: yard.lng } : { lat: yard.lat + 0.55, lng: yard.lng + 0.55 }; // ~75km off
+  return { fence: { lat: yard.lat, lng: yard.lng, radius: 1500 }, pos: pos, onsite: onsite };
+}
+function __demoFences() {
+  var m = {}; (assignments || []).forEach(function (a) { if (a.tmv && !m[a.tmv]) { var g = __demoGeoFor(a.tmv); if (g) m[a.tmv] = g.fence; } }); return m;
+}
+function getDemoPosition(tmv) { var g = __demoGeoFor(tmv); return g ? { lat: g.pos.lat, lng: g.pos.lng } : null; }
+function geoInside(fence, pos){
+  if(!fence || !fence.lat || !fence.lng || !pos) return null;
+  var R=6371000, toR=Math.PI/180;
+  var dLat=(pos.lat-fence.lat)*toR, dLng=(pos.lng-fence.lng)*toR;
+  var la1=fence.lat*toR, la2=pos.lat*toR;
+  var h=Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
+  var d=2*R*Math.asin(Math.sqrt(h));
+  var r=(fence.radius && +fence.radius)||200;
+  return d<=r;
+}
+function tGeofenceCell(a){
+  var g=(window.__geoMap||{})[a.tmv];            // {lat,lng,radius} from config
+  if(!g || !g.lat || !g.lng) return '<td class="geo-cell">—</td>'; // no fence defined
+  var pos=getTmvPosition(a.tmv);
+  if(pos==null) return '<td class="geo-cell"><span class="geo geo-fence" title="Location set — position feed pending">Location set</span></td>';
+  var inside=geoInside(g,pos);
+  var lbl = inside ? 'On-site' : 'Off-site';
+  var demo = __geoDemoMode ? ' <span class="geo-demo">demo</span>' : '';
+  // coordinates kept in the map tooltip (title), not rendered as wide inline text
+  var coord = '';
+  // tiny schematic map thumbnail (offline-safe, no API key) — click to enlarge
+  var thumb = '<img class="geo-thumb" alt="map" src="data:image/svg+xml;utf8,' +
+    encodeURIComponent(miniMapSvg(g, pos, inside)) + '" ' +
+    'onclick="openMapModal(\'' + a.tmv + '\')" title="Click to enlarge map">';
+  return '<td class="geo-cell"><span class="geo-map"><span class="geo '+(inside?'geo-on':'geo-off')+'" title="'+(inside?'At location':'Away from location')+'">'+lbl+'</span>'+thumb+'</span>'+demo+coord+'</td>';
+}
+// Schematic mini-map: yard circle + position dot within a padded lat/lng box.
+function miniMapSvg(g, pos, inside){
+  var W=92,H=68, pad=8;
+  var latMin=Math.min(g.lat,pos.lat), latMax=Math.max(g.lat,pos.lat);
+  var lngMin=Math.min(g.lng,pos.lng), lngMax=Math.max(g.lng,pos.lng);
+  var dLat=(latMax-latMin)||0.02, dLng=(lngMax-lngMin)||0.02;
+  latMin-=dLat*0.5; latMax+=dLat*0.5; lngMin-=dLng*0.5; lngMax+=dLng*0.5;
+  function px(lat,lng){ return [ pad + (lng-lngMin)/(lngMax-lngMin)*(W-2*pad), pad + (latMax-lat)/(latMax-latMin)*(H-2*pad) ]; }
+  var gy=px(g.lat,g.lng), py=px(pos.lat,pos.lng);
+  var r=Math.max(3, g.radius? Math.min(18, g.radius/4000*(H-2*pad)) : 9);
+  var dot = inside ? '#15803d' : '#b91c1c';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+
+    '<rect width="'+W+'" height="'+H+'" fill="#eef2f7"/>'+
+    '<circle cx="'+gy[0].toFixed(1)+'" cy="'+gy[1].toFixed(1)+'" r="'+r.toFixed(1)+'" fill="#bfdbfe" stroke="#2563eb" stroke-width="1"/>'+
+    '<line x1="0" y1="'+gy[1].toFixed(1)+'" x2="'+W+'" y2="'+gy[1].toFixed(1)+'" stroke="#cbd5e1" stroke-width="0.5"/>'+
+    '<line x1="'+gy[0].toFixed(1)+'" y1="0" x2="'+gy[0].toFixed(1)+'" y2="'+H+'" stroke="#cbd5e1" stroke-width="0.5"/>'+
+    '<circle cx="'+py[0].toFixed(1)+'" cy="'+py[1].toFixed(1)+'" r="3" fill="'+dot+'" stroke="#fff" stroke-width="1"/>'+
+    '</svg>';
+}
+function openMapModal(tmv){
+  var g=(window.__geoMap||{})[tmv]; if(!g||!g.lat||!g.lng) return;
+  var pos=getTmvPosition(tmv) || g;
+  var lat=g.lat.toFixed(6), lng=g.lng.toFixed(6);
+  document.getElementById('mapModalTitle').textContent = tmv + ' — location';
+  document.getElementById('mapModalCoords').textContent = 'Yard: ' + g.lat.toFixed(5) + ', ' + g.lng.toFixed(5) +
+    ((pos!==g) ? ('   ·   TMV now: ' + pos.lat.toFixed(5) + ', ' + pos.lng.toFixed(5)) : '') +
+    ((window.__geoMap && g.radius) ? ('   ·   radius ' + g.radius + ' m') : '');
+  document.getElementById('mapModalFrame').src =
+    'https://www.openstreetmap.org/export/embed.html?bbox=' +
+    (g.lng-0.02).toFixed(5) + '%2C' + (g.lat-0.015).toFixed(5) + '%2C' + (g.lng+0.02).toFixed(5) + '%2C' + (g.lat+0.015).toFixed(5) +
+    '&layer=mapnik&marker=' + lat + '%2C' + lng;
+  document.getElementById('mapModalGoogle').href = 'https://www.google.com/maps/search/?api=1&query=' + lat + '%2C' + lng;
+  document.getElementById('mapModalOsm').href = 'https://www.openstreetmap.org/?mlat=' + lat + '#map=15/' + lat + '/' + lng;
+  document.getElementById('mapModalBack').classList.add('open');
+}
+function closeMapModal(){ document.getElementById('mapModalBack').classList.remove('open'); }
+function tShowAssignment(id){
+  // open the assignment detail (assign.html) — same target the table uses
+  window.open('assign.html?id='+encodeURIComponent(id), '_blank');
+}
+async function tDeleteAssignment(id, tmv){
+  if(!confirm('Delete assignment '+(tmv||id)+'?\n\nThis removes only this one record. It cannot be undone.')) return;
+  var user=sessionStorage.getItem('tmv_db_user'), pass=sessionStorage.getItem('tmv_db_pass');
+  if(!user||!pass){ alert('Admin login required to delete. Open Task.db once to authenticate.'); return; }
+  var token=btoa(user+':'+pass);
+  try{
+    var r=await fetch('/api/assignments/'+encodeURIComponent(id), { method:'DELETE', headers:{'Authorization':'Bearer '+token} });
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+    await loadAssignments(); buildTracker();
+  }catch(e){ alert('Delete failed: '+(e.message||e)); }
 }
 function buildTracker(){
   var f=document.getElementById('filter').value;
   var ft=document.getElementById('filterTech').value;
   var q=(document.getElementById('filterText').value||'').toLowerCase();
-  var counts={assigned:0,in_progress:0,completed:0,rejected:0}, html='';
-  assignments.forEach(function(a){
-    if(counts[a.status]!=null) counts[a.status]++;
-    if(f!=='all'&&a.status!==f) return;
-    if(ft!=='all'&&!(a.technician&&a.technician.name===ft)) return;
+  // Build fence map once per render from config (configData, set by loadConfig).
+  // In opt-in demo mode, synthetic West-Texas fences are used instead.
+  window.__geoMap = __geoDemoMode ? __demoFences() : ((configData && configData.geofences) || {});
+  var counts={assigned:0,in_progress:0,completed:0,rejected:0};
+  assignments.forEach(function(a){ if(counts[a.status]!=null) counts[a.status]++; });
+  var list=assignments.slice().sort(function(x,y){ return (y.createdAt||0)-(x.createdAt||0); });
+  if(f!=='all') list=list.filter(function(a){ return a.status===f; });
+  if(ft!=='all') list=list.filter(function(a){ return (a.technician&&a.technician.name||'')===ft; });
+  if(q) list=list.filter(function(a){
     var hay=((a.tmv||'')+' '+(a.technician&&a.technician.name||'')+' '+(a.vanType||'')+' '+(a.location||'')).toLowerCase();
-    if(q&&hay.indexOf(q)<0) return;
-    html+=trackerCard(a);
+    return hay.indexOf(q)>=0;
   });
-  document.getElementById('cards').innerHTML = html || '<p style="color:#888">No assignments match.</p>';
+  // Geofence filter (only meaningful once positions feed in; today shows Fence set vs —)
+  var fg=document.getElementById('filterGeo').value;
+  if(fg && fg!=='all'){
+    list=list.filter(function(a){
+      var g=(window.__geoMap||{})[a.tmv];
+      var hasFence = !!(g && g.lat && g.lng);
+      if(fg==='fence') return hasFence;
+      if(fg==='nofence') return !hasFence;
+      return true;
+    });
+  }
+  // Render as the Assignments table (db-viewer style): Status · TMV · Technician · Location · Date · Completed · actions
+  var rows=list.map(function(a){
+    return '<tr>'
+      + '<td>'+tStatusBadge(a.status)+'</td>'
+      + '<td><strong>'+escapeHtml(a.tmv||'-')+'</strong></td>'
+      + '<td>'+escapeHtml(tTechName(a))+'</td>'
+      + '<td>'+escapeHtml(a.location||'-')+'</td>'
+      + '<td>'+(a.date||'-')+'</td>'
+      + '<td><span class="ts">'+tDate(a.completedAt)+'</span></td>'
+      + tGeofenceCell(a)
+      + '<td class="tk-actions">'
+        + '<button class="btn sm ghost" onclick="tShowAssignment(\''+escAttr(a.id)+'\')">View</button>'
+        + (isAdmin()?' <button class="btn sm danger" onclick="tDeleteAssignment(\''+escAttr(a.id)+'\',\''+escAttr(a.tmv||'')+'\')">Delete</button>':'')
+      + '</td>'
+      + '</tr>';
+  }).join('');
+  if(!rows) rows='<tr><td colspan="8" class="tk-empty">No assignments match.</td></tr>';
+  document.getElementById('cards').innerHTML =
+    '<div class="tbl-wrap"><table>'
+    + '<colgroup><col class="col-status"><col class="col-tmv"><col class="col-tech"><col class="col-district"><col class="col-date"><col class="col-completed"><col class="col-location"><col class="col-actions"></colgroup>'
+    + '<thead><tr><th>Status</th><th>TMV</th><th>Technician</th><th>District</th><th>Date</th><th>Completed</th><th>Location</th><th></th></tr></thead>'
+    + '<tbody>'+rows+'</tbody></table></div>';
   document.getElementById('summary').innerHTML =
     '<div class="pill"><b>'+counts.assigned+'</b>Assigned</div>'
     +'<div class="pill"><b style="color:#d97706">'+counts.in_progress+'</b>In Progress</div>'
     +'<div class="pill"><b style="color:#16a34a">'+counts.completed+'</b>Completed</div>'
-    +'<div class="pill"><b style="color:#dc2626">'+counts.rejected+'</b>Rejected</div>';
+    +'<div class="pill"><b style="color:#dc2626">'+counts.rejected+'</b>Rejected</div>'
+    +'<div class="pill hint">'+(isAdmin()?'View / Delete enabled':'Read-only — admin manages')+'</div>';
 }
-function toggleAssign(id){
-  var el=document.getElementById('det_'+id);
-  if(el) el.classList.toggle('hidden');
-}
-['filter','filterTech'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', buildTracker); });
+['filter','filterTech','filterGeo'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', buildTracker); });
 var _ft=document.getElementById('filterText'); if(_ft) _ft.addEventListener('input', buildTracker);
+
+// ── Drag & drop for the Assignments board (admin-only) ──
+// Tracker is the read-only assignments TABLE above. Drag/reassign lives on the
+// separate Assignments board (admin page), not Tracker.
+var _rs=document.getElementById('roleSel');
+if(_rs) _rs.addEventListener('change', function(){ ROLE=_rs.value; localStorage.setItem('tmv_role', ROLE); applyRole(); buildTracker(); });
 
 function showView(v){
   document.getElementById('viewTracker').classList.toggle('active', v==='tracker');
   document.getElementById('viewTmv').classList.toggle('active', v==='tmv');
+  document.getElementById('viewTech').classList.toggle('active', v==='tech');
   document.getElementById('tabTracker').classList.toggle('active', v==='tracker');
   document.getElementById('tabTmv').classList.toggle('active', v==='tmv');
+  document.getElementById('tabTech').classList.toggle('active', v==='tech');
 }
 
 // ── TMV grid ───────────────────────────────────────────
+// Full checklist (schema only) for a vanType string, filtered by config `appliesTo`.
+// This is the single source of truth emitted to the tech page, ticket and Task.db.
+function fullChecklistFor(vanType) {
+  var vts = String(vanType || '').split(/\s*\+\s*/).map(function(s){return s.trim();}).filter(Boolean);
+  return (configData.checklist || []).filter(function(s){
+    if (typeof s === 'string') return true;
+    if (s.include === false) return false;
+    return s.appliesTo.some(function(v){ return vts.indexOf(v) >= 0; });
+  }).map(function(s){
+    if (typeof s === 'string') return { title: s, items: [] };
+    return { title: s.title, items: (s.items || []).map(function(it){ return { label: it.label, type: it.type }; }) };
+  });
+}
+
 
 function openTmv(k){
   selectedTmv=k;
@@ -194,22 +474,38 @@ function buildSections(k){
   var wrap=document.getElementById('sections');
   wrap.innerHTML=all.map(function(s,si){
     var items=s.items.map(function(it,ii){
-      return '<div class="row"><div class="lbl">'+escapeHtml(it.label)+'</div><div class="ctl" data-s="'+si+'" data-i="'+ii+'">'+renderCtl(it)+'</div></div>';
+      return '<div class="row"><div class="lbl">'+escapeHtml(it.label)+'</div><div class="ctl" data-s="'+si+'" data-i="'+ii+'">'+renderCtl(it, si, ii)+'</div></div>';
     }).join('');
     return '<div class="section" data-s="'+si+'"><h3>'+escapeHtml(s.title)+'</h3>'
       +'<div class="items">'+items+'</div></div>';
   }).join('');
-  wrap.querySelectorAll('.ctl').forEach(function(ctl,index){ ctl.querySelectorAll('input[type=radio]').forEach(function(radio){radio.name='item-'+index+'-'+radio.dataset.k;}); });
-  wrap.oninput=updateGen;
+  paintRadios();
 }
 
-function renderCtl(it){
-  var idB='';
+// Build a single radio option as a big, tappable label. Each item gets a
+// UNIQUE group name (`yn_<s>_<i>` / `pf_<s>_<i>`) so selections on one item
+// can never bleed into another — this fixes the "selection jumps to the next
+// question" bug caused by the old shared name="r".
+function rdo(name, k, val, cls, label){
+  return '<label class="rdo '+cls+'"><input type="radio" name="'+name+'" data-k="'+k+'" value="'+escAttr(val)+'" onchange="markRdo(this)"><span>'+escapeHtml(label)+'</span></label>';
+}
+function markRdo(el){
+  var ctl = el.closest ? el.closest('.ctl') : null;
+  if(!ctl) return;
+  if(el.type==='radio'){
+    ctl.querySelectorAll('input[type=radio][name="'+el.name+'"]').forEach(function(r){
+      if(r.closest('label')) r.closest('label').classList.toggle('checked', !!r.checked);
+    });
+  }
+  updateGen();
+}
+function renderCtl(it, si, ii){
+  var yn='yn_'+si+'_'+ii, pf='pf_'+si+'_'+ii;
   switch(it.type){
-    case 'yn': return '<label><input type="radio" name="r" data-k="yn" value="Yes">Yes</label><label><input type="radio" name="r" data-k="yn" value="No">No</label>';
-    case 'ynpf': return '<label><input type="radio" data-k="yn" value="Yes">Yes</label><label><input type="radio" data-k="yn" value="No">No</label><label><input type="radio" data-k="pf" value="Pass">Pass</label><label><input type="radio" data-k="pf" value="Fail">Fail</label>';
-    case 'ynver': return '<label><input type="radio" data-k="yn" value="Yes">Yes</label><label><input type="radio" data-k="yn" value="No">No</label><label>Ver#<input type="text" data-k="ver" size="6"></label>';
-    case 'pf': return '<label><input type="radio" data-k="pf" value="Pass">Pass</label><label><input type="radio" data-k="pf" value="Fail">Fail</label>';
+    case 'yn': return '<div class="seg">'+rdo(yn,'yn','Yes','rdo-yes','Yes')+rdo(yn,'yn','No','rdo-no','No')+'</div>';
+    case 'ynpf': return '<div class="seg">'+rdo(yn,'yn','Yes','rdo-yes','Yes')+rdo(yn,'yn','No','rdo-no','No')+rdo(pf,'pf','Pass','rdo-pass','Pass')+rdo(pf,'pf','Fail','rdo-fail','Fail')+'</div>';
+    case 'ynver': return '<div class="seg">'+rdo(yn,'yn','Yes','rdo-yes','Yes')+rdo(yn,'yn','No','rdo-no','No')+'</div><input type="text" data-k="ver" class="ver-in" placeholder="Ver #" onchange="markRdo(this)">';
+    case 'pf': return '<div class="seg">'+rdo(pf,'pf','Pass','rdo-pass','Pass')+rdo(pf,'pf','Fail','rdo-fail','Fail')+'</div>';
     case 'num': return '<input type="number" data-k="val" placeholder="value">';
     case 'text': return '<input type="text" data-k="val" size="22" placeholder="entry">';
     case 'date': return '<input type="date" data-k="val">';
@@ -241,28 +537,53 @@ function readCtl(ctl, def){
   var yn=ctl.querySelector('[data-k="yn"]:checked');
   var pf=ctl.querySelector('[data-k="pf"]:checked');
   var ver=ctl.querySelector('[data-k="ver"]');
-  if(yn){ return pf ? (yn.value+' / '+pf.value) : yn.value; }
+  // ynver: Yes/No + a free-text Version # — MUST keep both. (Old code dropped the ver#.)
   if(def && def.type==='ynver'){
     if(!yn) return '';
     if(ver && ver.value) return yn.value+' v'+ver.value;
     return yn.value;
   }
+  if(yn){ return pf ? (yn.value+' / '+pf.value) : yn.value; }
   if(pf){ return pf.value; }
   var val=ctl.querySelector('[data-k="val"]');
   return val ? val.value : '';
 }
+// Apply the saved ".checked" highlight class on radios when sections are (re)built.
+function paintRadios(){
+  document.querySelectorAll('#sections .ctl').forEach(function(ctl){
+    ctl.querySelectorAll('input[type=radio]').forEach(function(r){
+      if(r.checked && r.closest('label')) r.closest('label').classList.add('checked');
+    });
+  });
+}
 
-function buildTechSelect(){
-  var sel=document.getElementById('dTech');
-  (configData.technicians||[]).forEach(function(t){
+function personnelForDistrict(list,district){
+  if(!district) return list||[];
+  return (list||[]).filter(function(p){
+    if(!p) return false;
+    var pd=String(p.district||'');
+    return pd==='ALL' || pd===String(district);
+  });
+}
+function rebuildDetailTechSelect(){
+  var sel=document.getElementById('dTech'); if(!sel) return;
+  var district=(document.getElementById('dLoc')||{}).value||'';
+  var prior=sel.value||'';
+  sel.innerHTML='<option value="">— choose technician —</option>';
+  personnelForDistrict(configData.technicians||[],district).forEach(function(t){
     var o=document.createElement('option'); o.value=t.name; o.textContent=t.name; sel.appendChild(o);
   });
+  if(Array.prototype.some.call(sel.options,function(o){return o.value===prior;})) sel.value=prior;
+}
+function buildTechSelect(){
+  rebuildDetailTechSelect();
+  var sel=document.getElementById('dTech');
   sel.addEventListener('change', updateGen);
 }
-['dLoc','dDate'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', updateGen); });
+['dLoc','dDate'].forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('change', function(){ if(id==='dLoc') rebuildDetailTechSelect(); updateGen(); }); });
 
 function updateGen(){ if(typeof updateDispatchButtons==='function') updateDispatchButtons(); }
-async function submitInspection(){ return assignAndGenerateReport(); }
+async function submitInspection(){return assignAndGenerateReport();}
 
 function copyTicket(){ if(navigator.clipboard&&window.__lastTicket){ navigator.clipboard.writeText(window.__lastTicket).then(function(){alert('Copied');},function(){alert('Copy failed');}); } }
 // Send an SMS via the server (which calls the SMS provider). Works from any browser.
@@ -326,7 +647,7 @@ function copyMailTo(){
 }
 
 // ── Assign to Technician (handoff to mobile) ─────────────
-async function assignToTech(){ return assignAndGenerateReport(); }
+async function assignToTech(){return assignAndGenerateReport();}
 
 async function loadDemo(){
   var btn=document.getElementById('demoBtn');
@@ -349,11 +670,10 @@ async function loadDemo(){
 function escHtml(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 function goDb(){
-  sessionStorage.setItem("tmv_db_user", "admin");
-  sessionStorage.setItem("tmv_db_pass", "admin123");
-  window.open("/db?autologin=1", "_blank");
+  if(!APP_TOKEN){ showAppLogin('Please sign in first.'); return; }
+  window.location.assign('/db?session=1');
 }
 
-// ── Auth removed: app opens directly to the TMV grid ─────
+// Main desktop app requires a Superuser or Manager session.
 
 window.addEventListener('DOMContentLoaded', boot);

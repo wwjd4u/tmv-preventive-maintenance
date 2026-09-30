@@ -1,3 +1,25 @@
+
+## 2026-09-08 — Superuser User Roles
+- Added a Superuser-only **User Roles** panel beside Superuser Security.
+- Lists Recovery Superuser, additional Superusers, Managers, and Technicians with a role dropdown.
+- Role changes are enforced server-side, invalidate the changed user's sessions, and write an audit entry.
+- Recovery Superuser role is locked as the emergency owner account.
+- Additional Superuser login is supported for promoted Manager accounts.
+- Public `/api/config` responses now strip credential hashes and privileged role metadata.
+
+
+## 2026-09-08 — Authentication idle timeout and private Superuser credentials
+- Superuser username/password now come from the private `.env` (`ADMIN_USER`, `ADMIN_PASS`) instead of source code.
+- Added a rolling 15-minute inactivity timeout for server auth sessions.
+- Main app and Task.db now sign out after 15 minutes with no user activity and refresh the server session while the user is active.
+- Bumped the main app script version so mobile/PWA clients load the updated auth behavior.
+
+## 2026-09-08 — SMS Preferences exposed in Setup
+- Added SMS Preferences controls to Technician and Manager Setup cards.
+- Selected name/phone are prefilled on the existing consent page.
+- Added Manager mobile phone storage for SMS enrollment.
+- SMS consent roster validation now accepts Technicians or Managers.
+
 # TMV Preventive Maintenance App — Change Log
 
 This file explains application changes in plain language. It is intended to be updated with every future application change.
@@ -16,6 +38,39 @@ Historical entries below are based on the Git repository history. Older entries 
 ---
 
 ## 2026-09-08
+
+### Login boot hotfix
+- Fixed a post-login boot error caused by a leftover `isAdmin()` reference from the retired fake Admin/Tech role selector.
+- `isAdmin()` now uses the real authenticated role and treats both Superuser and Manager as operational admin roles for Tracker controls.
+- Removed the dead legacy role-dropdown listener.
+- Bumped the main app JavaScript cache version so browsers load the corrected file immediately.
+- Deployment status: **GitHub implementation pending MS-02 deployment verification.**
+
+
+### Completed application login and logout flow
+- Removed the legacy browser code that automatically stored and reused the built-in admin credentials.
+- Removed the fake Admin/Tech role selector from the desktop application.
+- Added a real Superuser / Manager login screen to the main desktop application.
+- Added a signed-in role/name indicator and **Log Out** button.
+- Added server-side session validation and logout endpoints.
+- Task.db now reuses the active authenticated session token instead of storing a username/password in session storage.
+- Task.db also has its own **Log Out** button and blank credential fields when no session exists.
+- Technician work-order links remain separate from Superuser/Manager login.
+- Deployment status: **GitHub implementation pending MS-02 deployment verification.**
+
+
+### Superuser and Manager role separation
+- Changed the built-in admin account into the **Superuser** role with full read/write/delete control.
+- Added true Manager login sessions with separate credentials stored in the existing Managers Setup section.
+- Managers can operate Assignments/Tracker/technician workflows.
+- In Setup, Managers can add/edit/delete Technicians; add/update Managers; add/edit Equipment; add/edit Districts; and add Inspection Settings.
+- Managers cannot delete Setup records other than Technicians.
+- Managers cannot access or modify Maintenance Categories.
+- Maintenance Categories and destructive Setup actions remain Superuser-only.
+- Backend API checks enforce these limits in addition to hiding restricted Setup controls in the UI.
+- Technician work-link behavior remains limited to the technician's assigned work and was not changed by this update.
+- Deployment status: **GitHub implementation pending MS-02 deployment verification.**
+
 
 ### Maintenance Categories — drag-and-drop task ordering
 - Replaced the task Move Up / Move Down arrow buttons with drag-and-drop ordering.
@@ -223,3 +278,19 @@ Historical entries below are based on the Git repository history. Older entries 
   - Superuser — manager abilities plus application Setup/configuration and user-role administration.
 - Existing authentication currently needs to be refactored before this is considered implemented.
 - **Status: Not implemented yet.**
+
+## 2026-09-08 — Finish installable mobile PWA
+- Area: Mobile / PWA
+- Added an Install App control with native install prompting where supported.
+- Added iPhone/iPad Safari instructions for Share → Add to Home Screen.
+- Added safe-area handling, larger phone tap targets, and a more compact mobile header.
+- Added remembered last tab behavior for installed-app launches.
+- Expanded the offline app shell while keeping all `/api/*` data network-only.
+- Added manifest shortcuts for Inspections, Tracker, and Tech.
+- Deployment/test status: GitHub patch prepared; live deployment pending.
+
+## 2026-09-08 — Superuser credential rotation
+- Added a Superuser-only Security section in Setup for changing the Superuser username and/or password.
+- Requires the current Superuser password and enforces the application password policy.
+- Updates the private `.env` file and invalidates all active admin sessions after a successful change.
+- Managers cannot view or call the Superuser credential-change function.

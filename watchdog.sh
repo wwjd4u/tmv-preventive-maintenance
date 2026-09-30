@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# Permanent application bind settings
+export PORT="${PORT:-9240}"
+export HOST="${HOST:-0.0.0.0}"
+
 # TMV app auto-restart watchdog
 # Pings http://127.0.0.1:9240/tech every 30s; restarts api-server.js if it stops responding.
 set -u

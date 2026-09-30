@@ -1,3 +1,4 @@
+const smsConsent = require('./sms-consent-server');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -32,9 +33,12 @@ process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err && err.message);
 });
 
-// ── Admin credentials (username / password) ──────────────
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = 'admin123';
+// ── Superuser credentials — private environment only ─────
+let ADMIN_USER = String(process.env.ADMIN_USER || '').trim();
+let ADMIN_PASS = String(process.env.ADMIN_PASS || '');
+if (!ADMIN_USER || !ADMIN_PASS) {
+  console.warn('[auth] ADMIN_USER / ADMIN_PASS are not configured; Superuser login is disabled.');
+}
 
 // ── Default config ─────────────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -58,6 +62,102 @@ function mergeTechPhones(cfg) {
   return cfg;
 }
 
+// ── DevIoT position feed (Microsoft Entra ID / API-key protected) ────────
+// The vendor dashboard (deviotinfo.azurewebsites.net/tmv-dashboard) is gated
+// by Entra ID. We never expose those secrets to the browser — this server
+// proxies the position feed and exposes it at GET /api/positions as
+// { [tmvId]: { lat, lng } }, so the Tracker's geofence column can flip to
+// On-site / Off-site. Configure via env vars (see .env.example.deviot). If no
+// credentials are present the feed is simply "not live" and the Tracker keeps
+// showing "Fence set". Token + payload are cached so we don't hammer the API.
+const DEVIOT = {
+  authority: process.env.DEVIOT_AUTHORITY || 'https://login.windows.net/bda43523-4404-4833-b00d-90e88aa1f2b3',
+  clientId: process.env.DEVIOT_CLIENT_ID || '',
+  clientSecret: process.env.DEVIOT_CLIENT_SECRET || '',
+  resource: process.env.DEVIOT_RESOURCE || 'e87edb1a-d08f-417f-87ff-dce775153729',
+  base: process.env.DEVIOT_BASE || 'https://deviotinfo.azurewebsites.net',
+  path: process.env.DEVIOT_POSITIONS_PATH || '/api/positions',
+  apiKey: process.env.DEVIOT_API_KEY || '',
+  apiKeyHeader: process.env.DEVIOT_API_KEY_HEADER || 'x-api-key',
+  noAuth: (process.env.DEVIOT_NO_AUTH === 'true'),   // for known-open / test endpoints (no token)
+  cacheMs: (process.env.DEVIOT_CACHE_MS && +process.env.DEVIOT_CACHE_MS) || 60000
+};
+let _deviotCache = { at: 0, data: null, logged: false };
+
+async function deviotGetToken() {
+  if (!DEVIOT.clientId || !DEVIOT.clientSecret) return null;
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: DEVIOT.clientId,
+    client_secret: DEVIOT.clientSecret,
+    scope: `${DEVIOT.resource}/.default`
+  });
+  try {
+    const r = await fetch(`${DEVIOT.authority}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    if (!r.ok) { console.error('[deviot] token request failed', r.status); return null; }
+    const j = await r.json().catch(() => null);
+    return j && j.access_token ? j.access_token : null;
+  } catch (e) { console.error('[deviot] token error', e.message); return null; }
+}
+
+function num(v) { return (v == null ? null : +v); }
+// Best-effort normalization of an unknown vendor payload into { tmvId:{lat,lng} }.
+function deviotNormalize(raw) {
+  const out = {};
+  let arr = null;
+  if (Array.isArray(raw)) arr = raw;
+  else if (raw && typeof raw === 'object') {
+    const maybe = raw.items || raw.data || raw.results || raw.positions || raw.units || raw.value;
+    arr = Array.isArray(maybe) ? maybe : null;
+    if (!arr) { // assume a keyed map of tmvId -> {lat,lng}
+      Object.keys(raw).forEach(k => {
+        const v = raw[k];
+        const lat = num(v && v.lat != null ? v.lat : v.latitude);
+        const lng = num(v && v.lng != null ? v.lng : v.longitude);
+        if (lat != null && lng != null) out[k] = { lat, lng };
+      });
+      return out;
+    }
+  }
+  if (arr) arr.forEach(it => {
+    if (!it) return;
+    const id = it.tmv || it.id || it.unit || it.tmvId || it.name;
+    const pos = it.position || {};
+    const lat = num(it.lat != null ? it.lat : it.latitude != null ? it.latitude : pos.lat != null ? pos.lat : pos.latitude);
+    const lng = num(it.lng != null ? it.lng : it.lon != null ? it.lon : it.longitude != null ? it.longitude : pos.lng != null ? pos.lng : pos.lon != null ? pos.lon : pos.longitude);
+    if (id != null && lat != null && lng != null) out[String(id)] = { lat, lng };
+  });
+  return out;
+}
+
+async function fetchDevIoTPositions() {
+  const configured = DEVIOT.clientId || DEVIOT.clientSecret || DEVIOT.apiKey || DEVIOT.noAuth;
+  if (!configured) return null; // no feed configured
+  const now = Date.now();
+  if (_deviotCache.data && now - _deviotCache.at < DEVIOT.cacheMs) return _deviotCache.data;
+  try {
+    const headers = { 'Accept': 'application/json' };
+    let token = null;
+    if (DEVIOT.apiKey) headers[DEVIOT.apiKeyHeader] = DEVIOT.apiKey;
+    else if (!DEVIOT.noAuth) { token = await deviotGetToken(); if (token) headers['Authorization'] = 'Bearer ' + token; }
+    if (!DEVIOT.apiKey && !DEVIOT.noAuth && !token) return null;
+    const r = await fetch(DEVIOT.base + DEVIOT.path, { headers });
+    if (!r.ok) { console.error('[deviot] positions HTTP', r.status); return _deviotCache.data || {}; }
+    const raw = await r.json().catch(() => null);
+    if (raw && !_deviotCache.logged) { console.log('[deviot] raw positions sample:', JSON.stringify(raw).slice(0, 500)); _deviotCache.logged = true; }
+    const norm = deviotNormalize(raw);
+    _deviotCache = { at: now, data: norm, logged: true };
+    return norm;
+  } catch (e) {
+    console.error('[deviot] fetch failed', e.message);
+    return _deviotCache.data || {};
+  }
+}
+
 function loadConfig() {
   return db.loadConfig();
 }
@@ -66,12 +166,104 @@ function saveConfig(c) {
   db.saveConfig(c);
 }
 
+function auditEvent(session, action, target, oldValue, newValue, details) {
+  try {
+    db.recordAudit({
+      actor: session ? (session.username || session.name || 'unknown') : 'system',
+      actorRole: session ? (session.role || '') : 'system',
+      action, target, oldValue, newValue, details
+    });
+  } catch (e) { console.error('[audit]', e.message); }
+}
+function auditConfigSummary(cfg) {
+  const c = cfg || {};
+  const names = arr => (Array.isArray(arr) ? arr : []).map(x => typeof x === 'string' ? x : (x && (x.name || x.username)) || '').filter(Boolean);
+  const accounts = arr => (Array.isArray(arr) ? arr : []).map(x => ({ name: (x && x.name) || '', username: (x && x.username) || '' }));
+  return {
+    locations: Array.isArray(c.locations) ? c.locations : [],
+    districts: Array.isArray(c.districts) ? c.districts : [],
+    technicians: names(c.technicians),
+    managers: accounts(c.managers),
+    superusers: accounts(c.superusers),
+    intervals: Array.isArray(c.intervals) ? c.intervals : [],
+    unitOptions: Array.isArray(c.unitOptions) ? c.unitOptions : [],
+    tmvUnits: Object.keys(c.tmvVanMap || {}).sort(),
+    geofences: Object.keys(c.geofences || {}).sort(),
+    checklist: (Array.isArray(c.checklist) ? c.checklist : []).map(x => typeof x === 'string' ? x : (x && x.title) || '').filter(Boolean)
+  };
+}
+function currentGitDeployment() {
+  try {
+    const gitDir = path.join(__dirname, '.git');
+    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
+    if (head.startsWith('ref: ')) {
+      const ref = head.slice(5).trim();
+      let commit = '';
+      try { commit = fs.readFileSync(path.join(gitDir, ref), 'utf8').trim(); } catch (_) {}
+      if (!commit) {
+        try {
+          const packed = fs.readFileSync(path.join(gitDir, 'packed-refs'), 'utf8').split(/\r?\n/);
+          const hit = packed.find(line => line && !line.startsWith('#') && line.endsWith(' ' + ref));
+          if (hit) commit = hit.split(' ')[0];
+        } catch (_) {}
+      }
+      return { commit, branch: ref.replace(/^refs\/heads\//, '') };
+    }
+    return { commit: head, branch: 'detached' };
+  } catch (_) { return { commit: '', branch: '' }; }
+}
+const _deployment = currentGitDeployment();
+if (_deployment.commit) { try { db.recordDeployment(_deployment.commit, _deployment.branch); } catch (e) { console.error('[audit deployment]', e.message); } }
+
 // ── Assignments (admin → technician handoff) ───────────────
 function loadAssignments() {
   return db.loadAssignments();
 }
 function saveAssignments(list) {
   db.saveAssignments(list);
+}
+
+// ── Checklist is the single source of truth ───────────────
+// Given a vanType string (possibly "A + B + C"), return the FULL expected
+// checklist sections (schema only: {title, items:[{label,type}]}) filtered by
+// config.json `appliesTo`. This is what every assignment MUST carry so the
+// tech page, ticket, tracker and Task.db all stay in sync.
+function expectedSections(vanType, config) {
+  const vts = String(vanType || '')
+    .split(/\s*\+\s*/).map(s => s.trim()).filter(Boolean);
+  return (config.checklist || []).filter(s => {
+    if (typeof s === 'string') return true;
+    if (s.include === false) return false;
+    return s.appliesTo.some(v => vts.indexOf(v) >= 0);
+  }).map(s => {
+    if (typeof s === 'string') return { title: s, items: [] };
+    // Preserve the FULL item schema (label, type, opts, placeholder, etc.) so
+    // the tech page's choice/select controls have the options they need.
+    return {
+      title: s.title,
+      items: (s.items || []).map(it => Object.assign({}, it))
+    };
+  });
+}
+
+// Merge an incoming (possibly partial) sections array onto the FULL expected
+// checklist so the stored assignment always contains the complete checklist.
+// Any values the tech/admin already entered are preserved by title+label.
+function reconcileSections(incoming, full) {
+  const inc = Array.isArray(incoming) ? incoming : [];
+  return full.map(fs => {
+    const match = inc.find(x => x && x.title === fs.title);
+    const items = (fs.items || []).map(fit => {
+      const iit = match && Array.isArray(match.items)
+        ? match.items.find(x => x && x.label === fit.label)
+        : null;
+      const val = iit && iit.value != null ? iit.value : '';
+      // Keep the full item schema (label, type, opts, placeholder...) and only
+      // overlay the previously-entered value, so choice/select controls work.
+      return Object.assign({}, fit, { value: val });
+    });
+    return { title: fs.title, items: items };
+  });
 }
 
 // ── MIME types ────────────────────────────────────────────
@@ -159,13 +351,33 @@ function serveFile(res, p, contentType) {
   });
 }
 
-// ── Admin auth ────────────────────────────────────────────
-// Token is base64("<user>:<pass>"); sent in `Authorization: Bearer <token>`.
-function adminToken() {
-  return Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');
+// ── Role-aware auth sessions ───────────────────────────────
+// Built-in admin is the Superuser. Saved manager accounts receive Manager
+// sessions. Tokens are random server-side session IDs, not reusable admin creds.
+const authSessions = new Map();
+const AUTH_IDLE_MINUTES = Math.max(15, Number(process.env.AUTH_IDLE_MINUTES || 15));
+const AUTH_IDLE_MS = AUTH_IDLE_MINUTES * 60 * 1000;
+function newAuthSession(role, username, name, authSource) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const now = Date.now();
+  authSessions.set(token, { role, username, name: name || username, authSource: authSource || 'account', createdAt: now, lastActivity: now });
+  return token;
+}
+function getAuthSession(token) {
+  if (!token) return null;
+  const session = authSessions.get(token) || null;
+  if (!session) return null;
+  const last = session.lastActivity || session.createdAt || 0;
+  if (Date.now() - last >= AUTH_IDLE_MS) {
+    authSessions.delete(token);
+    return null;
+  }
+  session.lastActivity = Date.now();
+  return session;
 }
 function isAdmin(token) {
-  return token === adminToken();
+  const s = getAuthSession(token);
+  return !!s && (s.role === 'superuser' || s.role === 'manager');
 }
 
 // ── Password hashing (scrypt + per-user salt, constant-time compare) ──
@@ -183,6 +395,34 @@ function verifyPassword(pw, stored) {
   const a = Buffer.from(d), b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+function sameSecret(a, b) {
+  const aa = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+}
+function validAdminPassword(pw) {
+  return typeof pw === 'string' && pw.length >= 10 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+}
+function updatePrivateEnv(values) {
+  const ef = path.join(__dirname, '.env');
+  let lines = [];
+  try { if (fs.existsSync(ef)) lines = fs.readFileSync(ef, 'utf8').split(/\r?\n/); } catch (_) {}
+  Object.keys(values).forEach((key) => {
+    const value = String(values[key]);
+    let found = false;
+    lines = lines.map((line) => {
+      if (line.startsWith(key + '=')) { found = true; return key + '=' + value; }
+      return line;
+    });
+    if (!found) lines.push(key + '=' + value);
+  });
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  const tmp = ef + '.tmp-' + process.pid;
+  fs.writeFileSync(tmp, lines.join('\n') + '\n', { mode: 0o600 });
+  fs.renameSync(tmp, ef);
+  try { fs.chmodSync(ef, 0o600); } catch (_) {}
 }
 
 http.createServer((req, res) => {
@@ -227,15 +467,39 @@ http.createServer((req, res) => {
     return serveFile(res, path.join(__dirname, 'techindex.html'));
   }
 
+  // ── favicon (avoid console 404 noise) ──
+  if (url.pathname === '/favicon.ico') {
+    const fp = path.join(__dirname, 'favicon.ico');
+    if (fs.existsSync(fp)) return serveFile(res, fp, 'image/x-icon');
+    res.writeHead(204); res.end();
+    return;
+  }
+
+  // ── Serve PWA manifest (installable app metadata) ──
+  if (url.pathname === '/manifest.webmanifest' || url.pathname === '/manifest.json') {
+    return serveFile(res, path.join(__dirname, 'manifest.webmanifest'), 'application/manifest+json');
+  }
+  // ── Serve PWA service worker (must be served from root scope) ──
+  if (url.pathname === '/sw.js') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Service-Worker-Allowed', '/');
+    return serveFile(res, path.join(__dirname, 'sw.js'), 'application/javascript');
+  }
+  // ── Serve PWA icons ──
+  if (['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'].includes(url.pathname)) {
+    const fn = url.pathname.replace(/^\//, '');
+    return serveFile(res, path.join(__dirname, fn), 'image/png');
+  }
+
   // ── Serve static assets (.js / .css / images) with correct content-type ──
   const ext = url.pathname.split('.').pop().toLowerCase();
-  const STATIC_TYPES = { js:'application/javascript', html:'text/html', css:'text/css', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', ico:'image/x-icon' };
-  if (STATIC_TYPES[ext]) {
+  const STATIC_TYPES = { js:'application/javascript', html:'text/html', css:'text/css', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', ico:'image/x-icon', webmanifest:'application/manifest+json' };
+  if (STATIC_TYPES[ext] && !url.pathname.startsWith('/uploads/')) {
     const safe = url.pathname.replace(/^\/+/, '').split('/').pop();
     const full = path.join(__dirname, safe);
     if (full.startsWith(__dirname)) {
       // app.js and index.html never cached; other static assets can cache.
-      if (safe === 'app.js' || safe === 'index.html') {
+      if (['app.js','index.html','assign.html','privacy.html','terms.html','sms-consent.html','sms-consent.js'].includes(safe)) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         res.setHeader('Pragma', 'no-cache');
       }
@@ -255,11 +519,43 @@ http.createServer((req, res) => {
     return serveFile(res, filepath, MIME[ext] || 'application/octet-stream');
   }
 
+  if (smsConsent.handle(req, res, url, db, () => mergeTechPhones(loadConfig()))) return;
+
   // ── GET /api/config — public config (no auth needed) ────
-  // Real technician phones live in the git-ignored TECH_PHONES env var
-  // (a JSON map of name -> phone) so they never hit the public repo.
+  // Real technician phones live in the git-ignored TECH_PHONES env var.
+  // Password hashes / privileged account metadata are stripped before response.
   if (url.pathname === '/api/config' && req.method === 'GET') {
-    sendJson(res, 200, mergeTechPhones(loadConfig()));
+    const raw = mergeTechPhones(loadConfig()) || {};
+    const pub = { ...raw };
+    pub.technicians = (raw.technicians || []).map(function(t){
+      if (typeof t === 'string') return t;
+      const x = { ...t }; delete x.password; delete x.role; return x;
+    });
+    pub.managers = (raw.managers || []).map(function(m){
+      const x = { ...m }; delete x.password; delete x.role; return x;
+    });
+    delete pub.superusers;
+    delete pub.roleAudit;
+    sendJson(res, 200, pub);
+    return;
+  }
+
+  // ── GET /api/positions — DevIoT live position feed (proxied) ──
+  // Returns { positions:{ [tmvId]:{lat,lng} }, live:bool }. When the feed is
+  // not configured (no credentials) live:false and positions:{} — the Tracker
+  // geofence column then shows "Fence set". Admin-only to avoid leaking the
+  // vendor feed shape to the public technician app.
+  if (url.pathname === '/api/positions' && req.method === 'GET') {
+    const auth = req.headers['authorization'] || '';
+    const ok = auth === 'Basic ' + Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');
+    // Unauthenticated (or not-yet-configured) → return empty feed (200) so the
+    // tracker renders without stalling. No vendor data is leaked: positions is {}.
+    if (!ok) { sendJson(res, 200, { live: false, positions: {} }); return; }
+    fetchDevIoTPositions().then(function (positions) {
+      sendJson(res, 200, { live: !!positions, positions: positions || {} });
+    }).catch(function (e) {
+      sendJson(res, 200, { live: false, positions: {}, error: e.message });
+    });
     return;
   }
 
@@ -329,11 +625,13 @@ http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const d = JSON.parse(body);
-        const to = (d.to || '').replace(/\D/g, '');
+        const to = smsConsent.normalizePhone(d.to);
         const message = (d.message || '').toString().slice(0, 1600);
         if (!to) return sendJson(res, 400, { ok: false, error: 'Recipient phone required' });
         if (!message.trim()) return sendJson(res, 400, { ok: false, error: 'Message required' });
 
+        const blocked = smsConsent.sendBlockReason(to, db, process.env);
+        if (blocked) return sendJson(res, 403, { ok: false, error: blocked });
         const provider = (process.env.SMS_PROVIDER || 'textbelt').toLowerCase();
         let p;
         if (provider === 'twilio') p = sendViaTwilio(to, message);
@@ -377,9 +675,15 @@ http.createServer((req, res) => {
     const authSid = process.env.TWILIO_API_KEY_SID || accountSid;
     const token = process.env.TWILIO_API_KEY_SECRET || process.env.TWILIO_TOKEN;
     const from = process.env.TWILIO_FROM;
-    if (!accountSid || !token || !from) return Promise.resolve({ ok: false, error: 'Twilio env not configured' });
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+    if (!accountSid || !token || (!from && !messagingServiceSid)) return Promise.resolve({ ok: false, error: 'Twilio env not configured' });
     const auth = Buffer.from(authSid + ':' + token).toString('base64');
-    const postData = require('querystring').stringify({ To: '+' + to, From: from, Body: message });
+    // Route through the registered 10DLC Messaging Service when configured, so the
+    // campaign/brand is applied (avoids carrier filtering on direct from-number sends).
+    const body = { To: '+' + to, Body: message };
+    if (messagingServiceSid) body.MessagingServiceSid = messagingServiceSid;
+    else body.From = from;
+    const postData = require('querystring').stringify(body);
     return new Promise((resolve) => {
       const req = require('https').request({
         method: 'POST',
@@ -436,14 +740,30 @@ http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const d = JSON.parse(body);
-        if (d.username === ADMIN_USER && d.password === ADMIN_PASS) {
-          return sendJson(res, 200, { ok: true, token: adminToken() });
+        if (ADMIN_USER && ADMIN_PASS && d.username === ADMIN_USER && d.password === ADMIN_PASS) {
+          const token = newAuthSession('superuser', ADMIN_USER, 'Superuser', 'recovery');
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: 'Superuser', authSource: 'recovery', idleMinutes: AUTH_IDLE_MINUTES });
         }
-        // Manager login: a saved manager with a matching password gets full admin token.
-        const cfgMgr = (loadConfig() || {}).managers || [];
+        const cfgAuth = loadConfig() || {};
+        const extraSu = (cfgAuth.superusers || []).find(s => (s.username || s.name) === d.username);
+        if (extraSu && verifyPassword(d.password || '', extraSu.password)) {
+          const token = newAuthSession('superuser', extraSu.username || extraSu.name, extraSu.name || extraSu.username, 'account');
+          return sendJson(res, 200, { ok: true, token, role: 'superuser', name: extraSu.name || extraSu.username, authSource: 'account', idleMinutes: AUTH_IDLE_MINUTES });
+        }
+        // Saved manager login receives a Manager session with restricted Setup rights.
+        const cfgMgr = cfgAuth.managers || [];
         const mgr = cfgMgr.find(m => (m.username || m.name) === d.username);
         if (mgr && verifyPassword(d.password || '', mgr.password)) {
-          return sendJson(res, 200, { ok: true, token: adminToken(), manager: mgr.name || mgr.username });
+          const token = newAuthSession('manager', mgr.username || mgr.name, mgr.name || mgr.username);
+          return sendJson(res, 200, { ok: true, token, role: 'manager', name: mgr.name || mgr.username, idleMinutes: AUTH_IDLE_MINUTES });
+        }
+        // Technician accounts use the same hashed-password storage as Managers.
+        const cfgTech = cfgAuth.technicians || [];
+        const tech = cfgTech.map(t => typeof t === 'string' ? { name: t } : t)
+          .find(t => t && t.username && t.username === d.username);
+        if (tech && verifyPassword(d.password || '', tech.password)) {
+          const token = newAuthSession('technician', tech.username, tech.name || tech.username);
+          return sendJson(res, 200, { ok: true, token, role: 'technician', name: tech.name || tech.username, idleMinutes: AUTH_IDLE_MINUTES });
         }
         return sendJson(res, 401, { error: 'Invalid credentials' });
       } catch (e) {
@@ -453,74 +773,487 @@ http.createServer((req, res) => {
     return;
   }
 
+  // ── Superuser credential rotation ───────────────────────
+  if (url.pathname === '/api/superuser/credentials' && req.method === 'POST') {
+    const auth = req.headers['authorization'] || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    const session = getAuthSession(tok);
+    if (!session || session.role !== 'superuser' || session.authSource !== 'recovery') return sendJson(res, 403, { error: 'Recovery Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body || '{}');
+        if (!sameSecret(d.currentPassword, ADMIN_PASS)) return sendJson(res, 401, { error: 'Current password is incorrect' });
+        const nextUser = String(d.newUsername || '').trim();
+        const nextPass = String(d.newPassword || '');
+        if (!nextUser && !nextPass) return sendJson(res, 400, { error: 'Enter a new username and/or password' });
+        if (nextUser && !/^[A-Za-z0-9._@-]{3,64}$/.test(nextUser)) {
+          return sendJson(res, 400, { error: 'Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen' });
+        }
+        if (nextPass && !validAdminPassword(nextPass)) {
+          return sendJson(res, 400, { error: 'Password must be at least 10 characters with an uppercase letter, number, and special character' });
+        }
+        const oldUser = ADMIN_USER;
+        const finalUser = nextUser || ADMIN_USER;
+        const finalPass = nextPass || ADMIN_PASS;
+        updatePrivateEnv({ ADMIN_USER: finalUser, ADMIN_PASS: finalPass });
+        ADMIN_USER = finalUser;
+        ADMIN_PASS = finalPass;
+        process.env.ADMIN_USER = finalUser;
+        process.env.ADMIN_PASS = finalPass;
+        auditEvent(session, 'superuser_credentials_updated', 'Recovery Superuser',
+          { username: oldUser }, { username: finalUser },
+          { usernameChanged: oldUser !== finalUser, passwordChanged: !!nextPass });
+        authSessions.clear();
+        return sendJson(res, 200, { ok: true, message: 'Superuser credentials updated. Sign in again.' });
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Credential update failed: ' + e.message });
+      }
+    });
+    return;
+  }
+
+  // ── Auth session inspection / logout ─────────────────────
+  if (url.pathname === '/api/session' && req.method === 'GET') {
+    const auth = req.headers['authorization'] || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    const session = getAuthSession(tok);
+    if (!session) return sendJson(res, 401, { error: 'Login required' });
+    return sendJson(res, 200, { ok: true, role: session.role, name: session.name, username: session.username, authSource: session.authSource || 'account', idleMinutes: AUTH_IDLE_MINUTES });
+  }
+
+  if (url.pathname === '/api/logout' && req.method === 'POST') {
+    const auth = req.headers['authorization'] || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (tok) authSessions.delete(tok);
+    return sendJson(res, 200, { ok: true });
+  }
+
   // ── Admin-only endpoints below ───────────────────────────
   // Check for Authorization header
   const authHeader = req.headers['authorization'] || '';
   const reqToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  const isAdminReq = isAdmin(reqToken);
+  const authSession = getAuthSession(reqToken);
+  const isSuperuserReq = !!authSession && authSession.role === 'superuser';
+  const isManagerReq = !!authSession && authSession.role === 'manager';
+  const isAdminReq = isSuperuserReq || isManagerReq; // operational admin access
+
+  // ── Superuser-only permanent audit log ─────────────────
+  if (url.pathname === '/api/audit-log' && req.method === 'GET') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit') || 200)));
+    return sendJson(res, 200, { ok: true, entries: db.getAuditLog(limit) });
+  }
+
+  // ── Superuser-only User Roles management ────────────────
+  if (url.pathname === '/api/user-roles' && req.method === 'GET') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    const cfg = loadConfig() || {};
+    const users = [];
+    users.push({ key: '__recovery__', name: 'Recovery Superuser', username: ADMIN_USER, role: 'superuser', recovery: true, loginReady: !!(ADMIN_USER && ADMIN_PASS) });
+    (cfg.superusers || []).forEach(function(u){ users.push({ key: u.username || u.name, name: u.name || u.username || '', username: u.username || '', role: 'superuser', recovery: false, loginReady: !!(u.username && u.password) }); });
+    (cfg.managers || []).forEach(function(u){ users.push({ key: u.username || u.name, name: u.name || u.username || '', username: u.username || '', role: 'manager', recovery: false, loginReady: !!(u.username && u.password) }); });
+    (cfg.technicians || []).forEach(function(raw){
+      const u = typeof raw === 'string' ? { name: raw } : raw;
+      users.push({ key: u.username || u.name, name: u.name || u.username || '', username: u.username || '', role: 'technician', recovery: false, loginReady: !!(u.username && u.password) });
+    });
+    return sendJson(res, 200, { ok: true, users, audit: (cfg.roleAudit || []).slice(-25).reverse() });
+  }
+
+  if (url.pathname === '/api/user-roles' && req.method === 'PUT') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body || '{}');
+        const sourceRole = String(d.currentRole || '').toLowerCase();
+        const nextRole = String(d.newRole || '').toLowerCase();
+        const key = String(d.key || '').trim();
+        if (key === '__recovery__') return sendJson(res, 400, { error: 'The Recovery Superuser role is locked.' });
+        if (!['superuser','manager','technician'].includes(sourceRole) || !['superuser','manager','technician'].includes(nextRole)) {
+          return sendJson(res, 400, { error: 'Invalid role selection' });
+        }
+        if (!key) return sendJson(res, 400, { error: 'User is required' });
+        if (sourceRole === nextRole) return sendJson(res, 200, { ok: true, message: 'Role unchanged' });
+
+        const cfg = loadConfig() || {};
+        cfg.superusers = Array.isArray(cfg.superusers) ? cfg.superusers : [];
+        cfg.managers = Array.isArray(cfg.managers) ? cfg.managers : [];
+        cfg.technicians = Array.isArray(cfg.technicians) ? cfg.technicians : [];
+        const lists = { superuser: cfg.superusers, manager: cfg.managers, technician: cfg.technicians };
+        const src = lists[sourceRole];
+        const idx = src.findIndex(function(raw){
+          const u = typeof raw === 'string' ? { name: raw } : raw;
+          return (u.username || u.name) === key;
+        });
+        if (idx < 0) return sendJson(res, 404, { error: 'User not found in current role' });
+        let rec = src[idx];
+        if (typeof rec === 'string') rec = { name: rec, email: '', phone: '', username: '', password: '' };
+        rec = { ...rec };
+        rec.name = rec.name || rec.username || key;
+
+        if (!rec.username && nextRole !== 'technician') {
+          rec.username = String(rec.name || '').toLowerCase().replace(/[^a-z0-9._@-]+/g, '.').replace(/^\.+|\.+$/g, '');
+        }
+        const proposedKey = rec.username || rec.name;
+        const allPriv = cfg.superusers.concat(cfg.managers).filter(function(x){ return x !== src[idx]; });
+        if (nextRole !== 'technician') {
+          if (!proposedKey) return sendJson(res, 400, { error: 'A username is required for Manager or Superuser access' });
+          if (proposedKey === ADMIN_USER) return sendJson(res, 400, { error: 'That username is reserved by the Recovery Superuser' });
+          const dup = allPriv.some(function(u){ return (u.username || u.name) === proposedKey; });
+          if (dup) return sendJson(res, 400, { error: 'That username is already in use' });
+        }
+        if (nextRole === 'superuser' && (!rec.username || !rec.password || !String(rec.password).startsWith('scrypt$'))) {
+          return sendJson(res, 400, { error: 'Set this person up as a Manager with a login password first, then promote to Superuser.' });
+        }
+
+        // Remove this identity from every role list before inserting the new role.
+        // This makes the role change atomic and prevents stale duplicate records from
+        // making a user appear to revert on the next reload.
+        ['superuser','manager','technician'].forEach(function(roleName){
+          const list = lists[roleName];
+          for (let i = list.length - 1; i >= 0; i--) {
+            const raw = list[i];
+            const u = typeof raw === 'string' ? { name: raw } : raw;
+            const same = (u.username && rec.username && u.username === rec.username) ||
+                         (u.name && rec.name && u.name === rec.name) ||
+                         ((u.username || u.name) === key);
+            if (same) list.splice(i, 1);
+          }
+        });
+        rec.role = nextRole;
+        lists[nextRole].push(rec);
+        cfg.roleAudit = Array.isArray(cfg.roleAudit) ? cfg.roleAudit : [];
+        cfg.roleAudit.push({
+          at: Date.now(),
+          actor: authSession.username || authSession.name || 'superuser',
+          user: rec.name || rec.username || key,
+          username: rec.username || '',
+          from: sourceRole,
+          to: nextRole
+        });
+        if (cfg.roleAudit.length > 200) cfg.roleAudit = cfg.roleAudit.slice(-200);
+        saveConfig(cfg);
+        auditEvent(authSession, 'user_role_changed', rec.name || rec.username || key,
+          { role: sourceRole }, { role: nextRole }, { username: rec.username || '' });
+
+        // Any live session for the changed account is invalidated immediately.
+        for (const [tok, s] of authSessions.entries()) {
+          if ((rec.username && s.username === rec.username) || (rec.name && s.name === rec.name)) authSessions.delete(tok);
+        }
+        const needsPassword = !rec.password || !String(rec.password).startsWith('scrypt$');
+        const roleLabel = nextRole.charAt(0).toUpperCase() + nextRole.slice(1);
+        return sendJson(res, 200, { ok: true, message: needsPassword ? 'Role changed to ' + roleLabel + '. Set a login username/password in Setup before this user can sign in.' : 'Role changed successfully.' });
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Role change failed: ' + e.message });
+      }
+    });
+    return;
+  }
 
   // ── GET /api/admin/db — full DB dump for admin viewer (admin only) ──
   if (url.pathname === '/api/admin/db' && req.method === 'GET') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
     const dump = db.getAdminDump();
-    return sendJson(res, 200, { ...dump, dbFile: DB_PATH });
+    return sendJson(res, 200, { ...dump, dbFile: DB_PATH, auth: { role: authSession.role, name: authSession.name } });
   }
 
   // ── GET /api/admin/purge — wipe all temp records before production ──
   if (url.pathname === '/api/admin/purge' && req.method === 'POST') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    const purgeCount = loadAssignments().length;
     db.purgeAssignments();
+    auditEvent(authSession, 'assignments_purged', 'All assignment records', { count: purgeCount }, { count: 0 }, null);
     return sendJson(res, 200, { ok: true, message: 'All assignment records purged.' });
+  }
+
+  // ── POST /api/admin/backfill — reconcile existing assignments to the full
+  // checklist so every stored record carries the complete, van-type-appropriate
+  // sections (main → tech → tracker → Task.db stay in sync). Values already
+  // entered by techs are preserved. (admin only)
+  if (url.pathname === '/api/admin/backfill' && req.method === 'POST') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    const config = loadConfig();
+    const assignments = loadAssignments();
+    let updated = 0, missingVan = 0;
+    assignments.forEach(a => {
+      if (Array.isArray(a.selectedSectionTitles)) return; // Preserve deliberately scoped work orders.
+      if (!a.vanType) { missingVan++; return; }
+      const full = expectedSections(a.vanType, config);
+      if (!full.length) { missingVan++; return; }
+      const reconciled = reconcileSections(a.sections, full);
+      a.sections = reconciled;
+      updated++;
+    });
+    saveAssignments(assignments);
+    auditEvent(authSession, 'assignments_backfilled', 'Assignment checklists', null, null, { updated, missingVan });
+    return sendJson(res, 200, { ok: true, updated, missingVan, message: `Reconciled ${updated} assignment(s) to the full checklist.` });
   }
 
   // ── PUT /api/config — full config save (admin only) ─────
   // Persists the entire config object so the admin viewer can manage
   // intervals, locations, unitOptions, technicians, districts, checklist, etc.
   if (url.pathname === '/api/config' && req.method === 'PUT') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
         const incoming = JSON.parse(body);
         const config = loadConfig() || {};
-        // Merge: keep any existing keys not present in the incoming payload,
-        // then overwrite with whatever the client sent (full-save model).
-        const merged = { ...config, ...incoming };
+        let merged;
+        if (isSuperuserReq) {
+          merged = { ...config, ...incoming };
+        } else {
+          // Managers may operate Setup, but cannot modify Maintenance Categories
+          // and cannot delete Setup data other than Technicians.
+          merged = { ...config, ...incoming };
+          merged.checklist = config.checklist || [];
+
+          const oldLoc = Array.isArray(config.locations) ? config.locations : [];
+          const newLoc = Array.isArray(incoming.locations) ? incoming.locations : oldLoc;
+          merged.locations = oldLoc.concat(newLoc.filter(x => oldLoc.indexOf(x) < 0));
+
+          const oldDistricts = Array.isArray(config.districts) ? config.districts : [];
+          const newDistricts = Array.isArray(incoming.districts) ? incoming.districts : oldDistricts;
+          merged.districts = oldDistricts.concat(newDistricts.filter(x => oldDistricts.indexOf(x) < 0));
+
+          const oldIntervals = Array.isArray(config.intervals) ? config.intervals : [];
+          const newIntervals = Array.isArray(incoming.intervals) ? incoming.intervals : oldIntervals;
+          merged.intervals = oldIntervals.concat(newIntervals.filter(x => oldIntervals.indexOf(x) < 0));
+
+          const oldUnits = Array.isArray(config.unitOptions) ? config.unitOptions : [];
+          const newUnits = Array.isArray(incoming.unitOptions) ? incoming.unitOptions : oldUnits;
+          merged.unitOptions = oldUnits.concat(newUnits.filter(x => oldUnits.indexOf(x) < 0));
+
+          merged.tmvVanMap = { ...(config.tmvVanMap || {}), ...(incoming.tmvVanMap || {}) };
+          merged.geofences = { ...(config.geofences || {}), ...(incoming.geofences || {}) };
+          // Technicians are the one Setup list Managers may add/edit/delete.
+          if (Array.isArray(incoming.technicians)) merged.technicians = incoming.technicians;
+        }
+        // Account/role arrays are managed only by their dedicated endpoints.
+        // Never let a stale general Setup save overwrite a role change.
+        merged.superusers = Array.isArray(config.superusers) ? config.superusers : [];
+        merged.managers = Array.isArray(config.managers) ? config.managers : [];
+        merged.technicians = Array.isArray(config.technicians) ? config.technicians : [];
+        const beforeAudit = auditConfigSummary(config);
+        const afterAudit = auditConfigSummary(merged);
+        const changedKeys = Object.keys(afterAudit).filter(k => JSON.stringify(beforeAudit[k]) !== JSON.stringify(afterAudit[k]));
         saveConfig(merged);
+        auditEvent(authSession, 'setup_config_updated', 'Setup', beforeAudit, afterAudit, { changedKeys });
         sendJson(res, 200, { ok: true, config: merged });
       } catch(e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
   }
 
-  // ── PUT /api/managers — save managers with hashed passwords (admin only) ──
+  // ── PUT /api/superusers — edit normal promoted Superusers only ──
+  // Recovery Superuser remains private in ADMIN_USER/ADMIN_PASS and is never
+  // included in or modified by this endpoint.
+  if (url.pathname === '/api/superusers' && req.method === 'PUT') {
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const incoming = Array.isArray(parsed.superusers) ? parsed.superusers : [];
+        const config = loadConfig() || {};
+        const current = Array.isArray(config.superusers) ? config.superusers : [];
+        const managers = Array.isArray(config.managers) ? config.managers : [];
+
+        if (incoming.length !== current.length) {
+          return sendJson(res, 400, { error: 'Add or remove Superusers through Security > User Roles.' });
+        }
+
+        const managerKeys = new Set(
+          managers.map(m => String((m && (m.username || m.name)) || '').trim()).filter(Boolean)
+        );
+        const seen = new Set();
+
+        const out = incoming.map((raw, i) => {
+          const u = raw && typeof raw === 'object' ? raw : {};
+          const prior = current[i] && typeof current[i] === 'object' ? current[i] : {};
+
+          const name = String(u.name || u.username || prior.name || prior.username || '').trim();
+          const username = String(u.username || prior.username || '').trim();
+
+          if (!username) throw new Error('Superuser login username is required');
+          if (!/^[A-Za-z0-9._@-]{3,64}$/.test(username)) {
+            throw new Error('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen');
+          }
+          if (username === ADMIN_USER) throw new Error('That username is reserved by the Recovery Superuser');
+          if (seen.has(username)) throw new Error('Duplicate Superuser username: ' + username);
+          if (managerKeys.has(username)) throw new Error('That username is already used by a Manager');
+          seen.add(username);
+
+          let password = prior.password || '';
+          if (u.password && !String(u.password).startsWith('scrypt$')) {
+            if (!validAdminPassword(u.password)) {
+              throw new Error('Superuser password must be at least 10 characters with an uppercase letter, number, and special character');
+            }
+            password = hashPassword(u.password);
+          }
+          if (!password || !String(password).startsWith('scrypt$')) {
+            throw new Error('This Superuser does not have a valid saved login password. Use Security > User Roles to correct the account first.');
+          }
+
+          const email = String(u.email != null ? u.email : (prior.email || '')).trim();
+          const phone = String(u.phone != null ? u.phone : (prior.phone || '')).trim();
+          const district = String(u.district != null ? u.district : (prior.district || '')).trim();
+
+          return {
+            name: name || username,
+            username,
+            email,
+            phone,
+            district,
+            password,
+            role: 'superuser'
+          };
+        });
+
+        const merged = { ...config, superusers: out };
+        saveConfig(merged);
+
+        auditEvent(
+          authSession,
+          'superusers_updated',
+          'Superusers',
+          current.map(u => ({
+            name: (u && u.name) || '',
+            username: (u && u.username) || '',
+            email: (u && u.email) || '',
+            phone: (u && u.phone) || '',
+            district: (u && u.district) || ''
+          })),
+          out.map(u => ({
+            name: u.name,
+            username: u.username,
+            email: u.email,
+            phone: u.phone,
+            district: u.district
+          })),
+          {
+            passwordUpdatedFor: incoming
+              .filter(u => u && u.password && !String(u.password).startsWith('scrypt$'))
+              .map(u => u.username || u.name || '')
+              .filter(Boolean)
+          }
+        );
+
+        current.forEach((prior, i) => {
+          const before = prior && (prior.username || prior.name);
+          const after = out[i] && (out[i].username || out[i].name);
+          if (before && before !== after) {
+            for (const [tok, sess] of authSessions.entries()) {
+              if (sess.username === before || sess.name === (prior.name || before)) {
+                authSessions.delete(tok);
+              }
+            }
+          }
+        });
+
+        return sendJson(res, 200, {
+          ok: true,
+          superusers: out.map(u => ({
+            name: u.name,
+            username: u.username,
+            email: u.email,
+            phone: u.phone,
+            district: u.district
+          }))
+        });
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message || 'Superuser save failed' });
+      }
+    });
+    return;
+  }
+
+  // ── PUT /api/managers — Superuser full control; Managers may add/update but not remove ──
   if (url.pathname === '/api/managers' && req.method === 'PUT') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
         const incoming = JSON.parse(body).managers || [];
         const current = (loadConfig() || {}).managers || [];
+        if (isManagerReq) {
+          const incomingKeys = new Set(incoming.map(m => m.username || m.name));
+          const removed = current.some(m => !incomingKeys.has(m.username || m.name));
+          if (removed) return sendJson(res, 403, { error: 'Managers may add or update managers but cannot delete managers' });
+        }
         const savedByName = {};
         current.forEach(m => { savedByName[m.username || m.name] = m; });
         const out = incoming.map(m => {
           const name = m.name || m.username || '';
           const username = m.username || m.name || '';
           const existing = savedByName[username];
-          // Hash the password only if a new plaintext password was supplied;
-          // otherwise preserve the already-hashed value already stored.
           let password = existing ? existing.password : '';
           if (m.password && !m.password.startsWith('scrypt$')) {
+            if (!validAdminPassword(m.password)) throw new Error('Manager password must be at least 10 characters with an uppercase letter, number, and special character');
             password = hashPassword(m.password);
           }
-          return { name, username, password };
+          const email = (m.email || (existing && existing.email) || '').trim();
+          const phone = (m.phone || (existing && existing.phone) || '').trim();
+          const district = String(m.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'manager' };
         });
         const config = loadConfig() || {};
         const merged = { ...config, managers: out };
         saveConfig(merged);
-        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username })) });
+        auditEvent(authSession, 'managers_updated', 'Managers',
+          current.map(m => ({ name: m.name || '', username: m.username || '' })),
+          out.map(m => ({ name: m.name || '', username: m.username || '' })),
+          { passwordUpdatedFor: incoming.filter(m => m.password && !String(m.password).startsWith('scrypt$')).map(m => m.username || m.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, managers: out.map(m => ({ name: m.name, username: m.username, email: m.email, phone: m.phone, district: m.district })) });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PUT /api/technicians — account/contact save with hashed passwords ──
+  if (url.pathname === '/api/technicians' && req.method === 'PUT') {
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required' });
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const incoming = JSON.parse(body).technicians || [];
+        const config = loadConfig() || {};
+        const current = Array.isArray(config.technicians) ? config.technicians : [];
+        const saved = {};
+        current.forEach(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          if (t.username) saved['u:' + t.username] = t;
+          if (t.name) saved['n:' + t.name] = t;
+        });
+        const out = incoming.map(function(raw){
+          const t = typeof raw === 'string' ? { name: raw } : raw;
+          const name = String(t.name || t.username || '').trim();
+          const username = String(t.username || '').trim();
+          const existing = (username && saved['u:' + username]) || (name && saved['n:' + name]) || null;
+          let password = existing ? (existing.password || '') : '';
+          if (t.password && !String(t.password).startsWith('scrypt$')) {
+            if (!validAdminPassword(t.password)) throw new Error('Technician password must be at least 10 characters with an uppercase letter, number, and special character');
+            password = hashPassword(t.password);
+          }
+          const email = String(t.email || (existing && existing.email) || '').trim();
+          const phone = String(t.phone || (existing && existing.phone) || '').trim();
+          const district = String(t.district || (existing && existing.district) || '').trim();
+          return { name, username, email, phone, district, password, role: 'technician' };
+        });
+        const merged = { ...config, technicians: out };
+        saveConfig(merged);
+        auditEvent(authSession, 'technicians_updated', 'Technicians',
+          current.map(function(raw){ const t=typeof raw==='string'?{name:raw}:raw; return {name:t.name||'',username:t.username||'',email:t.email||'',phone:t.phone||''}; }),
+          out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })),
+          { passwordUpdatedFor: incoming.filter(t => t && t.password && !String(t.password).startsWith('scrypt$')).map(t => t.username || t.name || '').filter(Boolean) });
+        sendJson(res, 200, { ok: true, technicians: out.map(t => ({ name:t.name, username:t.username, email:t.email, phone:t.phone, district:t.district })) });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
@@ -532,7 +1265,7 @@ http.createServer((req, res) => {
 
   // ── POST /api/assets — add new asset (admin only) ───────
   if (url.pathname === '/api/assets' && req.method === 'POST') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to add assets' });
+    if (!isAdminReq) return sendJson(res, 401, { error: 'Manager or Superuser required to add assets' });
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
@@ -546,6 +1279,8 @@ http.createServer((req, res) => {
         a.lastMaint = a.lastMaint !== undefined ? a.lastMaint : null;
         assets.push(a);
         saveAssets(assets);
+        auditEvent(authSession, 'asset_added', a.tmvId || a.name || String(a.id), null,
+          { id: a.id, tmvId: a.tmvId || '', name: a.name || '', type: a.type || '', location: a.location || '' }, null);
         sendJson(res, 200, { ok: true, asset: a });
       } catch(e) { sendJson(res, 400, { error: e.message }); }
     });
@@ -574,7 +1309,7 @@ http.createServer((req, res) => {
   // ── DELETE /api/assets/:id — delete asset (admin only) ──
   const delMatch = url.pathname.match(/^\/api\/assets\/(\d+)$/);
   if (delMatch && req.method === 'DELETE') {
-    if (!isAdminReq) return sendJson(res, 401, { error: 'Admin required to delete assets' });
+    if (!isSuperuserReq) return sendJson(res, 403, { error: 'Superuser required to delete assets' });
     const id = parseInt(delMatch[1]);
     const assets = loadAssets();
     const target = assets.find(a => a.id === id);
@@ -586,6 +1321,8 @@ http.createServer((req, res) => {
       });
     }
     saveAssets(assets.filter(a => a.id !== id));
+    auditEvent(authSession, 'asset_deleted', target ? (target.tmvId || target.name || String(id)) : String(id),
+      target ? { id: target.id, tmvId: target.tmvId || '', name: target.name || '', type: target.type || '', location: target.location || '' } : null, null, null);
     return sendJson(res, 200, { ok: true });
   }
 
@@ -714,6 +1451,7 @@ http.createServer((req, res) => {
       if (tooLarge) return sendJson(res, 413, { error: 'Request too large' });
       try {
         const work = buildWorkOrder(JSON.parse(body), mergeTechPhones(loadConfig()));
+        work.order = loadAssignments().filter(a => (a.technician?.name || a.technician) === work.technician.name).length;
         const saved = db.createWorkOrder(work);
         sendJson(res, saved.replayed ? 200 : 201, { ok: true, ...saved, ticket: saved.assignment.report.text });
       } catch (error) {
@@ -743,8 +1481,9 @@ http.createServer((req, res) => {
           phone: techIn.phone || ''
         };
         const config = loadConfig();
-        const sections = Array.isArray(d.sections) ? d.sections : [];
-        if (!sections.length) return sendJson(res, 400, { error: 'Select at least one checklist section' });
+        const full = expectedSections(d.vanType, config);
+        const sections = reconcileSections(d.sections, full);
+        if (!sections.length) return sendJson(res, 400, { error: 'No checklist sections apply to this van type' });
         const assignments = loadAssignments();
         const assignment = {
           id: crypto.randomBytes(6).toString('hex'),
@@ -755,6 +1494,7 @@ http.createServer((req, res) => {
           date: d.date || new Date().toISOString().slice(0, 10),
           createdAt: Date.now(),
           status: 'assigned',           // assigned → in_progress → completed
+          order: loadAssignments().filter(a => (a.technician && (a.technician.name || a.technician)) === (techIn.name || techIn)).length,
           sections,                     // [{title, items:[{label,type}]}]
           results: null,                // filled by technician
           completedAt: null,
@@ -776,8 +1516,29 @@ http.createServer((req, res) => {
   // GET /api/assignments/:id — technician fetches their assignment
   const assignGet = url.pathname.match(/^\/api\/assignments\/([\w-]+)$/);
   if (assignGet && req.method === 'GET') {
-    const a = loadAssignments().find(x => x.id === assignGet[1]);
+    const assignments = loadAssignments();
+    const a = assignments.find(x => x.id === assignGet[1]);
     if (!a) return sendJson(res, 404, { error: 'Assignment not found' });
+
+    // Recover orphaned assignment photo references if an older client cleared
+    // the photos array after the files were already uploaded. Assignment photo
+    // filenames are prefixed with "<assignment-id>_".
+    if (!Array.isArray(a.photos) || !a.photos.length) {
+      try {
+        const prefix = a.id + '_';
+        const recovered = fs.readdirSync(UPLOADS_DIR)
+          .filter(name => name.startsWith(prefix) && /\.(jpe?g|png|gif|webp|heic|avif)$/i.test(name))
+          .sort()
+          .map(file => ({ file, caption: '' }));
+        if (recovered.length) {
+          a.photos = recovered;
+          saveAssignments(assignments);
+          console.log('[photos] recovered', recovered.length, 'photo(s) for assignment', a.id);
+        }
+      } catch (e) {
+        console.error('[photos] recovery failed for', a.id, e.message);
+      }
+    }
     return sendJson(res, 200, { assignment: a });
   }
 
@@ -796,9 +1557,43 @@ http.createServer((req, res) => {
         if (d.status) assignments[idx].status = d.status;
         if (d.results) assignments[idx].results = d.results;
         if (Array.isArray(d.photos)) assignments[idx].photos = d.photos;
+        if (typeof d.order === 'number' && isFinite(d.order)) assignments[idx].order = d.order;
+        // Persist reassignment to a different technician (drag-and-drop move).
+        if (d.technician) {
+          if (typeof d.technician === 'string') assignments[idx].technician = { name: d.technician };
+          else if (typeof d.technician === 'object') assignments[idx].technician = d.technician;
+        }
         if (d.status === 'completed') assignments[idx].completedAt = Date.now();
         saveAssignments(assignments);
         sendJson(res, 200, { ok: true, assignment: assignments[idx] });
+      } catch (e) { sendJson(res, 400, { error: e.message }); }
+    });
+    return;
+  }
+
+  // ── PATCH /api/assignments/order — bulk-save drag reorder + reassignment ──
+  // Body: { items: [{ id, technician, order }] }  (technician may be null/'' = Unassigned)
+  if (url.pathname === '/api/assignments/order' && req.method === 'PATCH') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const updates = Array.isArray(d.items) ? d.items : [];
+        const assignments = loadAssignments();
+        const byId = {};
+        assignments.forEach(a => { byId[a.id] = a; });
+        updates.forEach(u => {
+          const a = byId[u.id];
+          if (!a) return;
+          if (typeof u.order === 'number' && isFinite(u.order)) a.order = u.order;
+          if ('technician' in u) {
+            const t = u.technician;
+            a.technician = t ? (typeof t === 'string' ? { name: t } : t) : { name: '' };
+          }
+        });
+        saveAssignments(assignments);
+        sendJson(res, 200, { ok: true, saved: updates.length });
       } catch (e) { sendJson(res, 400, { error: e.message }); }
     });
     return;
@@ -879,5 +1674,5 @@ http.createServer((req, res) => {
 }).listen(PORT, '0.0.0.0', () => {
   console.log(`🏭 TMV Master App running at http://0.0.0.0:${PORT} (all interfaces)`);
   console.log(`   Windows access: http://localhost:${PORT}`);
-  console.log(`   Admin login: POST /api/login  (user: ${ADMIN_USER} / pass: ${ADMIN_PASS})`);
+  console.log('   Admin login endpoint: POST /api/login');
 });

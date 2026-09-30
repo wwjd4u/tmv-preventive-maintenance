@@ -33,6 +33,7 @@
   .btn.sm{padding:6px 12px;font-size:13px}
   .btn.danger{background:var(--due)}
   .btn.xs{padding:4px 8px;font-size:12px}
+  select.reassign-sel{background:#fff;color:var(--cudd);border:1px solid var(--cudd);cursor:pointer;max-width:140px}
 
   #loginOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:center;justify-content:center}
   #loginBox{background:#fff;border-radius:14px;padding:28px 32px;min-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.18)}
@@ -67,6 +68,16 @@
   #detailContent .cl-val.yes{background:#e7f6ec;color:#15803d}
   #detailContent .cl-val.no{background:#fde8e8;color:#b91c1c}
   #detailContent .cl-val.na{background:#f1f1f1;color:#888}
+  /* Merged work-order sheet: question on the left, color-coded answer on the right */
+  #detailContent .checklist.merged{gap:0}
+  #detailContent .sheet-sec{margin-top:10px;margin-bottom:2px;color:#234;font-size:13px}
+  #detailContent .cl-item.sheet-row{display:flex;justify-content:space-between;gap:12px}
+  #detailContent .sheet-row .q{flex:1;text-align:left;color:#222}
+  #detailContent .sheet-row .cl-val{margin-left:auto}
+  #detailContent .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:6px}
+  #detailContent .photo-thumb{width:100%;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer;background:#fff}
+  #detailContent .photo-wrap{display:flex;flex-direction:column;gap:4px}
+  #detailContent .photo-cap{font-size:12px;color:#666;text-align:center}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{background:#f8f8fa;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top}
@@ -115,15 +126,25 @@
   .line-item button:hover{color:var(--due)}
 
   footer{text-align:center;color:#9aa;font-size:12px;padding:18px}
+  footer a{color:#9aa;text-decoration:none}
+  footer a:hover{text-decoration:underline}
 
   /* SINGLE-PAGE ASSET MANAGER */
   .muted{color:#888;font-size:13px;margin-left:8px}
-  .asset-manage{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;margin-top:12px}
+  .asset-manage{display:grid;grid-template-columns:repeat(3,minmax(300px,1fr));gap:16px;margin-top:12px}
+  .setup-c1{grid-column:1}
+  .setup-c2{grid-column:2}
+  .setup-c3{grid-column:3}
   .mblock{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+  @media (max-width:1100px){.asset-manage{grid-template-columns:repeat(2,minmax(300px,1fr))}.setup-c1,.setup-c2,.setup-c3{grid-column:auto}}
+  @media (max-width:760px){.asset-manage{grid-template-columns:1fr}.setup-c1,.setup-c2,.setup-c3{grid-column:1}}
   .mblock h3{margin:0 0 14px;color:var(--cudd);font-size:15px;border-bottom:2px solid var(--cudd);padding-bottom:8px}
   .mblock .cnt{color:#999;font-weight:normal;font-size:13px}
   .mrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .mrow.addrow{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);margin-bottom:0}
+  .geo-row{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .geo-row label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px}
+  .geo-note{display:block;margin-top:8px;font-size:12px;color:#888}
   .contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
   .contact-grid .minput{margin-top:0}
   .saved-ok{margin-left:10px;color:#16a34a;font-weight:600;font-size:13px;vertical-align:middle}
@@ -148,14 +169,44 @@
   .empty{color:#999;font-size:13px;font-style:italic;padding:6px 0}
   .addtaskrow{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
 </style>
+
+<style id="tmv-footer-black-override">
+footer,
+footer a,
+footer a:link,
+footer a:visited,
+footer a:hover,
+footer a:active {
+    color: #000 !important;
+}
+</style>
+
+
+<style id="setup-admin-layout-cleanup">
+  /* Dedicated Superuser Security page. */
+  .security-page-grid{display:grid;grid-template-columns:1fr;gap:16px;max-width:980px;margin:0 auto;}
+  #viewSecurity .mblock{width:100%;}
+  #superuserSecurityBlock .contact-grid{grid-template-columns:repeat(2,minmax(220px,1fr));}
+  #userRolesList{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px;}
+  .user-role-row{display:grid;grid-template-columns:minmax(260px,1fr) minmax(170px,200px) 120px;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff;}
+  .user-role-row .msel{width:100%;min-width:0;}
+  .user-role-action{width:100%;white-space:nowrap;}
+  @media (max-width:700px){
+    main{padding:12px;}
+    #superuserSecurityBlock .contact-grid{grid-template-columns:1fr;}
+    .user-role-row{grid-template-columns:1fr;gap:8px;}
+    .user-role-row .msel,.user-role-action{width:100%;}
+  }
+</style>
+
 </head>
 <body>
 
 <div id="loginOverlay">
   <div id="loginBox">
-    <h2>Admin Login</h2>
-    <input id="user" type="text" placeholder="Username" value="admin" autocomplete="username" name="login_user">
-    <input id="pass" type="password" placeholder="Password" value="admin123" autocomplete="current-password" name="login_pass">
+    <h2>Superuser / Manager Login</h2>
+    <input id="user" type="text" placeholder="Username" autocomplete="username" name="login_user">
+    <input id="pass" type="password" placeholder="Password" autocomplete="current-password" name="login_pass">
     <div id="loginErr"></div>
     <button class="btn" onclick="doLogin()" style="width:100%">Log In</button>
   </div>
@@ -163,11 +214,13 @@
 
 <header>
   <img src="cudd-logo-sm.png" alt="CUDD" onerror="this.style.display='none'">
-  <h1>TMV Preventive Maintenance Admin</h1>
+  <h1>TMV Preventive Maintenance</h1>
   <nav>
     <button id="tabAssign" class="active" onclick="switchTab('assign')">Assignments</button>
     <button id="tabAssets" onclick="switchTab('assets')">Setup</button>
+    <button id="tabSecurity" onclick="switchTab('security')" style="display:none">Security</button>
     <a class="backbtn" href="/" title="Back to main app">← Main App</a>
+    <button class="btn sm ghost" onclick="dbLogout()">Log Out</button>
   </nav>
 </header>
 
@@ -188,11 +241,56 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Status</th><th>TMV</th><th>Technician</th><th>Location</th><th>Date</th><th>Completed</th><th></th></tr></thead>
+        <thead><tr><th>Status</th><th>TMV</th><th>Technician</th><th>District</th><th>Date</th><th>Completed</th><th></th></tr></thead>
         <tbody id="assignBody"></tbody>
       </table>
     </div>
     <div id="assignEmpty" class="empty" style="display:none">No assignments found.</div>
+  </div>
+
+  <!-- SECURITY TAB (SUPERUSER ONLY) -->
+  <div id="viewSecurity" class="view">
+    <div class="bar">
+      <span class="muted">Superuser-only account security and role management.</span>
+    </div>
+    <div class="security-page-grid">
+      <!-- SUPERUSER SECURITY -->
+      <section class="mblock" id="superuserSecurityBlock" style="display:none">
+        <h3>Superuser Security</h3>
+        <div style="font-size:13px;color:#666;margin-bottom:10px">Change the Superuser username and/or password. Current password is required. All active admin sessions will be signed out after a change.</div>
+        <div class="contact-grid">
+          <input id="suCurrentPass" class="minput" type="password" placeholder="Current password" autocomplete="current-password">
+          <input id="suNewUser" class="minput" placeholder="New username (optional)" autocomplete="off">
+          <input id="suNewPass" class="minput" type="password" placeholder="New password (optional)" autocomplete="new-password">
+          <input id="suConfirmPass" class="minput" type="password" placeholder="Confirm new password" autocomplete="new-password">
+        </div>
+        <div style="font-size:12px;color:#777;margin:9px 0">Password: 10+ characters, 1 uppercase, 1 number, and 1 special character.</div>
+        <button class="btn sm" onclick="saveSuperuserCredentials()">Update Superuser Login</button>
+      </section>
+
+      <!-- USER ROLES -->
+      <section class="mblock" id="userRolesBlock" style="display:none">
+        <h3>User Roles</h3>
+        <div style="font-size:13px;color:#666;margin-bottom:10px">Superuser-only role management. The Recovery Superuser is locked. Role changes take effect immediately and sign out the changed account.</div>
+        <div id="userRolesList"><div class="empty">Loading users…</div></div>
+        <div id="userRolesStatus" class="saved-ok" style="display:block;margin:10px 0 0"></div>
+      </section>
+
+      <section class="mblock" id="auditLogBlock" style="display:none;grid-column:1/-1">
+        <h3>Audit Log</h3>
+        <div class="bar" style="margin-bottom:10px">
+          <span class="muted" style="margin-left:0">Permanent SQLite record of administrative and deployment changes. Passwords are never stored in the audit log.</span>
+          <button class="btn ghost sm" onclick="loadAuditLog()" style="margin-left:auto">↻ Refresh Audit</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Date / Time</th><th>User</th><th>Role</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+            <tbody id="auditLogBody"><tr><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
   </div>
 
   <!-- ASSETS TAB -->
@@ -204,9 +302,28 @@
 
     <div class="asset-manage">
 
+      <!-- SUPERUSERS (normal promoted accounts only; Recovery Superuser stays in Security) -->
+      <section class="mblock setup-c1" style="grid-row:1">
+        <h3>Superusers <span class="cnt" id="cntSu"></span></h3>
+        <div class="mrow">
+          <select id="selSu" class="msel" onchange="fillSu()" autocomplete="off" name="setup_su"></select>
+        </div>
+        <div class="contact-grid">
+          <input id="suName" class="minput" placeholder="Display name">
+          <input id="suUser" class="minput" placeholder="Login username" autocomplete="username">
+          <input id="suEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
+          <input id="suPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
+          <select id="suDistrict" class="msel" aria-label="Superuser district"></select>
+          <input id="suPass" class="minput" type="password" placeholder="New password (optional)" autocomplete="new-password">
+          <input id="suPassConfirm" class="minput" type="password" placeholder="Confirm new password" autocomplete="new-password">
+        </div>
+        <div style="font-size:12px;color:#777;margin:9px 0">Normal Superuser accounts only. Recovery Superuser remains locked under Security.</div>
+        <button class="btn sm" onclick="saveSu()">Save Superuser</button>
+      </section>
+
       <!-- TMV UNITS -->
-      <section class="mblock">
-        <h3>TMV Units <span class="cnt" id="cntTmv"></span></h3>
+      <section class="mblock setup-c1" style="grid-row:2">
+        <h3>Equipment Units <span class="cnt" id="cntTmv"></span></h3>
         <div class="mrow">
           <select id="selTmv" class="msel" onchange="onSelTmv()" autocomplete="off" name="setup_tmv"></select>
           <select id="selTmvType" class="msel" title="Van type" onchange="updateTmvType()" autocomplete="off" name="setup_tmvtype"></select>
@@ -217,43 +334,21 @@
           <select id="newTmvType" class="msel"></select>
           <button class="btn sm" onclick="addTmv()">+ Add TMV</button>
         </div>
-      </section>
-
-      <!-- LOCATIONS -->
-      <section class="mblock">
-        <h3>Locations <span class="cnt" id="cntLoc"></span></h3>
-        <div class="mrow">
-          <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
-          <button class="btn sm ghost" onclick="renameLoc()">Rename</button>
-          <button class="btn sm danger" onclick="deleteLoc()">× Remove</button>
-        </div>
-        <div class="mrow addrow">
-          <input id="newLoc" class="minput" placeholder="Midland">
-          <button class="btn sm" onclick="addLoc()">+ Add Location</button>
-        </div>
-      </section>
-
-      <!-- TECHNICIANS -->
-      <section class="mblock">
-        <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
-        <div class="mrow">
-          <select id="selTech" class="msel" onchange="fillTechContact()" autocomplete="off" name="setup_tech"></select>
-          <button class="btn sm ghost" onclick="renameTech()">Rename</button>
-          <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
-        </div>
-        <div class="contact-grid">
-          <input id="techEmail" class="minput" placeholder="Email (name@co.com)">
-          <input id="techPhone" class="minput" placeholder="Phone (+1…)">
-        </div>
-        <button class="btn sm" onclick="saveTechContact()">Save Contact Info</button><span id="techStatus" class="saved-ok"></span>
-        <div class="mrow addrow">
-          <input id="newTech" class="minput" placeholder="Jason Guynes">
-          <button class="btn sm" onclick="addTech()">+ Add Technician</button>
+        <div class="geo-row">
+          <label>Location (lat / lng / radius m)</label>
+          <div class="mrow">
+            <input id="geoLat" class="minput" placeholder="lat" inputmode="decimal" style="max-width:110px">
+            <input id="geoLng" class="minput" placeholder="lng" inputmode="decimal" style="max-width:110px">
+            <input id="geoRad" class="minput" placeholder="200" inputmode="numeric" style="max-width:80px">
+            <button class="btn sm ghost" onclick="geoHere()">Use my location</button>
+            <button class="btn sm" onclick="setGeofence()">Save location</button>
+          </div>
+          <span class="geo-note">Location saved. Live position feed (DevIoT) not connected yet — tracker shows “Location set” until then.</span>
         </div>
       </section>
 
       <!-- MANAGERS -->
-      <section class="mblock">
+      <section class="mblock setup-c2" style="grid-row:1">
         <h3>Managers <span class="cnt" id="cntMgr"></span></h3>
         <div class="mrow">
           <select id="selMgr" class="msel" onchange="fillMgr()" autocomplete="off" name="setup_mgr"></select>
@@ -262,17 +357,58 @@
         <div class="contact-grid">
           <input id="mgrName" class="minput" placeholder="Display name (e.g. Jane Doe)">
           <input id="mgrUser" class="minput" placeholder="Login username (e.g. jdoe)" autocomplete="username" name="mgr_username">
+          <input id="mgrEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
+          <input id="mgrPhone" class="minput" placeholder="Mobile phone (+1…)" autocomplete="tel">
+          <select id="mgrDistrict" class="msel" aria-label="Manager district"></select>
           <input id="mgrPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
+          <input id="mgrPassConfirm" class="minput" type="password" placeholder="Confirm login password" autocomplete="new-password">
         </div>
-        <button class="btn sm" onclick="saveMgr()">Save Manager</button>
+        <button class="btn sm" onclick="saveMgr()">Save Manager</button> <button class="btn sm ghost" onclick="openSmsPreferences('manager')">SMS Preferences</button>
         <div class="mrow addrow">
           <input id="newMgr" class="minput" placeholder="Add by name…">
           <button class="btn sm" onclick="addMgr()">+ Add Manager</button>
         </div>
       </section>
 
+      <!-- TECHNICIANS -->
+      <section class="mblock setup-c3" style="grid-row:1">
+        <h3>Technicians <span class="cnt" id="cntTech"></span></h3>
+        <div class="mrow">
+          <select id="selTech" class="msel" onchange="fillTechContact()" autocomplete="off" name="setup_tech"></select>
+          <button class="btn sm ghost" onclick="renameTech()">Rename</button>
+          <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
+        </div>
+        <div class="contact-grid">
+          <input id="techUser" class="minput" placeholder="Login username (e.g. jguynes)" autocomplete="username">
+          <input id="techEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
+          <input id="techPhone" class="minput" placeholder="Phone (+1…)" autocomplete="tel">
+          <select id="techDistrict" class="msel" aria-label="Technician district"></select>
+          <input id="techPass" class="minput" type="password" placeholder="Login password" autocomplete="new-password">
+          <input id="techPassConfirm" class="minput" type="password" placeholder="Confirm login password" autocomplete="new-password">
+        </div>
+        <button class="btn sm" onclick="saveTechContact()">Save Technician</button> <button class="btn sm ghost" onclick="openSmsPreferences('technician')">SMS Preferences</button><span id="techStatus" class="saved-ok"></span>
+        <div class="mrow addrow">
+          <input id="newTech" class="minput" placeholder="Jason Guynes">
+          <button class="btn sm" onclick="addTech()">+ Add Technician</button>
+        </div>
+      </section>
+
+      <!-- LOCATIONS -->
+      <section class="mblock setup-c2" style="grid-row:2">
+        <h3>Districts <span class="cnt" id="cntLoc"></span></h3>
+        <div class="mrow">
+          <select id="selLoc" class="msel" autocomplete="off" name="setup_loc"></select>
+          <button class="btn sm ghost" onclick="renameLoc()">Rename</button>
+          <button class="btn sm danger" onclick="deleteLoc()">× Remove</button>
+        </div>
+        <div class="mrow addrow">
+          <input id="newLoc" class="minput" placeholder="Midland">
+          <button class="btn sm" onclick="addLoc()">+ Add District</button>
+        </div>
+      </section>
+
       <!-- INSPECTION SETTINGS -->
-      <section class="mblock">
+      <section class="mblock setup-c3" style="grid-row:2">
         <h3>Inspection Settings</h3>
         <div style="margin-bottom:14px">
           <label>Inspection Intervals (days, comma-separated):</label><br>
@@ -287,8 +423,8 @@
       </section>
 
       <!-- CATEGORIES (expandable cards) -->
-      <section class="mblock catblock">
-        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span></h3>
+      <section class="mblock catblock" style="grid-column:1 / -1">
+        <h3>Maintenance Categories <span class="cnt" id="cntCat"></span><button id="toggleAllCatsBtn" class="btn sm ghost" onclick="toggleAllCats()" style="float:right;margin-top:-4px">Expand All</button></h3>
         <div class="mrow addrow">
           <input id="newCat" class="minput" placeholder="Air Conditioning">
           <button class="btn sm" onclick="addCat()">+ Add Category</button>
@@ -311,10 +447,16 @@
   </div>
 </div>
 
-<footer>CUDD Energy Services TMV Admin</footer>
+<footer>
+  <a href="security.html">Security</a> · <a href="terms.html">Terms &amp; Conditions</a><br>
+  CUDD Energy Services TMV Admin
+</footer>
 
 <script>
 let token = null;
+let currentRole = '';
+let currentUserName = '';
+let currentAuthSource = '';
 let dbData = { assignments:[], assets:[], config:{} };
 
 /* AUTH - working bypass login */
@@ -325,26 +467,192 @@ function doLogin(){
   fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) })
     .then(r => r.json())
     .then(d => {
-      if(d.token){ token = d.token; document.getElementById('loginOverlay').style.display='none'; loadData(); }
+      if(d.token){ token = d.token; currentRole = d.role || ''; currentUserName = d.name || ''; currentAuthSource = d.authSource || 'account'; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now(); sessionStorage.setItem('tmv_auth_token', token); sessionStorage.setItem('tmv_auth_role', currentRole); sessionStorage.setItem('tmv_auth_name', currentUserName); document.getElementById('loginOverlay').style.display='none'; applyRoleUi(); loadData(); }
       else document.getElementById('loginErr').textContent = d.error || 'Invalid credentials';
     })
     .catch(() => document.getElementById('loginErr').textContent = 'Server error');
 }
 
-// Auto-login from Task.db button (?autologin=1)
+// Reuse the current authenticated app session when Task.db is opened.
 (function(){
-  if(location.search.includes('autologin=1')){
-    var u = sessionStorage.getItem('tmv_db_user');
-    var p = sessionStorage.getItem('tmv_db_pass');
-    if(u && p){
-      document.getElementById('user').value = u;
-      document.getElementById('pass').value = p;
-      setTimeout(doLogin, 100);
-    }
-  }
+  var shared = sessionStorage.getItem('tmv_auth_token');
+  if(!shared) return;
+  fetch('/api/session', { headers:{'Authorization':'Bearer '+shared} })
+    .then(function(r){ if(!r.ok) throw new Error('expired'); return r.json(); })
+    .then(function(d){
+      token = shared; currentRole = d.role || ''; currentUserName = d.name || ''; currentAuthSource = d.authSource || 'account'; if(d.idleMinutes) DB_AUTH_IDLE_MS=Math.max(15,Number(d.idleMinutes))*60*1000; dbAuthLastActivity=Date.now();
+      document.getElementById('loginOverlay').style.display='none';
+      applyRoleUi(); loadData();
+    })
+    .catch(function(){ sessionStorage.removeItem('tmv_auth_token'); sessionStorage.removeItem('tmv_auth_role'); sessionStorage.removeItem('tmv_auth_name'); });
 })();
 
+function dbLogout(){
+  var headers = token ? {'Authorization':'Bearer '+token} : {};
+  fetch('/api/logout', {method:'POST', headers:headers}).catch(function(){}).finally(function(){
+    token=null; currentRole=''; currentUserName=''; currentAuthSource='';
+    sessionStorage.removeItem('tmv_auth_token');
+    sessionStorage.removeItem('tmv_auth_role');
+    sessionStorage.removeItem('tmv_auth_name');
+    document.getElementById('user').value='';
+    document.getElementById('pass').value='';
+    document.getElementById('loginOverlay').style.display='flex';
+  });
+}
+
 function authHdr(){ return { 'Authorization': 'Bearer ' + token } }
+function saveSuperuserCredentials(){
+  if(currentRole !== 'superuser' || currentAuthSource !== 'recovery'){ alert('Recovery Superuser required'); return; }
+  var current = document.getElementById('suCurrentPass').value || '';
+  var newUser = (document.getElementById('suNewUser').value || '').trim();
+  var newPass = document.getElementById('suNewPass').value || '';
+  var confirmPass = document.getElementById('suConfirmPass').value || '';
+  if(!current){ alert('Enter your current password'); return; }
+  if(!newUser && !newPass){ alert('Enter a new username and/or password'); return; }
+  if(newUser && !/^[A-Za-z0-9._@-]{3,64}$/.test(newUser)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
+  if(newPass){
+    if(newPass !== confirmPass){ alert('New passwords do not match'); return; }
+    if(newPass.length < 10 || !/[A-Z]/.test(newPass) || !/[0-9]/.test(newPass) || !/[^A-Za-z0-9]/.test(newPass)){
+      alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return;
+    }
+  }
+  if(!confirm('Update the Superuser login? This will sign out all active admin sessions.')) return;
+  fetch('/api/superuser/credentials', {
+    method:'POST',
+    headers:Object.assign({'Content-Type':'application/json'}, authHdr()),
+    body:JSON.stringify({currentPassword:current,newUsername:newUser,newPassword:newPass})
+  }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok){ alert((x.d && x.d.error) || 'Credential update failed'); return; }
+      sessionStorage.removeItem('tmv_auth_token');
+      sessionStorage.removeItem('tmv_auth_role');
+      sessionStorage.removeItem('tmv_auth_name');
+      alert('Superuser login updated. Sign in again with the new credentials.');
+      location.href='/';
+    }).catch(function(){ alert('Credential update failed'); });
+}
+function loadUserRoles(){
+  if(currentRole !== 'superuser') return;
+  fetch('/api/user-roles',{headers:authHdr()})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok) throw new Error((x.d&&x.d.error)||'Could not load users');
+      renderUserRoles(x.d.users || []);
+    }).catch(function(e){
+      var box=document.getElementById('userRolesList');
+      if(box) box.innerHTML='<div class="empty">'+esc(e.message||'Could not load users')+'</div>';
+    });
+}
+function renderUserRoles(users){
+  var box=document.getElementById('userRolesList');
+  if(!box) return;
+  if(!users.length){ box.innerHTML='<div class="empty">No users configured.</div>'; return; }
+  box.innerHTML = users.map(function(u){
+    var locked = !!u.recovery;
+    var label = u.name || u.username || 'Unnamed user';
+    var login = u.username ? '<div style="font-size:12px;color:#777">'+esc(u.username)+'</div>' : '<div style="font-size:12px;color:#a16207">No login username</div>';
+    var note = locked ? '<div style="font-size:11px;color:#777;margin-top:3px">Emergency recovery account — role locked</div>' : (!u.loginReady && u.role!=='technician' ? '<div style="font-size:11px;color:#b45309;margin-top:3px">Login password still needs to be set</div>' : '');
+    return '<div class="user-role-row">'+
+      '<div><b>'+esc(label)+'</b>'+login+note+'</div>'+
+      '<select class="msel" id="roleSel_'+encodeURIComponent(u.role+'|'+u.key)+'" '+(locked?'disabled':'')+'>'+
+        '<option value="technician" '+(u.role==='technician'?'selected':'')+'>Technician</option>'+
+        '<option value="manager" '+(u.role==='manager'?'selected':'')+'>Manager</option>'+
+        '<option value="superuser" '+(u.role==='superuser'?'selected':'')+'>Superuser</option>'+
+      '</select>'+
+      '<button class="btn sm user-role-action" '+(locked?'disabled':'')+
+        ' data-user-key="'+esc(u.key)+'" data-current-role="'+esc(u.role)+'" onclick="changeUserRoleFromButton(this)">Change Role</button>'+
+    '</div>';
+  }).join('');
+}
+function changeUserRoleFromButton(btn){
+  if(!btn) return;
+  changeUserRole(btn.getAttribute('data-user-key')||'', btn.getAttribute('data-current-role')||'');
+}
+function auditDisplayValue(v){
+  if(v == null || v === '') return '';
+  if(typeof v === 'string') return v;
+  try { return JSON.stringify(v); } catch(e) { return String(v); }
+}
+function loadAuditLog(){
+  if(currentRole !== 'superuser') return;
+  fetch('/api/audit-log?limit=250',{headers:authHdr()})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok) throw new Error((x.d&&x.d.error)||'Could not load audit log');
+      var body=document.getElementById('auditLogBody'); if(!body) return;
+      var rows=x.d.entries||[];
+      body.innerHTML=rows.length?rows.map(function(e){
+        var detail=e.details!=null?e.details:(e.newValue!=null?e.newValue:e.oldValue);
+        return '<tr><td>'+esc(new Date(e.at).toLocaleString())+'</td><td>'+esc(e.actor||'')+'</td><td>'+esc(e.actorRole||'')+'</td><td>'+esc(e.action||'')+'</td><td>'+esc(e.target||'')+'</td><td style="max-width:420px;white-space:normal">'+esc(auditDisplayValue(detail))+'</td></tr>';
+      }).join(''):'<tr><td colspan="6" class="empty">No audit records yet.</td></tr>';
+    }).catch(function(e){ var body=document.getElementById('auditLogBody'); if(body) body.innerHTML='<tr><td colspan="6">'+esc(e.message||'Could not load audit log')+'</td></tr>'; });
+}
+
+function changeUserRole(key,currentRoleValue){
+  var id='roleSel_'+encodeURIComponent(currentRoleValue+'|'+key);
+  var sel=document.getElementById(id);
+  if(!sel) return;
+  var next=sel.value;
+  if(next===currentRoleValue){ alert('This user already has that role.'); return; }
+  var pretty = next.charAt(0).toUpperCase()+next.slice(1);
+  if(!confirm('Change this user from '+currentRoleValue+' to '+pretty+'?\n\nTheir active login session will be ended immediately.')){ sel.value=currentRoleValue; return; }
+  fetch('/api/user-roles',{
+    method:'PUT',
+    headers:Object.assign({'Content-Type':'application/json'},authHdr()),
+    body:JSON.stringify({key:key,currentRole:currentRoleValue,newRole:next})
+  }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){
+      if(!x.ok){ alert((x.d&&x.d.error)||'Role change failed'); sel.value=currentRoleValue; return; }
+      var s=document.getElementById('userRolesStatus'); if(s) s.textContent=x.d.message||'Role changed.';
+      loadData();
+    }).catch(function(){ alert('Role change failed'); sel.value=currentRoleValue; });
+}
+
+var DB_AUTH_IDLE_MS = 15 * 60 * 1000;
+var dbAuthLastActivity = Date.now();
+var dbAuthLastHeartbeat = 0;
+var dbAuthIdleTimer = setInterval(function(){
+  if(token && Date.now() - dbAuthLastActivity >= DB_AUTH_IDLE_MS){
+    var old = token;
+    token=null; currentRole=''; currentUserName='';
+    sessionStorage.removeItem('tmv_auth_token');
+    sessionStorage.removeItem('tmv_auth_role');
+    sessionStorage.removeItem('tmv_auth_name');
+    fetch('/api/logout',{method:'POST',headers:{'Authorization':'Bearer '+old}}).catch(function(){});
+    document.getElementById('loginErr').textContent='Signed out after 15 minutes of inactivity.';
+    document.getElementById('loginOverlay').style.display='flex';
+  }
+},15000);
+function noteDbAuthActivity(){
+  if(!token) return;
+  dbAuthLastActivity=Date.now();
+  if(Date.now()-dbAuthLastHeartbeat < 60000) return;
+  dbAuthLastHeartbeat=Date.now();
+  fetch('/api/session',{headers:authHdr()}).then(function(r){ if(r.status===401) dbAuthLastActivity=0; }).catch(function(){});
+}
+['pointerdown','keydown','touchstart','scroll'].forEach(function(evt){ window.addEventListener(evt,noteDbAuthActivity,{passive:true}); });
+function isSuperuser(){ return currentRole === 'superuser'; }
+function applyRoleUi(){
+  var manager = currentRole === 'manager';
+  var cat = document.querySelector('.catblock');
+  if(cat) cat.style.display = manager ? 'none' : '';
+  var suSecurity = document.getElementById('superuserSecurityBlock');
+  if(suSecurity) suSecurity.style.display = (currentRole === 'superuser' && currentAuthSource === 'recovery') ? '' : 'none';
+  var userRoles = document.getElementById('userRolesBlock');
+  if(userRoles) userRoles.style.display = currentRole === 'superuser' ? '' : 'none';
+  var auditLog = document.getElementById('auditLogBlock');
+  if(auditLog) auditLog.style.display = currentRole === 'superuser' ? '' : 'none';
+  var securityTab = document.getElementById('tabSecurity');
+  if(securityTab) securityTab.style.display = currentRole === 'superuser' ? '' : 'none';
+  if(currentRole !== 'superuser'){
+    var securityView = document.getElementById('viewSecurity');
+    if(securityView && securityView.classList.contains('active')) switchTab('assign');
+  }
+  ['deleteTmv()','deleteLoc()','deleteMgr()','purgeData()'].forEach(function(call){
+    document.querySelectorAll('[onclick="'+call+'"]').forEach(function(el){ el.style.display = manager ? 'none' : ''; });
+  });
+  // Technician delete remains available to Managers by design.
+}
 
 /* LOAD DATA */
 function loadData(){
@@ -353,10 +661,16 @@ function loadData(){
     .then(d => {
       if(d.error){ alert(d.error); return; }
       dbData = d;
+      if(d.auth && d.auth.role){ currentRole = d.auth.role; currentUserName = d.auth.name || currentUserName; }
+      applyRoleUi();
       try { renderStats(); } catch(e){ console.error('renderStats', e); }
       try { renderAssignments(); } catch(e){ console.error('renderAssignments', e); }
       try { renderAssetManager(); } catch(e){ console.error('renderAssetManager', e); }
       try { populateConfig(); } catch(e){ console.error('populateConfig', e); }
+      if(currentRole === 'superuser') {
+        try { loadUserRoles(); } catch(e){ console.error('loadUserRoles', e); }
+        try { loadAuditLog(); } catch(e){ console.error('loadAuditLog', e); }
+      }
     })
     .catch(() => alert('Failed to load DB data'));
 }
@@ -384,13 +698,19 @@ function statusBadge(s){
 
 /* TABS */
 function switchTab(tab){
-  ['assign','assets'].forEach(t => {
-    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.remove('active');
-    document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1)).classList.remove('active');
+  if(tab === 'security' && currentRole !== 'superuser') tab = 'assign';
+  ['assign','assets','security'].forEach(t => {
+    var tb=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
+    var vw=document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(tb) tb.classList.remove('active');
+    if(vw) vw.classList.remove('active');
   });
-  document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
-  document.getElementById('view'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
+  var activeTab=document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1));
+  var activeView=document.getElementById('view'+tab.charAt(0).toUpperCase()+tab.slice(1));
+  if(activeTab) activeTab.classList.add('active');
+  if(activeView) activeView.classList.add('active');
   if(tab === 'assets'){ renderAssetManager(); }
+  if(tab === 'security'){ loadUserRoles(); }
 }
 
 /* ASSIGNMENTS */
@@ -408,6 +728,16 @@ function deleteAssignment(id, tmv){
       loadData();
     })
     .catch(e => alert('Delete failed: '+e.message));
+}
+function reassignAssignment(id, techNameNew){
+  if(!confirm('Reassign this assignment to '+techNameNew+'?')) return;
+  fetch('/api/assignments/'+id, { method:'PUT', headers: Object.assign({'Content-Type':'application/json'}, authHdr()), body: JSON.stringify({ technician: { name: techNameNew } }) })
+    .then(r => r.json().then(d => ({ ok:r.ok, status:r.status, d })))
+    .then(({ ok, status, d }) => {
+      if(!ok){ alert('Reassign failed ('+status+'): '+((d&&d.error)||'unknown error')); return; }
+      loadData();
+    })
+    .catch(e => alert('Reassign failed: '+e.message));
 }
 function renderAssignments(){
   const filter = document.getElementById('filterStatus').value;
@@ -443,7 +773,30 @@ function renderAssignments(){
     const dbn = document.createElement('button');
     dbn.className='btn sm danger'; dbn.textContent='Delete';
     dbn.addEventListener('click', function(){ deleteAssignment(a.id, a.tmv||''); });
+    // Reassign dropdown — reassign this one assignment to another technician
+    const rsel = document.createElement('select');
+    rsel.className='btn xs reassign-sel';
+    const cfg = dbData.config || {};
+    const techs = (cfg.technicians || []).map(t => (typeof t==='string'? t : (t&&t.name)||''));
+    const curName = techName(a.technician);
+    const ropt0 = document.createElement('option');
+    ropt0.value=''; ropt0.textContent='Reassign…'; rsel.appendChild(ropt0);
+    techs.forEach(function(nm){
+      if(!nm) return;
+      const o = document.createElement('option');
+      o.value = nm; o.textContent = nm;
+      if(nm === curName) o.selected = true;
+      rsel.appendChild(o);
+    });
+    rsel.addEventListener('change', function(){
+      const nv = rsel.value;
+      if(!nv || nv === curName){ if(nv===curName) rsel.value=''; return; }
+      reassignAssignment(a.id, nv);
+      rsel.value='';
+    });
     tdAct.appendChild(vb);
+    tdAct.appendChild(document.createTextNode(' '));
+    tdAct.appendChild(rsel);
     tdAct.appendChild(document.createTextNode(' '));
     tdAct.appendChild(dbn);
     tr.appendChild(tdAct);
@@ -451,23 +804,64 @@ function renderAssignments(){
   });
 }
 
+function mergeSheet(a){
+  // answers keyed by section title -> ordered values from tech's returned results
+  var resBySec = {};
+  (a.results||[]).forEach(function(sec){
+    resBySec[sec.title] = (sec.items||[]).map(function(it){ return it.value; });
+  });
+  function valCell(v){
+    var vLabel = '-', vCls = 'na';
+    if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
+    else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
+    else if(v!=='' && v!=null){ vLabel=esc(String(v)); vCls=''; }
+    return '<span class="cl-val '+vCls+'">'+vLabel+'</span>';
+  }
+  var out = '';
+  (a.sections||[]).forEach(function(sec){
+    var answers = resBySec[sec.title];
+    out += '<div class="sheet-sec"><strong>'+esc(sec.title||'Section')+'</strong></div>';
+    (sec.items||[]).forEach(function(item, ii){
+      var ans = (answers && answers[ii]!=null) ? answers[ii] : (item.value||'');
+      out += '<div class="cl-item sheet-row"><span class="q">'+esc(item.label||'')+'</span>'+valCell(ans)+'</div>';
+    });
+  });
+  // defensive: any result sections not present in the dispatched checklist
+  (a.results||[]).forEach(function(sec){
+    if(!(a.sections||[]).some(function(s){ return s.title===sec.title; })){
+      out += '<div class="sheet-sec"><strong>'+esc(sec.title||'Section')+'</strong></div>';
+      (sec.items||[]).forEach(function(item){
+        out += '<div class="cl-item sheet-row"><span class="q">'+esc(item.label||'')+'</span>'+valCell(item.value||'')+'</div>';
+      });
+    }
+  });
+  return out;
+}
+
 function showAssignment(id){
   const a = dbData.assignments.find(x => x.id == id);
   if(!a) return;
   document.getElementById('detailTitle').textContent = (a.tmv||'Assignment') + ' - ' + techName(a.technician);
   let html = '<div class="section"><h3>Info</h3><p>Status: <b>'+a.status+'</b><br>Technician: '+esc(techName(a.technician))+'<br>Completed: '+(a.completedAt||'-')+'</p></div>';
-  if(a.results && a.results.length){
-    html += '<div class="section"><h3>Checklist</h3><div class="checklist">';
-    a.results.forEach(function(sec){
-      html += '<div style="margin-bottom:10px"><strong>'+esc(sec.title||'Section')+'</strong></div>';
-      (sec.items||[]).forEach(function(item){
-        var v = item.value;
-        var vLabel = '-', vCls = 'na';
-        if(v===true||v==='yes'||v==='Yes'){ vLabel='YES'; vCls='yes'; }
-        else if(v===false||v==='no'||v==='No'){ vLabel='NO'; vCls='no'; }
-        else if(v){ vLabel=esc(String(v)); vCls=''; }
-        html += '<div class="cl-item"><span class="cl-val '+vCls+'">'+vLabel+'</span><span>'+esc(item.label||'')+'</span></div>';
-      });
+  // MERGED WORK-ORDER SHEET — question (left) + tech answer (right), aligned
+  // row-by-row and color-coded. Dispatched checklist (a.sections) supplies the
+  // question text; the technician's returned results (a.results) supply answers.
+  // Replaces the old two-panel layout (checklist stacked above a separate
+  // answers list).
+  if((a.sections && a.sections.length) || (a.results && a.results.length)){
+    html += '<div class="section"><h3>Work Order Checklist</h3><div class="checklist merged">' + mergeSheet(a) + '</div></div>';
+  }
+  // PHOTOS — uploaded proof photos (file names stored on the assignment;
+  // served from /uploads/). Restored after the merged-sheet rewrite dropped it.
+  if(a.photos && a.photos.length){
+    html += '<div class="section"><h3>Photos ('+a.photos.length+')</h3><div class="photo-grid">';
+    a.photos.forEach(function(p){
+      var f = p.file || '';
+      var cap = p.caption || '';
+      html += '<div class="photo-wrap">'
+            + '<img class="photo-thumb" src="/uploads/'+esc(f)+'" alt="'+esc(cap)+'" loading="lazy" data-full="/uploads/'+esc(f)+'">'
+            + (cap ? '<div class="photo-cap">'+esc(cap)+'</div>' : '')
+            + '</div>';
     });
     html += '</div></div>';
   }
@@ -475,6 +869,11 @@ function showAssignment(id){
   document.getElementById('detailPanel').style.display = 'block';
 }
 function closeDetail(){ document.getElementById('detailPanel').style.display = 'none'; }
+// Tap a photo thumbnail in the detail modal to open the full-size image.
+document.getElementById('detailContent').addEventListener('click', function(e){
+  var img = e.target.closest && e.target.closest('.photo-thumb');
+  if(img && img.dataset.full){ window.open(img.dataset.full, '_blank'); }
+});
 
 /* ===== SINGLE-PAGE ASSET MANAGER (dropdown-driven) ===== */
 
@@ -499,7 +898,12 @@ function renderAssetManager(){
   cfg.vanTypes    = cfg.vanTypes    || [];
   cfg.tmvVanMap   = cfg.tmvVanMap   || {};
 
-  // --- TMV Units (from tmvVanMap) ---
+  // Ensure "Equipment" and "Misc." are available as van-type dropdown entries.
+  ['Equipment','Misc.'].forEach(function(t){
+    if(cfg.vanTypes.indexOf(t) === -1) cfg.vanTypes.push(t);
+  });
+
+  // --- Equipment Units (from tmvVanMap) ---
   var tmvIds = Object.keys(cfg.tmvVanMap);
   _fill('selTmv', tmvIds.map(function(id){ return {value:id, label:id}; }));
   // van-type dropdowns
@@ -512,6 +916,24 @@ function renderAssetManager(){
   // --- Locations ---
   _fill('selLoc', cfg.locations.map(function(l,i){ return {value:String(i), label:l}; }));
   document.getElementById('cntLoc').textContent = '(' + cfg.locations.length + ')';
+
+  // --- Personnel district dropdowns ---
+  // Technicians belong to a specific district. Managers may use ALL to cover
+  // every district while still allowing a specific district assignment.
+  var districtOpts=[{value:'',label:'— Select district —'}].concat(cfg.locations.map(function(l){return {value:l,label:l};}));
+  var managerDistrictOpts=[{value:'',label:'— Select district —'},{value:'ALL',label:'ALL — All districts'}]
+    .concat(cfg.locations.map(function(l){return {value:l,label:l};}));
+  _fill('techDistrict',districtOpts);
+  _fill('mgrDistrict',managerDistrictOpts);
+  _fill('suDistrict',managerDistrictOpts);
+
+  // --- Superusers (normal promoted accounts only) ---
+  var superusers = Array.isArray(cfg.superusers) ? cfg.superusers : [];
+  _fill('selSu', superusers.map(function(u,i){
+    return {value:String(i), label:(u && (u.name || u.username)) || ('Superuser '+(i+1))};
+  }));
+  document.getElementById('cntSu').textContent = '(' + superusers.length + ')';
+  fillSu();
 
   // --- Technicians ---
   var prevTechName = (function(){ var s=document.getElementById('selTech'); return (s && s.selectedIndex>=0) ? s.options[s.selectedIndex].text : null; })();
@@ -547,6 +969,11 @@ function onSelTmv(){
   var curType = Array.isArray(cur) ? (cur[0]||'') : (cur||'');
   var sel = document.getElementById('selTmvType');
   if(sel && curType) sel.value = curType;
+  // populate geofence fields for this unit
+  var g = (cfg.geofences && cfg.geofences[id]) || {};
+  document.getElementById('geoLat').value = g.lat||'';
+  document.getElementById('geoLng').value = g.lng||'';
+  document.getElementById('geoRad').value = g.radius||'';
 }
 
 function updateTmvType(){
@@ -576,14 +1003,37 @@ function deleteTmv(){
   if(!id) return;
   if(!confirm('Remove TMV unit "' + id + '"?')) return;
   delete cfg.tmvVanMap[id];
+  if(cfg.geofences) delete cfg.geofences[id];
   saveConfigArray('tmvVanMap', cfg.tmvVanMap);
+}
+
+// ── Geofencing (fence definition only; live position feed pending Samsera) ──
+function geoHere(){
+  if(!navigator.geolocation){ alert('Geolocation not available'); return; }
+  navigator.geolocation.getCurrentPosition(function(p){
+    document.getElementById('geoLat').value = p.coords.latitude.toFixed(6);
+    document.getElementById('geoLng').value = p.coords.longitude.toFixed(6);
+    if(!document.getElementById('geoRad').value) document.getElementById('geoRad').value = 200;
+  }, function(e){ alert('Could not get location: ' + e.message); }, { enableHighAccuracy:true, timeout:10000 });
+}
+function setGeofence(){
+  var cfg = dbData.config;
+  var id = document.getElementById('selTmv').value;
+  if(!id){ alert('Select a TMV unit first'); return; }
+  var lat = parseFloat(document.getElementById('geoLat').value);
+  var lng = parseFloat(document.getElementById('geoLng').value);
+  if(isNaN(lat) || isNaN(lng)){ alert('Enter a valid lat & lng'); return; }
+  var rad = parseFloat(document.getElementById('geoRad').value) || 200;
+  if(!cfg.geofences) cfg.geofences = {};
+  cfg.geofences[id] = { lat:lat, lng:lng, radius:rad };
+  saveConfigArray('geofences', cfg.geofences);
 }
 
 /* ---- Locations ---- */
 function addLoc(){
   var cfg = dbData.config;
   var v = document.getElementById('newLoc').value.trim();
-  if(!v){ alert('Location name required'); return; }
+  if(!v){ alert('District name required'); return; }
   if(!cfg.locations) cfg.locations = [];
   cfg.locations.push(v);
   document.getElementById('newLoc').value = '';
@@ -593,16 +1043,111 @@ function renameLoc(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selLoc').value, 10);
   if(isNaN(i)) return;
-  var v = prompt('Rename location:', cfg.locations[i]);
+  var v = prompt('Rename district:', cfg.locations[i]);
   if(v!==null && v.trim()){ cfg.locations[i] = v.trim(); saveConfigArray('locations', cfg.locations); }
 }
 function deleteLoc(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selLoc').value, 10);
   if(isNaN(i)) return;
-  if(!confirm('Remove location "' + cfg.locations[i] + '"?')) return;
+  if(!confirm('Remove district "' + cfg.locations[i] + '"?')) return;
   cfg.locations.splice(i,1);
   saveConfigArray('locations', cfg.locations);
+}
+
+/* ---- Superusers (normal promoted accounts only) ---- */
+function suObj(i){
+  var cfg=dbData.config||{};
+  cfg.superusers=Array.isArray(cfg.superusers)?cfg.superusers:[];
+  var cur=cfg.superusers[i];
+  if(!cur) return null;
+  if(typeof cur==='string'){
+    cur={name:cur,username:cur,email:'',phone:'',district:'',password:''};
+    cfg.superusers[i]=cur;
+  }
+  if(!cur.username) cur.username=cur.name||'';
+  if(!cur.name) cur.name=cur.username||'';
+  if(!cur.email) cur.email='';
+  if(!cur.phone) cur.phone='';
+  if(!cur.district) cur.district='';
+  if(typeof cur.password==='undefined') cur.password='';
+  return cur;
+}
+function fillSu(){
+  var sel=document.getElementById('selSu');
+  if(!sel || sel.value===''){
+    ['suName','suUser','suEmail','suPhone','suPass','suPassConfirm'].forEach(function(id){
+      var e=document.getElementById(id); if(e)e.value='';
+    });
+    var sd=document.getElementById('suDistrict'); if(sd)sd.value='';
+    return;
+  }
+  var i=parseInt(sel.value,10);
+  if(isNaN(i))return;
+  var u=suObj(i); if(!u)return;
+  document.getElementById('suName').value=u.name||'';
+  document.getElementById('suUser').value=u.username||'';
+  document.getElementById('suEmail').value=u.email||'';
+  document.getElementById('suPhone').value=u.phone||'';
+  document.getElementById('suDistrict').value=u.district||'';
+  document.getElementById('suPass').value='';
+  document.getElementById('suPassConfirm').value='';
+}
+function saveSu(){
+  if(currentRole!=='superuser'){alert('Superuser required');return;}
+  var cfg=dbData.config||{};
+  cfg.superusers=Array.isArray(cfg.superusers)?cfg.superusers:[];
+  var i=parseInt(document.getElementById('selSu').value,10);
+  if(isNaN(i)){alert('Select a Superuser first');return;}
+  var u=suObj(i); if(!u)return;
+
+  var name=document.getElementById('suName').value.trim();
+  var username=document.getElementById('suUser').value.trim();
+  var pw=document.getElementById('suPass').value||'';
+  var pwConfirm=document.getElementById('suPassConfirm').value||'';
+
+  if(!username){alert('Login username required');return;}
+  if(!/^[A-Za-z0-9._@-]{3,64}$/.test(username)){
+    alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen');return;
+  }
+  if(pw!==pwConfirm){alert('Superuser passwords do not match');return;}
+  if(pw && (pw.length<10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){
+    alert('Password must be at least 10 characters with an uppercase letter, number, and special character');return;
+  }
+
+  var payload=cfg.superusers.map(function(raw,idx){
+    var x=(typeof raw==='string')?{name:raw,username:raw}:raw;
+    if(idx===i){
+      return {
+        name:name||username,
+        username:username,
+        email:document.getElementById('suEmail').value.trim(),
+        phone:document.getElementById('suPhone').value.trim(),
+        district:document.getElementById('suDistrict').value||'',
+        password:pw
+      };
+    }
+    return {
+      name:x.name||x.username||'',
+      username:x.username||'',
+      email:x.email||'',
+      phone:x.phone||'',
+      district:x.district||'',
+      password:''
+    };
+  });
+
+  fetch('/api/superusers',{
+    method:'PUT',
+    headers:Object.assign({'Content-Type':'application/json'},authHdr()),
+    body:JSON.stringify({superusers:payload})
+  })
+  .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+  .then(function(x){
+    if(!x.ok)throw new Error((x.d&&x.d.error)||'Superuser save failed');
+    loadData();
+  })
+  .catch(function(e){alert(e.message||'Superuser save failed');});
 }
 
 /* ---- Technicians ---- */
@@ -611,33 +1156,62 @@ function addTech(){
   var v = document.getElementById('newTech').value.trim();
   if(!v){ alert('Technician name required'); return; }
   if(!cfg.technicians) cfg.technicians = [];
-  cfg.technicians.push({name:v, email:'', phone:''});
+  cfg.technicians.push({name:v, username:'', email:'', phone:'', district:'', password:''});
   document.getElementById('newTech').value = '';
-  saveConfigArray('technicians', cfg.technicians);
+  saveTechnicians();
 }
 function techObj(i){
   var cfg = dbData.config;
   var cur = cfg.technicians[i];
   if(typeof cur==='string'){ cfg.technicians[i] = {name:cur, email:'', phone:''}; cur = cfg.technicians[i]; }
+  if(!cur.username) cur.username='';
   if(!cur.email)   cur.email='';
   if(!cur.phone)   cur.phone='';
+  if(!cur.district) cur.district='';
+  if(typeof cur.password==='undefined') cur.password='';
   return cur;
 }
 function fillTechContact(){
   var i = parseInt(document.getElementById('selTech').value, 10);
   if(isNaN(i)) return;
   var t = techObj(i);
+  document.getElementById('techUser').value = t.username || '';
   document.getElementById('techEmail').value = t.email || '';
   document.getElementById('techPhone').value = t.phone || '';
+  document.getElementById('techDistrict').value = t.district || '';
+  document.getElementById('techPass').value = ''; // never echo the stored hash
+  document.getElementById('techPassConfirm').value = '';
+}
+function saveTechnicians(){
+  var cfg = dbData.config || {};
+  fetch('/api/technicians', {
+    method:'PUT',
+    headers:{ ...authHdr(), 'Content-Type':'application/json' },
+    body:JSON.stringify({ technicians:(cfg.technicians||[]).map(function(raw){
+      var t=typeof raw==='string'?{name:raw}:raw;
+      return { name:t.name||'', username:t.username||'', email:t.email||'', phone:t.phone||'', district:t.district||'', password:(t.password && !String(t.password).startsWith('scrypt$'))?t.password:'' };
+    }) })
+  }).then(function(r){ return r.json().then(function(d){return {ok:r.ok,d:d};}); })
+    .then(function(x){ if(!x.ok) throw new Error((x.d&&x.d.error)||'Technician save failed'); loadData(); showSaved('techStatus'); })
+    .catch(function(e){ alert(e.message||'Technician save failed'); });
 }
 function saveTechContact(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selTech').value, 10);
   if(isNaN(i)){ alert('Select a technician first'); return; }
   var t = techObj(i);
-  t.email    = document.getElementById('techEmail').value.trim();
-  t.phone    = document.getElementById('techPhone').value.trim();
-  saveConfigArray('technicians', cfg.technicians);
+  var username = document.getElementById('techUser').value.trim();
+  var pw = document.getElementById('techPass').value || '';
+  var pwConfirm = document.getElementById('techPassConfirm').value || '';
+  if(pw !== pwConfirm){ alert('Technician passwords do not match'); return; }
+  if(username && !/^[A-Za-z0-9._@-]{3,64}$/.test(username)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
+  t.username = username;
+  t.email = document.getElementById('techEmail').value.trim();
+  t.phone = document.getElementById('techPhone').value.trim();
+  t.district = document.getElementById('techDistrict').value || '';
+  if(pw) t.password = pw;
+  saveTechnicians();
 }
 function renameTech(){
   var cfg = dbData.config;
@@ -650,9 +1224,25 @@ function renameTech(){
     if(typeof cur==='string') cfg.technicians[i] = {name:v.trim(), email:'', phone:''};
     else cur.name = v.trim();
     if(document.getElementById('selTech').value==String(i)) fillTechContact();
-    saveConfigArray('technicians', cfg.technicians);
+    saveTechnicians();
   }
 }
+function openSmsPreferences(kind){
+  var item = null;
+  if(kind==='technician'){
+    var ti = parseInt(document.getElementById('selTech').value,10);
+    if(!isNaN(ti)) item = techObj(ti);
+  } else {
+    var mi = parseInt(document.getElementById('selMgr').value,10);
+    if(!isNaN(mi)) item = mgrObj(mi);
+  }
+  if(!item){ alert('Select a '+(kind==='technician'?'technician':'manager')+' first'); return; }
+  var name = item.name || item.username || '';
+  var phone = item.phone || '';
+  if(!phone){ alert('Save a mobile phone number first'); return; }
+  window.open('/sms-consent.html?name='+encodeURIComponent(name)+'&phone='+encodeURIComponent(phone), '_blank');
+}
+
 function deleteTech(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selTech').value, 10);
@@ -661,7 +1251,7 @@ function deleteTech(){
   var name = typeof cur==='string' ? cur : (cur.name||'');
   if(!confirm('Remove technician "' + name + '"?')) return;
   cfg.technicians.splice(i,1);
-  saveConfigArray('technicians', cfg.technicians);
+  saveTechnicians();
 }
 
 /* ---- Managers (full admin rights) ---- */
@@ -673,6 +1263,7 @@ function mgrObj(i){
   if(typeof cur==='string'){ cfg.managers[i] = {name:cur, username:cur, password:''}; cur = cfg.managers[i]; }
   if(!cur.username) cur.username = cur.name || '';
   if(!cur.name) cur.name = cur.username || '';
+  if(!cur.district) cur.district = '';
   if(typeof cur.password==='undefined') cur.password = '';
   return cur;
 }
@@ -683,14 +1274,18 @@ function fillMgr(){
   if(!m) return;
   document.getElementById('mgrName').value = m.name || '';
   document.getElementById('mgrUser').value = m.username || '';
+  document.getElementById('mgrEmail').value = m.email || '';
+  document.getElementById('mgrPhone').value = m.phone || '';
+  document.getElementById('mgrDistrict').value = m.district || '';
   document.getElementById('mgrPass').value = ''; // never echo the stored hash
+  document.getElementById('mgrPassConfirm').value = '';
 }
 function addMgr(){
   var cfg = dbData.config;
   if(!cfg.managers) cfg.managers = [];
   var v = document.getElementById('newMgr').value.trim();
   if(!v){ alert('Manager name required'); return; }
-  cfg.managers.push({name:v, username:v, password:''});
+  cfg.managers.push({name:v, username:v, email:'', phone:'', district:'', password:''});
   document.getElementById('newMgr').value = '';
   saveConfigArray('managers', cfg.managers);
 }
@@ -704,16 +1299,22 @@ function saveMgr(){
   var nm = document.getElementById('mgrName').value.trim();
   var un = document.getElementById('mgrUser').value.trim();
   var pw = document.getElementById('mgrPass').value;
+  var pwConfirm = document.getElementById('mgrPassConfirm').value || '';
+  if(pw !== pwConfirm){ alert('Manager passwords do not match'); return; }
   if(!un){ alert('Login username required'); return; }
   m.name = nm || un;
   m.username = un;
+  m.email = document.getElementById('mgrEmail').value.trim();
+  m.phone = document.getElementById('mgrPhone').value.trim();
+  m.district = document.getElementById('mgrDistrict').value || '';
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
   if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
   // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
   fetch('/api/managers', {
     method:'PUT',
     headers:{ ...authHdr(), 'Content-Type':'application/json' },
     body: JSON.stringify({ managers: cfg.managers.map(function(x){
-      return { name:x.name, username:x.username, password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
+      return { name:x.name, username:x.username, email:x.email||'', phone:x.phone||'', district:x.district||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
     }) })
   })
   .then(function(){ loadData(); })
@@ -749,6 +1350,11 @@ function renderCatCards(){
   var cfg = dbData.config || {};
   cfg.checklist = cfg.checklist || [];
   document.getElementById('cntCat').textContent = '(' + cfg.checklist.length + ')';
+  var toggleAllBtn = document.getElementById('toggleAllCatsBtn');
+  if(toggleAllBtn){
+    var everyOpen = cfg.checklist.length > 0 && cfg.checklist.every(function(_, ci){ return isCatOpen(ci); });
+    toggleAllBtn.textContent = everyOpen ? 'Collapse All' : 'Expand All';
+  }
   var wrap = document.getElementById('catCards');
   wrap.innerHTML = '';
   cfg.checklist.forEach(function(c, ci){
@@ -770,7 +1376,8 @@ function renderCatCards(){
         items.forEach(function(it, ii){
           var label = typeof it==='string' ? it : (it.label||'');
           var type  = typeof it==='object' ? (it.type||'text') : 'text';
-          html += '<div class="taskline">' +
+          html += '<div class="taskline" draggable="true" data-ci="' + ci + '" data-ii="' + ii + '" ondragstart="taskDragStart(event,' + ci + ',' + ii + ')" ondragover="taskDragOver(event,' + ci + ',' + ii + ')" ondragleave="taskDragLeave(event)" ondrop="taskDrop(event,' + ci + ',' + ii + ')" ondragend="taskDragEnd(event)">' +
+            '<span class="taskdrag" title="Drag to reorder" style="cursor:grab;font-size:18px;line-height:1;user-select:none;padding:0 6px">⋮⋮</span>' +
             '<span class="tlabel">' + esc(label) + '</span>' +
             '<select class="ttype-sel" onchange="changeTaskType(' + ci + ',' + ii + ',this.value)">' +
               taskTypeOptions(type) +
@@ -803,6 +1410,13 @@ function renderCatCards(){
 var _openCats = {};
 function isCatOpen(ci){ return _openCats[ci] === true; }
 function toggleCat(ci){ _openCats[ci] = !isCatOpen(ci); renderCatCards(); }
+function toggleAllCats(){
+  var cfg = dbData.config || {};
+  var cats = cfg.checklist || [];
+  var everyOpen = cats.length > 0 && cats.every(function(_, ci){ return isCatOpen(ci); });
+  cats.forEach(function(_, ci){ _openCats[ci] = !everyOpen; });
+  renderCatCards();
+}
 function toggleCatInclude(ci, val){
   var cfg = dbData.config;
   if(!cfg.checklist[ci]) return;
@@ -871,6 +1485,60 @@ function changeTaskType(ci, ii, val){
   cat.items[ii].type = val;
   saveConfigArray('checklist', cfg.checklist);
 }
+var _taskDrag = null;
+function clearTaskDropLines(){
+  document.querySelectorAll('.taskline').forEach(function(el){
+    el.style.borderTop = '';
+    el.style.borderBottom = '';
+    el.style.opacity = '';
+  });
+}
+function taskDragStart(e, ci, ii){
+  _taskDrag = {ci:ci, ii:ii};
+  if(e.dataTransfer){
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', ci + ':' + ii); }catch(_e){}
+  }
+  e.currentTarget.style.opacity = '0.45';
+}
+function taskDragOver(e, ci, ii){
+  if(!_taskDrag || _taskDrag.ci !== ci) return;
+  e.preventDefault();
+  if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  clearTaskDropLines();
+  var r = e.currentTarget.getBoundingClientRect();
+  var after = e.clientY > (r.top + r.height / 2);
+  e.currentTarget.style.borderTop = after ? '' : '3px solid #812F2F';
+  e.currentTarget.style.borderBottom = after ? '3px solid #812F2F' : '';
+}
+function taskDragLeave(e){
+  e.currentTarget.style.borderTop = '';
+  e.currentTarget.style.borderBottom = '';
+}
+function taskDrop(e, ci, ii){
+  if(!_taskDrag || _taskDrag.ci !== ci) return;
+  e.preventDefault();
+  var cfg = dbData.config;
+  var cat = cfg.checklist && cfg.checklist[ci];
+  if(!cat || typeof cat==='string' || !Array.isArray(cat.items)) return;
+  var r = e.currentTarget.getBoundingClientRect();
+  var after = e.clientY > (r.top + r.height / 2);
+  var from = _taskDrag.ii;
+  var insertAt = ii + (after ? 1 : 0);
+  var moved = cat.items.splice(from, 1)[0];
+  if(from < insertAt) insertAt--;
+  if(insertAt < 0) insertAt = 0;
+  if(insertAt > cat.items.length) insertAt = cat.items.length;
+  cat.items.splice(insertAt, 0, moved);
+  _openCats[ci] = true;
+  _taskDrag = null;
+  clearTaskDropLines();
+  saveConfigArray('checklist', cfg.checklist);
+}
+function taskDragEnd(){
+  _taskDrag = null;
+  clearTaskDropLines();
+}
 
 
 /* CONFIG HELPERS */
@@ -885,7 +1553,8 @@ function showSaved(elId){
 function saveConfigArray(key, value){
   var cfg = dbData.config;
   cfg[key] = value;
-  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(cfg) })
+  var patch = {}; patch[key] = value;
+  fetch('/api/config', { method:'PUT', headers:{...authHdr(),'Content-Type':'application/json'}, body:JSON.stringify(patch) })
     .then(function(){ loadData(); showSaved('techStatus'); })
     .catch(function(){ alert('Update failed'); });
 }

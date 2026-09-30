@@ -20,22 +20,26 @@ function updateDispatchButtons() {
   const ready = !!(values.tmv && values.technician && values.location && values.date);
   ['dispatchBtn','genBtn'].forEach(id => {
     const button=document.getElementById(id); button.disabled=dispatchBusy||!ready;
-    button.textContent=dispatchBusy?'Saving…':'Assign Technician and Generate Report';
+    button.textContent=dispatchBusy?'Saving…':'Assign Technician';
   });
 }
 function buildTmvGrid() {
-  const map=configData.tmvVanMap||{}, techs=configData.technicians||[];
+  const map=configData.tmvVanMap||{}, allTechs=configData.technicians||[];
   const type=document.getElementById('unitType'), district=document.getElementById('unitDistrict'), tech=document.getElementById('unitTech');
+  const techs=personnelForDistrict(allTechs,district.value||'');
   if (!type.dataset.loaded) {
     (configData.vanTypes||[]).forEach(v=>type.add(new Option(v,v)));
     (configData.locations||[]).forEach(v=>district.add(new Option(v,v)));
-    techs.forEach(t=>tech.add(new Option(t.name,t.name)));
     const today=new Date();
     type.dataset.loaded='true'; document.getElementById('unitDate').value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
     ['unitSearch','unitType','unitTech','unitStatus'].forEach(id=>document.getElementById(id).addEventListener('input',buildTmvGrid));
-    district.addEventListener('change',()=>{updateDispatchButtons();});
+    district.addEventListener('change',()=>{ dispatchUnit=null; buildTmvGrid(); updateDispatchButtons(); });
     document.getElementById('unitDate').addEventListener('input',updateDispatchButtons);
   }
+  const priorTech=tech.value||'';
+  tech.innerHTML='<option value="">All technicians</option>';
+  techs.forEach(t=>tech.add(new Option(t.name,t.name)));
+  if(techs.some(t=>t.name===priorTech)) tech.value=priorTech;
   const query=document.getElementById('unitSearch').value.toLowerCase(), status=document.getElementById('unitStatus').value;
   const keys=Object.keys(map).filter(k=>{
     const current=latestForUnit(k), name=dispatchDrafts[k]??current?.technician?.name??'';
@@ -48,10 +52,10 @@ function buildTmvGrid() {
     button.onclick=()=>openTmv(k);
     const label=document.createElement('label');label.className='card-tech';label.append(document.createTextNode('Technician'));
     const select=document.createElement('select');select.setAttribute('aria-label','Technician for '+k);select.add(new Option('— choose technician —',''));
-    techs.forEach(t=>select.add(new Option(t.name,t.name)));select.value=dispatchDrafts[k]??current?.technician?.name??'';
+    techs.forEach(t=>select.add(new Option(t.name,t.name)));select.value=dispatchDrafts[k]??'';
     select.onchange=()=>{
       dispatchDrafts[k]=select.value;dispatchUnit=k;
-      dispatchNotice(select.value?'Ready to assign '+k+' to '+select.value+'. Select a district and date, then generate the report.':'Choose a technician for '+k+'.');
+      dispatchNotice(select.value?'Ready to assign '+k+' to '+select.value+'. Select a district and date, then click Assign Technician.':'Choose a technician for '+k+'.');
       buildTmvGrid();
     };
     label.append(select);card.append(button,label);grid.append(card);
@@ -63,8 +67,10 @@ const openInspection = openTmv;
 openTmv = function(unit) {
   openInspection(unit); dispatchUnit=unit;
   const latest=latestForUnit(unit);
-  document.getElementById('dTech').value=dispatchDrafts[unit]??latest?.technician?.name??'';
+  document.getElementById('dTech').value=dispatchDrafts[unit]??'';
   document.getElementById('dLoc').value=document.getElementById('unitDistrict').value||latest?.location||'';
+  if(typeof rebuildDetailTechSelect==='function') rebuildDetailTechSelect();
+  document.getElementById('dTech').value=dispatchDrafts[unit]??'';
   document.getElementById('dDate').value=document.getElementById('unitDate').value;
   updateDispatchButtons();
 };
@@ -86,28 +92,28 @@ function showWorkOrder(assignment) {
     const a=document.createElement('a');a.href=url;a.download=assignment.tmv+'-'+assignment.id+'-report.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
   const actions=document.createElement('div');actions.className='links';link.className='em';actions.append(link,download);
+  const copy=document.createElement('button');copy.className='btn ghost';copy.textContent='Copy Ticket';copy.onclick=copyTicket;actions.append(copy);
+  if(assignment.technician.email){
+    const email=document.createElement('a');email.className='em';email.textContent='Send via Email';
+    email.href='mailto:'+encodeURIComponent(assignment.technician.email)+'?subject='+encodeURIComponent('CUDD PM Ticket — '+assignment.tmv)+'&body='+encodeURIComponent(assignment.report.text+'\n'+link.href);
+    email.onclick=mailtoFallback;actions.append(email);
+  }
+  if(assignment.technician.phone){
+    const sms=document.createElement('button');sms.className='btn ghost';sms.textContent='Send via SMS';
+    sms.dataset.sms=assignment.technician.phone.replace(/\D/g,'');sms.dataset.ticket=encodeURIComponent(assignment.report.text+'\n'+link.href);
+    sms.onclick=()=>sendDispatchSms(sms);actions.append(sms);
+  }
   out.append(note,report,actions);
 }
-async function assignAndGenerateReport() {
-  if(dispatchBusy)return;
+function assignAndGenerateReport() {
   const values=dispatchValues();
   if(!values.tmv||!values.technician||!values.location||!values.date){dispatchNotice('Select a TMV technician, district and date first.');return;}
-  const fingerprint=JSON.stringify(values);
-  if(!pendingDispatch||pendingDispatch.fingerprint!==fingerprint){
-    const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
-    pendingDispatch={fingerprint,requestId:Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')};
-    try{sessionStorage.setItem('tmv.pendingDispatch',JSON.stringify(pendingDispatch));}catch(_){}
-  }
-  dispatchBusy=true;updateDispatchButtons();document.getElementById('errSlot').replaceChildren();
-  let saved=false;
-  try{
-    const response=await fetch('/api/work-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,requestId:pendingDispatch.requestId})});
-    const data=await response.json();if(!response.ok)throw new Error(data.error||'Unable to save work order');
-    saved=true;dispatchDrafts[values.tmv]=values.technician;
-    assignments=assignments.filter(a=>a.id!==data.assignment.id).concat(data.assignment);
-    buildTracker();buildTechFilter();buildTmvGrid();showWorkOrder(data.assignment);
-  }catch(error){showErr(saved?'Work order saved. Refresh to view the report.':'Assignment was not confirmed. Retry with the same selections; this will not duplicate a saved request. '+error.message);}
-  finally{dispatchBusy=false;updateDispatchButtons();}
+  try {
+    // No assignment is saved until the section selection page is submitted.
+    const draftId=crypto.randomUUID();
+    sessionStorage.setItem('tmv.workOrderDraft.'+draftId,JSON.stringify(values));
+    window.location.assign('/work-order-builder.html?draft='+encodeURIComponent(draftId));
+  } catch(error) { showErr('Unable to open the work order. Enable browser session storage and try again. '+error.message); }
 }
 async function loadDemoFromToolbar(button){
   button.disabled=true;
