@@ -1,25 +1,30 @@
-# Runtime data (not source)
-assignments.json
-uploads/
+# TMV Azure one-pull repository
+# Keep the deployable application state in GitHub master:
+#   .env
+#   tmv.db
+#   uploads/
+#   assignments.json (if present)
+#
+# Ignore only disposable/recreated runtime files.
+
+# SQLite transient files
+tmv.db-shm
+tmv.db-wal
+
+# Runtime logs / process state
 server.log
 tunnel.log
 tunnel-url.txt
-tmv.db
-tmv.db-shm
-tmv.db-wal
 server.pid
+tunnel.pid
 watchdog.lock
 watchdog.log
+watchdog.boot.log
 
-# Node
+# Node dependencies are rebuilt with npm install
 node_modules/
 npm-debug.log*
-
-# Secrets (NEVER commit — contains live API keys)
-.env
 
 # OS / editor
 .DS_Store
 *.swp
-tunnel.pid
-watchdog.boot.log
