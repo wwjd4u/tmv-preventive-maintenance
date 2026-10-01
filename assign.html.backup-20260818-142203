@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work Order · CUDD PM</title>
+<style>
+  :root{ --line:#e6e6ec; --cudd:#13315c; --blue:#2563eb; --orange:#d97706; --green:#16a34a; --red:#dc2626; --bg:#f4f5f8; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:#1f2430}
+  .wrap{max-width:920px;margin:0 auto;padding:18px 16px 60px}
+  a.back{display:inline-block;margin:4px 0 14px;color:var(--blue);text-decoration:none;font-weight:600}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 18px 8px;box-shadow:0 1px 3px rgba(20,20,40,.05)}
+  .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .top h1{font-size:20px;margin:0;color:var(--cudd)}
+  .st{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;text-transform:capitalize}
+  .st-assigned{background:#e8f0ff;color:var(--blue)}
+  .st-in_progress{background:#fff2dd;color:var(--orange)}
+  .st-completed{background:#e7f6ec;color:var(--green)}
+  .st-rejected{background:#fde8e8;color:var(--red)}
+  .sub{color:#667;font-size:13px;margin:6px 0 2px}
+  .tech{color:#334;font-size:14px;margin:4px 0 10px}
+  .contact-bar{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 4px}
+  .cb-call,.cb-email,.cb-sms{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;font-size:14px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:#f8f9fb;cursor:pointer}
+  .cb-call{background:#e8f0ff;color:var(--blue);border-color:#cfe0ff}
+  .cb-email{background:#eafaf0;color:var(--green);border-color:#cdeed7}
+  .cb-sms{background:#fff2dd;color:var(--orange);border-color:#ffe0b0}
+  .section{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0}
+  .section h3{margin:0 0 8px;font-size:15px;background:#eaf2fb;padding:8px 11px;border-radius:8px;color:var(--cudd)}
+  .sheet-sec{margin:12px 0 2px;color:#234;font-weight:700;font-size:13px}
+  .cl-item{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:6px 2px;border-bottom:1px dashed #eee}
+  .cl-item:last-child{border-bottom:0}
+  .q{flex:1;text-align:left;color:#222}
+  .cl-val{display:inline-block;min-width:54px;text-align:center;padding:3px 9px;border-radius:6px;font-weight:700;font-size:12px;margin-left:auto}
+  .cl-val.yes{background:#e7f6ec;color:#15803d}
+  .cl-val.no{background:#fde8e8;color:#b91c1c}
+  .cl-val.na{background:#f1f1f1;color:#888}
+  .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+  .photo img{width:100%;border-radius:10px;border:1px solid var(--line)}
+  .muted{color:#888;font-size:13px}
+  .err{color:var(--red);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html#tracker">← Back to Tracker</a>
+  <div id="root"><p class="muted">Loading work order…</p></div>
+</div>
+<script>
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function statusLabel(s){ return (s||'assigned').replace('_',' '); }
+
+function contactBar(t, cfg){
+  if(!t) return '<div class="muted">No technician assigned.</div>';
+  var name = (typeof t === 'string') ? t : (t.name || '');
+  // join contact details from config technicians (by name) when the record
+  // only carries a name string or lacks phone/email.
+  var phone='', em='';
+  if(typeof t === 'object'){ phone=t.phone||''; em=t.email||''; }
+  if((!phone||!em) && cfg && cfg.technicians){
+    var rec=(cfg.technicians||[]).filter(function(x){ return x.name===name; })[0];
+    if(rec){ phone=phone||rec.phone||''; em=em||rec.email||''; }
+  }
+  if(!name) return '<div class="muted">No technician assigned.</div>';
+  var sms=String(phone).replace(/\D/g,'');
+  var b='<div class="contact-bar">';
+  if(phone) b+='<a class="cb-call" href="tel:'+esc(phone)+'">📞 Call</a>';
+  if(em) b+='<a class="cb-email" href="mailto:'+esc(em)+'">✉️ Email</a>';
+  if(sms) b+='<button class="cb-sms" data-sms="'+esc(sms)+'" onclick="sendSms(this)">💬 Text / SMS</button>';
+  if(!phone && !em) b+='<span class="muted">No phone/email on file for '+esc(name)+' — add them in config to enable Call / Text / Email.</span>';
+  b+='</div>';
+  return b;
+}
+
+// Row-aligned sheet: question left, color-coded answer right.
+function mergeSheet(a){
+  var resBySec={};
+  (a.results||[]).forEach(function(sec){
+    resBySec[sec.title]=(sec.items||[]).map(function(it){ return it.value; });
+  });
+  function valCell(v){
+    var lab='-', cls='na';
+    if(v===true||v==='yes'||v==='Yes'){ lab='YES'; cls='yes'; }
+    else if(v===false||v==='no'||v==='No'){ lab='NO'; cls='no'; }
+    else if(v!=='' && v!=null){ lab=esc(String(v)); cls=''; }
+    return '<span class="cl-val '+cls+'">'+lab+'</span>';
+  }
+  var out='';
+  (a.sections||[]).forEach(function(sec){
+    var ans=resBySec[sec.title];
+    out+='<div class="sheet-sec">'+esc(sec.title||'Section')+'</div>';
+    (sec.items||[]).forEach(function(item,ii){
+      var a2=(ans&&ans[ii]!=null)?ans[ii]:(item.value||'');
+      out+='<div class="cl-item"><span class="q">'+esc(item.label||'')+'</span>'+valCell(a2)+'</div>';
+    });
+  });
+  // defensive: extra result sections not in dispatched checklist
+  (a.results||[]).forEach(function(sec){
+    if(!(a.sections||[]).some(function(s){ return s.title===sec.title; })){
+      out+='<div class="sheet-sec">'+esc(sec.title||'Section')+'</div>';
+      (sec.items||[]).forEach(function(item){
+        out+='<div class="cl-item"><span class="q">'+esc(item.label||'')+'</span>'+valCell(item.value||'')+'</div>';
+      });
+    }
+  });
+  return out;
+}
+
+function photoGrid(photos){
+  if(!photos||!photos.length) return '';
+  return '<div class="photos">'+photos.map(function(p){
+    var src=p.file?('/uploads/'+encodeURIComponent(p.file)):p.local;
+    return '<div class="photo"><img src="'+esc(src)+'" alt="" loading="lazy"></div>';
+  }).join('')+'</div>';
+}
+
+async function sendSms(btn){
+  var num=btn.getAttribute('data-sms')||'';
+  if(!num){ alert('No phone number on file for this technician.'); return; }
+  var msg='CUDD PM: work order '+ (window.__tmv||'') +' — open the PM app to view details.';
+  var prev=btn.textContent; btn.disabled=true; btn.textContent='Sending…';
+  try{
+    var r=await fetch('/api/sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:num,message:msg})});
+    var d=await r.json();
+    if(!r.ok||!d.ok) throw new Error(d.error||('HTTP '+r.status));
+    btn.textContent='✓ Sent';
+    setTimeout(function(){ btn.textContent=prev; btn.disabled=false; },2500);
+  }catch(e){ btn.disabled=false; btn.textContent=prev; alert('SMS failed: '+(e.message||e)); }
+}
+
+(async function(){
+  var id=new URLSearchParams(location.search).get('id');
+  var root=document.getElementById('root');
+  if(!id){ root.innerHTML='<p class="err">No work order id in URL.</p>'; return; }
+  var cfg={};
+  try{ var cr=await fetch('/api/config'); if(cr.ok) cfg=await cr.json(); }catch(e){}
+  if(!cfg.technicians){ try{ var cf=await fetch('/config.json'); if(cf.ok) cfg=await cf.json(); }catch(e){} }
+  try{
+    var r=await fetch('/api/assignments/'+encodeURIComponent(id));
+    if(!r.ok){ root.innerHTML='<p class="err">Work order not found (HTTP '+r.status+').</p>'; return; }
+    var d=await r.json();
+    var a=d.assignment; if(!a){ root.innerHTML='<p class="err">Empty work order.</p>'; return; }
+    window.__tmv=a.tmv||'';
+    var t=a.technician||{};
+    var cnt=0; (a.sections||[]).forEach(function(s){ cnt+=(s.items||[]).length; });
+    var sub=[a.vanType,a.location,a.date].filter(Boolean).map(esc).join(' · ');
+    var h='<div class="card">';
+    h+='<div class="top"><h1>'+esc(a.tmv||'Untitled')+'</h1><span class="st st-'+(a.status||'assigned')+'">'+statusLabel(a.status)+'</span></div>';
+    if(sub) h+='<div class="sub">'+sub+'</div>';
+    var techName=(typeof t==='string')?t:(t.name||'');
+    if(techName) h+='<div class="tech">👷 '+esc(techName)+'</div>';
+    h+=contactBar(t, cfg);
+    if(cnt) h+='<div class="muted" style="margin:6px 0">'+cnt+' items · '+(a.sections?a.sections.length:0)+' sections</div>';
+    h+='<div class="section"><h3>Work Order Checklist</h3>'+mergeSheet(a)+'</div>';
+    if((a.photos||[]).length) h+='<div class="section"><h3>Photos</h3>'+photoGrid(a.photos)+'</div>';
+    h+='</div>';
+    root.innerHTML=h;
+  }catch(e){ root.innerHTML='<p class="err">Error: '+(e.message||e)+'</p>'; }
+})();
+</script>
+</body>
+</html>

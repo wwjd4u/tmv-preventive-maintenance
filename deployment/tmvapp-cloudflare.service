@@ -1,0 +1,19 @@
+[Unit]
+Description=TMV Cloudflare Tunnel
+After=NetworkManager.service tmvapp-node.service
+Requires=tmvapp-node.service
+
+[Service]
+Type=simple
+User=jason_guynes
+Group=jason_guynes
+WorkingDirectory=/home/jason_guynes/preventive-maintenance-app
+Environment=HOME=/home/jason_guynes
+
+ExecStart=/usr/local/bin/cloudflared tunnel --config /home/jason_guynes/preventive-maintenance-app/tmv-app.yml run tmv-app
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

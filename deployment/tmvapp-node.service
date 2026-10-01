@@ -1,0 +1,18 @@
+[Unit]
+Description=TMV Preventive Maintenance Node Server
+After=NetworkManager.service
+
+[Service]
+Type=simple
+User=jason_guynes
+Group=jason_guynes
+WorkingDirectory=/home/jason_guynes/preventive-maintenance-app
+Environment=HOME=/home/jason_guynes
+
+ExecStart=/home/jason_guynes/.hermes/node/bin/node /home/jason_guynes/preventive-maintenance-app/api-server.js
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

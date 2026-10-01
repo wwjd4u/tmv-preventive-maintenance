@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — CUDD Energy Services TMV Preventive Maintenance SMS</title>
+<style>
+  :root { --c:#0b3d2e; --bg:#f7f8f7; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:var(--bg); color:#1a1a1a; line-height:1.6; }
+  .wrap { max-width:780px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { color:var(--c); font-size:1.6rem; margin-bottom:4px; }
+  h2 { color:var(--c); font-size:1.15rem; margin-top:32px; }
+  .meta { color:#666; font-size:.85rem; margin-bottom:24px; }
+  a { color:#0a6b4f; }
+  p, li { font-size:.96rem; }
+  code { background:#eef1ef; padding:1px 5px; border-radius:4px; }
+  .footer { margin-top:40px; padding-top:16px; border-top:1px solid #ddd; color:#888; font-size:.82rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Privacy Policy</h1>
+  <div class="meta">CUDD Energy Services — TMV Preventive Maintenance SMS Program · Effective date: July 23, 2026</div>
+
+  <h2>1. Who We Are</h2>
+  <p>This SMS program is operated by CUDD Energy Services ("we," "us") to send maintenance dispatch and work-order notifications to field technicians and contracted service personnel through the TMV Preventive Maintenance web application (<code>https://tmvapp.local-journal.com</code>).</p>
+
+  <h2>2. Information We Collect</h2>
+  <p>We collect only the information needed to deliver work-related SMS messages:</p>
+  <ul>
+    <li><strong>Mobile phone number</strong> — provided by the technician in their app profile.</li>
+    <li><strong>Name and role</strong> — to route the correct assignments.</li>
+    <li><strong>Message content</strong> — dispatch tickets, unit/vessel identifiers (e.g., TMV-4471), van type, assigned functions, and the work-order link. This content is operational and contains no sensitive financial or health information.</li>
+  </ul>
+
+  <h2>3. How We Use Information</h2>
+  <ul>
+    <li>To send maintenance dispatch, assignment, and work-order completion notifications.</li>
+    <li>To confirm receipt and log completion of assigned functions in the PM app.</li>
+    <li>We do <strong>not</strong> sell, rent, or share phone numbers or message content with third parties for marketing.</li>
+  </ul>
+
+  <h2>4. Message Frequency &amp; Rates</h2>
+  <p>Message frequency varies with assigned work — typically 1–10 messages per day per technician. Standard message and data rates may apply under your mobile carrier plan.</p>
+
+  <h2>5. Your Choices &amp; Opt-Out</h2>
+  <ul>
+    <li>Reply <code>STOP</code> to any message to opt out of SMS alerts. You will receive a confirmation and no further messages.</li>
+    <li>Reply <code>HELP</code> for assistance, or email the program administrator.</li>
+    <li>You may also disable SMS in your TMV PM app profile at any time.</li>
+  </ul>
+
+  <h2>6. Data Retention &amp; Security</h2>
+  <p>Phone numbers and message logs are stored on access-controlled servers and retained only as long as the technician relationship is active, after which they are removed. We use TLS in transit and restricted access controls at rest.</p>
+
+  <h2>7. Contact</h2>
+  <p>For privacy questions or to request deletion of your mobile number, contact the PM app administrator via the dispatcher console or reply <code>HELP</code> to a message.</p>
+
+  <div class="footer">This policy satisfies carrier 10DLC consent and privacy disclosures for A2P messaging.</div>
+</div>
+</body>
+</html>
