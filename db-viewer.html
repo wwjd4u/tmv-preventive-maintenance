@@ -938,10 +938,10 @@ function renderAssetManager(){
 
   // --- Technicians ---
   var prevTechName = (function(){ var s=document.getElementById('selTech'); return (s && s.selectedIndex>=0) ? s.options[s.selectedIndex].text : null; })();
-  _fill('selTech', cfg.technicians.map(function(t,i){
+  _fill('selTech', [{value:'',label:'— New Technician —'}].concat(cfg.technicians.map(function(t,i){
     var name = typeof t==='string' ? t : (t.name||'');
     return {value:String(i), label:name};
-  }));
+  })));
   if(prevTechName){
     var st = document.getElementById('selTech');
     for(var k=0;k<st.options.length;k++){ if(st.options[k].text===prevTechName){ st.value=st.options[k].value; break; } }
@@ -950,10 +950,10 @@ function renderAssetManager(){
   document.getElementById('cntTech').textContent = '(' + cfg.technicians.length + ')';
 
   // --- Managers ---
-  _fill('selMgr', (cfg.managers||[]).map(function(t,i){
+  _fill('selMgr', [{value:'',label:'— New Manager —'}].concat((cfg.managers||[]).map(function(t,i){
     var name = t.name || t.username || '';
     return {value:String(i), label:name};
-  }));
+  })));
   document.getElementById('cntMgr').textContent = '(' + (cfg.managers||[]).length + ')';
   fillMgr();
 
@@ -1174,7 +1174,13 @@ function techObj(i){
 }
 function fillTechContact(){
   var i = parseInt(document.getElementById('selTech').value, 10);
-  if(isNaN(i)) return;
+  if(isNaN(i)){
+    ['techName','techUser','techEmail','techPhone','techPass','techPassConfirm'].forEach(function(id){
+      var e=document.getElementById(id); if(e)e.value='';
+    });
+    var td=document.getElementById('techDistrict'); if(td)td.value='';
+    return;
+  }
   var t = techObj(i);
   document.getElementById('techName').value = t.name || '';
   document.getElementById('techUser').value = t.username || '';
@@ -1305,7 +1311,13 @@ function mgrObj(i){
 }
 function fillMgr(){
   var i = parseInt(document.getElementById('selMgr').value, 10);
-  if(isNaN(i)) return;
+  if(isNaN(i)){
+    ['mgrName','mgrUser','mgrEmail','mgrPhone','mgrPass','mgrPassConfirm'].forEach(function(id){
+      var e=document.getElementById(id); if(e)e.value='';
+    });
+    var md=document.getElementById('mgrDistrict'); if(md)md.value='';
+    return;
+  }
   var m = mgrObj(i);
   if(!m) return;
   document.getElementById('mgrName').value = m.name || '';
