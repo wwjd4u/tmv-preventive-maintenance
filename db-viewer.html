@@ -379,6 +379,7 @@ footer a:active {
           <button class="btn sm danger" onclick="deleteTech()">× Remove</button>
         </div>
         <div class="contact-grid">
+          <input id="techName" class="minput" placeholder="Display name (e.g. Jason Guynes)">
           <input id="techUser" class="minput" placeholder="Login username (e.g. jguynes)" autocomplete="username">
           <input id="techEmail" class="minput" placeholder="Email (name@co.com)" autocomplete="email">
           <input id="techPhone" class="minput" placeholder="Phone (+1…)" autocomplete="tel">
@@ -1175,6 +1176,7 @@ function fillTechContact(){
   var i = parseInt(document.getElementById('selTech').value, 10);
   if(isNaN(i)) return;
   var t = techObj(i);
+  document.getElementById('techName').value = t.name || '';
   document.getElementById('techUser').value = t.username || '';
   document.getElementById('techEmail').value = t.email || '';
   document.getElementById('techPhone').value = t.phone || '';
@@ -1196,23 +1198,57 @@ function saveTechnicians(){
     .catch(function(e){ alert(e.message||'Technician save failed'); });
 }
 function saveTechContact(){
-  var cfg = dbData.config;
-  var i = parseInt(document.getElementById('selTech').value, 10);
-  if(isNaN(i)){ alert('Select a technician first'); return; }
-  var t = techObj(i);
+  var cfg = dbData.config || {};
+  cfg.technicians = Array.isArray(cfg.technicians) ? cfg.technicians : [];
+
+  var sel = document.getElementById('selTech');
+  var i = parseInt(sel && sel.value, 10);
+  var creating = isNaN(i);
+
+  var name = document.getElementById('techName').value.trim();
   var username = document.getElementById('techUser').value.trim();
   var pw = document.getElementById('techPass').value || '';
   var pwConfirm = document.getElementById('techPassConfirm').value || '';
+
+  if(!name){ alert('Technician display name required'); return; }
+  if(!username){ alert('Technician login username required'); return; }
+  if(!/^[A-Za-z0-9._@-]{3,64}$/.test(username)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
   if(pw !== pwConfirm){ alert('Technician passwords do not match'); return; }
-  if(username && !/^[A-Za-z0-9._@-]{3,64}$/.test(username)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
-  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
-  t.username = username;
-  t.email = document.getElementById('techEmail').value.trim();
-  t.phone = document.getElementById('techPhone').value.trim();
-  t.district = document.getElementById('techDistrict').value || '';
-  if(pw) t.password = pw;
+  if(creating && !pw){ alert('Password required for a new Technician login'); return; }
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){
+    alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return;
+  }
+
+  var duplicate = cfg.technicians.some(function(raw, idx){
+    if(!creating && idx === i) return false;
+    var x = typeof raw === 'string' ? {name:raw,username:''} : raw;
+    return (x.username && x.username === username) || (x.name && x.name === name);
+  });
+  if(duplicate){ alert('A Technician with that name or username already exists'); return; }
+
+  if(creating){
+    cfg.technicians.push({
+      name:name,
+      username:username,
+      email:document.getElementById('techEmail').value.trim(),
+      phone:document.getElementById('techPhone').value.trim(),
+      district:document.getElementById('techDistrict').value || '',
+      password:pw
+    });
+  } else {
+    var t = techObj(i);
+    if(!t) return;
+    t.name = name;
+    t.username = username;
+    t.email = document.getElementById('techEmail').value.trim();
+    t.phone = document.getElementById('techPhone').value.trim();
+    t.district = document.getElementById('techDistrict').value || '';
+    if(pw) t.password = pw;
+  }
+
   saveTechnicians();
 }
+
 function renameTech(){
   var cfg = dbData.config;
   var i = parseInt(document.getElementById('selTech').value, 10);
@@ -1290,36 +1326,77 @@ function addMgr(){
   saveConfigArray('managers', cfg.managers);
 }
 function saveMgr(){
-  var cfg = dbData.config;
-  if(!cfg.managers) cfg.managers = [];
-  var i = parseInt(document.getElementById('selMgr').value, 10);
-  if(isNaN(i)){ alert('Add the manager first (use + Add Manager), then set username & password.'); return; }
-  var m = mgrObj(i);
-  if(!m) return;
-  var nm = document.getElementById('mgrName').value.trim();
-  var un = document.getElementById('mgrUser').value.trim();
-  var pw = document.getElementById('mgrPass').value;
+  var cfg = dbData.config || {};
+  cfg.managers = Array.isArray(cfg.managers) ? cfg.managers : [];
+
+  var sel = document.getElementById('selMgr');
+  var i = parseInt(sel && sel.value, 10);
+  var creating = isNaN(i);
+
+  var name = document.getElementById('mgrName').value.trim();
+  var username = document.getElementById('mgrUser').value.trim();
+  var pw = document.getElementById('mgrPass').value || '';
   var pwConfirm = document.getElementById('mgrPassConfirm').value || '';
+
+  if(!name){ alert('Manager display name required'); return; }
+  if(!username){ alert('Manager login username required'); return; }
+  if(!/^[A-Za-z0-9._@-]{3,64}$/.test(username)){ alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return; }
   if(pw !== pwConfirm){ alert('Manager passwords do not match'); return; }
-  if(!un){ alert('Login username required'); return; }
-  m.name = nm || un;
-  m.username = un;
-  m.email = document.getElementById('mgrEmail').value.trim();
-  m.phone = document.getElementById('mgrPhone').value.trim();
-  m.district = document.getElementById('mgrDistrict').value || '';
-  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){ alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return; }
-  if(pw){ m.password = pw; } // plaintext here → server hashes it; empty = keep existing hash
-  // Send the whole managers array through the manager-save endpoint (hashes passwords server-side)
+  if(creating && !pw){ alert('Password required for a new Manager login'); return; }
+  if(pw && (pw.length < 10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){
+    alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return;
+  }
+
+  var duplicate = cfg.managers.some(function(raw, idx){
+    if(!creating && idx === i) return false;
+    var x = typeof raw === 'string' ? {name:raw,username:raw} : raw;
+    return (x.username && x.username === username) || (x.name && x.name === name);
+  });
+  if(duplicate){ alert('A Manager with that name or username already exists'); return; }
+
+  if(creating){
+    cfg.managers.push({
+      name:name,
+      username:username,
+      email:document.getElementById('mgrEmail').value.trim(),
+      phone:document.getElementById('mgrPhone').value.trim(),
+      district:document.getElementById('mgrDistrict').value || '',
+      password:pw
+    });
+  } else {
+    var m = mgrObj(i);
+    if(!m) return;
+    m.name = name;
+    m.username = username;
+    m.email = document.getElementById('mgrEmail').value.trim();
+    m.phone = document.getElementById('mgrPhone').value.trim();
+    m.district = document.getElementById('mgrDistrict').value || '';
+    if(pw) m.password = pw;
+  }
+
   fetch('/api/managers', {
     method:'PUT',
-    headers:{ ...authHdr(), 'Content-Type':'application/json' },
-    body: JSON.stringify({ managers: cfg.managers.map(function(x){
-      return { name:x.name, username:x.username, email:x.email||'', phone:x.phone||'', district:x.district||'', password: (x.password && !x.password.startsWith('scrypt$')) ? x.password : '' };
+    headers:Object.assign({'Content-Type':'application/json'}, authHdr()),
+    body:JSON.stringify({ managers:cfg.managers.map(function(raw){
+      var x=typeof raw==='string'?{name:raw,username:raw}:raw;
+      return {
+        name:x.name||'',
+        username:x.username||'',
+        email:x.email||'',
+        phone:x.phone||'',
+        district:x.district||'',
+        password:(x.password && !String(x.password).startsWith('scrypt$')) ? x.password : ''
+      };
     }) })
   })
-  .then(function(){ loadData(); })
-  .catch(function(){ alert('Manager save failed'); });
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+  .then(function(x){
+    if(!x.ok) throw new Error((x.d&&x.d.error)||'Manager save failed');
+    loadData();
+  })
+  .catch(function(e){ alert(e.message||'Manager save failed'); });
 }
+
 function deleteMgr(){
   var cfg = dbData.config;
   if(!cfg.managers) cfg.managers = [];
