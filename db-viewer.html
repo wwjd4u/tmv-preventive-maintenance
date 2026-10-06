@@ -919,14 +919,13 @@ function renderAssetManager(){
   document.getElementById('cntLoc').textContent = '(' + cfg.locations.length + ')';
 
   // --- Personnel district dropdowns ---
-  // Technicians belong to a specific district. Managers may use ALL to cover
-  // every district while still allowing a specific district assignment.
-  var districtOpts=[{value:'',label:'— Select district —'}].concat(cfg.locations.map(function(l){return {value:l,label:l};}));
-  var managerDistrictOpts=[{value:'',label:'— Select district —'},{value:'ALL',label:'ALL — All districts'}]
+  // Managers, Technicians, and normal Superusers may use ALL to cover every
+  // district while still allowing a specific district assignment.
+  var personnelDistrictOpts=[{value:'',label:'— Select district —'},{value:'ALL',label:'ALL — All districts'}]
     .concat(cfg.locations.map(function(l){return {value:l,label:l};}));
-  _fill('techDistrict',districtOpts);
-  _fill('mgrDistrict',managerDistrictOpts);
-  _fill('suDistrict',managerDistrictOpts);
+  _fill('techDistrict',personnelDistrictOpts);
+  _fill('mgrDistrict',personnelDistrictOpts);
+  _fill('suDistrict',personnelDistrictOpts);
 
   // --- Superusers (normal promoted accounts only) ---
   var superusers = Array.isArray(cfg.superusers) ? cfg.superusers : [];
