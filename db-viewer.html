@@ -318,7 +318,7 @@ footer a:active {
           <input id="suPassConfirm" class="minput" type="password" placeholder="Confirm new password" autocomplete="new-password">
         </div>
         <div style="font-size:12px;color:#777;margin:9px 0">Normal Superuser accounts only. Recovery Superuser remains locked under Security.</div>
-        <button class="btn sm" onclick="saveSu()">Save Superuser</button>
+        <button class="btn sm" onclick="saveSu()">Save Superuser</button><span id="suStatus" class="saved-ok"></span>
       </section>
 
       <!-- TMV UNITS -->
@@ -929,9 +929,9 @@ function renderAssetManager(){
 
   // --- Superusers (normal promoted accounts only) ---
   var superusers = Array.isArray(cfg.superusers) ? cfg.superusers : [];
-  _fill('selSu', superusers.map(function(u,i){
+  _fill('selSu', [{value:'',label:'— New Superuser —'}].concat(superusers.map(function(u,i){
     return {value:String(i), label:(u && (u.name || u.username)) || ('Superuser '+(i+1))};
-  }));
+  })));
   document.getElementById('cntSu').textContent = '(' + superusers.length + ')';
   fillSu();
 
@@ -1094,36 +1094,50 @@ function fillSu(){
   document.getElementById('suPassConfirm').value='';
 }
 function saveSu(){
-  if(currentRole!=='superuser'){alert('Superuser required');return;}
+  if(currentRole!=='superuser'){ alert('Superuser required'); return; }
+
   var cfg=dbData.config||{};
   cfg.superusers=Array.isArray(cfg.superusers)?cfg.superusers:[];
-  var i=parseInt(document.getElementById('selSu').value,10);
-  if(isNaN(i)){alert('Select a Superuser first');return;}
-  var u=suObj(i); if(!u)return;
+
+  var sel=document.getElementById('selSu');
+  var i=parseInt(sel && sel.value,10);
+  var creating=isNaN(i);
 
   var name=document.getElementById('suName').value.trim();
   var username=document.getElementById('suUser').value.trim();
+  var email=document.getElementById('suEmail').value.trim();
+  var phone=document.getElementById('suPhone').value.trim();
+  var district=document.getElementById('suDistrict').value||'';
   var pw=document.getElementById('suPass').value||'';
   var pwConfirm=document.getElementById('suPassConfirm').value||'';
 
-  if(!username){alert('Login username required');return;}
+  if(!name){ alert('Superuser display name required'); return; }
+  if(!username){ alert('Superuser login username required'); return; }
   if(!/^[A-Za-z0-9._@-]{3,64}$/.test(username)){
-    alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen');return;
+    alert('Username must be 3-64 characters using letters, numbers, dot, underscore, @, or hyphen'); return;
   }
-  if(pw!==pwConfirm){alert('Superuser passwords do not match');return;}
+  if(pw!==pwConfirm){ alert('Superuser passwords do not match'); return; }
+  if(creating && !pw){ alert('Password required for a new Superuser login'); return; }
   if(pw && (pw.length<10 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw))){
-    alert('Password must be at least 10 characters with an uppercase letter, number, and special character');return;
+    alert('Password must be at least 10 characters with an uppercase letter, number, and special character'); return;
   }
+
+  var duplicate=cfg.superusers.some(function(raw,idx){
+    if(!creating && idx===i) return false;
+    var x=typeof raw==='string'?{name:raw,username:raw}:raw;
+    return (x.username && x.username===username) || (x.name && x.name===name);
+  });
+  if(duplicate){ alert('A Superuser with that name or username already exists'); return; }
 
   var payload=cfg.superusers.map(function(raw,idx){
     var x=(typeof raw==='string')?{name:raw,username:raw}:raw;
-    if(idx===i){
+    if(!creating && idx===i){
       return {
-        name:name||username,
+        name:name,
         username:username,
-        email:document.getElementById('suEmail').value.trim(),
-        phone:document.getElementById('suPhone').value.trim(),
-        district:document.getElementById('suDistrict').value||'',
+        email:email,
+        phone:phone,
+        district:district,
         password:pw
       };
     }
@@ -1137,17 +1151,29 @@ function saveSu(){
     };
   });
 
+  if(creating){
+    payload.push({
+      name:name,
+      username:username,
+      email:email,
+      phone:phone,
+      district:district,
+      password:pw
+    });
+  }
+
   fetch('/api/superusers',{
     method:'PUT',
     headers:Object.assign({'Content-Type':'application/json'},authHdr()),
     body:JSON.stringify({superusers:payload})
   })
-  .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
   .then(function(x){
-    if(!x.ok)throw new Error((x.d&&x.d.error)||'Superuser save failed');
+    if(!x.ok) throw new Error((x.d&&x.d.error)||'Superuser save failed');
     loadData();
+    showSaved('suStatus');
   })
-  .catch(function(e){alert(e.message||'Superuser save failed');});
+  .catch(function(e){ alert(e.message||'Superuser save failed'); });
 }
 
 /* ---- Technicians ---- */
