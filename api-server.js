@@ -1064,18 +1064,27 @@ http.createServer((req, res) => {
         const current = Array.isArray(config.superusers) ? config.superusers : [];
         const managers = Array.isArray(config.managers) ? config.managers : [];
 
-        if (incoming.length !== current.length) {
-          return sendJson(res, 400, { error: 'Add or remove Superusers through Security > User Roles.' });
+        if (incoming.length < current.length) {
+          return sendJson(res, 400, { error: 'Remove Superusers through Security > User Roles.' });
+        }
+        if (incoming.length > current.length + 1) {
+          return sendJson(res, 400, { error: 'Add one Superuser at a time.' });
         }
 
         const managerKeys = new Set(
           managers.map(m => String((m && (m.username || m.name)) || '').trim()).filter(Boolean)
         );
+        const technicianKeys = new Set(
+          (Array.isArray(config.technicians) ? config.technicians : []).map(function(raw){
+            const t = typeof raw === 'string' ? { name: raw } : raw;
+            return String((t && (t.username || '')) || '').trim();
+          }).filter(Boolean)
+        );
         const seen = new Set();
 
         const out = incoming.map((raw, i) => {
           const u = raw && typeof raw === 'object' ? raw : {};
-          const prior = current[i] && typeof current[i] === 'object' ? current[i] : {};
+          const prior = (i < current.length && current[i] && typeof current[i] === 'object') ? current[i] : {};
 
           const name = String(u.name || u.username || prior.name || prior.username || '').trim();
           const username = String(u.username || prior.username || '').trim();
@@ -1087,6 +1096,7 @@ http.createServer((req, res) => {
           if (username === ADMIN_USER) throw new Error('That username is reserved by the Recovery Superuser');
           if (seen.has(username)) throw new Error('Duplicate Superuser username: ' + username);
           if (managerKeys.has(username)) throw new Error('That username is already used by a Manager');
+          if (technicianKeys.has(username)) throw new Error('That username is already used by a Technician');
           seen.add(username);
 
           let password = prior.password || '';
